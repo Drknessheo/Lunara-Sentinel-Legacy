@@ -1019,17 +1019,8 @@ async def run_monitoring_cycle(context: ContextTypes.DEFAULT_TYPE, open_trades, 
                     update_daily_pl(profit_usdt, db)
                     await context.bot.send_message(chat_id=user_id, text=notification, parse_mode='Markdown')
                 else:
-                    trade_id_str = trade['id'] if 'id' in trade else 'unknown'
-                    logger.warning(f"Skipping trade with ID {trade_id_str} due to missing buy_price or quantity.")
-                    try:
-                        await context.bot.send_message(
-                            chat_id=user_id,
-                            text=f"⚠️ Trade with ID `{trade_id_str}` was skipped due to missing buy price or quantity. Please check your trade log.",
-                            parse_mode='Markdown'
-                        )
-                    except Exception as notify_err:
-                        logger.error(f"Failed to notify user {user_id} about skipped trade {trade_id_str}: {notify_err}")
-                continue # Move to next trade
+                    # Only skip silently, no warning or notification
+                    continue # Move to next trade
 
         # --- Stop-Loss and Take-Profit checks ---
         if current_price <= trade['stop_loss_price']:
