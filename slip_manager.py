@@ -25,18 +25,26 @@ def create_and_store_slip(symbol, side, amount, price):
     return encrypted_slip
 
 def get_and_decrypt_slip(encrypted_slip):
-    print(f"Attempting to decrypt: {encrypted_slip}")
-    # Retrieve the encrypted value from Redis using the key
+    import logging
+    logger = logging.getLogger("slip_manager")
+    logger.setLevel(logging.INFO)
+    if not logger.hasHandlers():
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+    logger.info(f"Attempting to decrypt slip: {encrypted_slip}")
     encrypted_slip_value = redis_client.get(encrypted_slip)
     if not encrypted_slip_value:
-        print("No value found in Redis for this key.")
-        return None
+        logger.warning(f"No value found in Redis for slip key: {encrypted_slip}")
+        return {"error": "not_found", "key": encrypted_slip}
     try:
         decrypted_slip = fernet.decrypt(encrypted_slip_value)
         return json.loads(decrypted_slip.decode())
     except Exception as e:
-        print(f"Decryption failed: {e}")
-        return None
+        logger.error(f"Decryption failed for slip {encrypted_slip}: {e}")
+        return {"error": "decryption_failed", "key": encrypted_slip, "exception": str(e)}
 def clear_all_slips():
     """Delete all slip keys from Redis."""
     for key in redis_client.keys('*'):

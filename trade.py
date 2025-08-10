@@ -930,7 +930,9 @@ async def ai_trade_monitor(context: ContextTypes.DEFAULT_TYPE, symbol: str, user
             logger.info(f"Skipping {symbol}: USDT balance {usdt_balance} too low.")
             return
 
-        trade_size_usdt = usdt_balance * (config.PER_TRADE_ALLOCATION_PERCENT / 100)
+        # Use user's configured trade size if available, else fallback to allocation percent
+        settings = db.get_user_effective_settings(user_id)
+        trade_size_usdt = float(settings.get('TRADE_SIZE_USDT', 5.0))
         if trade_size_usdt < 5.0:
             trade_size_usdt = 5.0
         if usdt_balance < trade_size_usdt:
@@ -1019,6 +1021,14 @@ async def run_monitoring_cycle(context: ContextTypes.DEFAULT_TYPE, open_trades, 
                 else:
                     trade_id_str = trade['id'] if 'id' in trade else 'unknown'
                     logger.warning(f"Skipping trade with ID {trade_id_str} due to missing buy_price or quantity.")
+                    try:
+                        await context.bot.send_message(
+                            chat_id=user_id,
+                            text=f"⚠️ Trade with ID `{trade_id_str}` was skipped due to missing buy price or quantity. Please check your trade log.",
+                            parse_mode='Markdown'
+                        )
+                    except Exception as notify_err:
+                        logger.error(f"Failed to notify user {user_id} about skipped trade {trade_id_str}: {notify_err}")
                 continue # Move to next trade
 
         # --- Stop-Loss and Take-Profit checks ---
