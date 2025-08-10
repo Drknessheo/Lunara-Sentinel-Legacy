@@ -1,15 +1,109 @@
-# Database access functions for Lunara Bot
 import sqlite3
+import functools
+import config
+from security import decrypt_data
 
-def get_db_connection():
-    conn = sqlite3.connect('lunara_bot.db')
-    conn.row_factory = sqlite3.Row
-    return conn
+def db_connection(func):
+    """Decorator to handle database connection and cursor management."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        conn = sqlite3.connect('lunara_bot.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        try:
+            result = func(cursor, *args, **kwargs)
+            conn.commit()
+            return result
+        except sqlite3.Error as e:
+            print(f"Database error in {func.__name__}: {e}")
+            conn.rollback()
+            raise  # Re-raise the exception after rollback
+        finally:
+            conn.close()
+    return wrapper
 
-def initialize_database():
+# --- Admin and API Key Management ---
+def update_user_subscription(cursor, user_id: int, tier: str = "PREMIUM", expires: str = None):
+    """Update a user's subscription tier and expiration."""
+    get_or_create_user(cursor, user_id)
+    cursor.execute("UPDATE users SET subscription_tier = ?, subscription_expires = ? WHERE user_id = ?", (tier, expires, user_id))
+
+@db_connection
+def store_user_api_keys(cursor, user_id: int, api_key: str, secret_key: str):
+    """Encrypt and store API keys for a user."""
+    from cryptography.fernet import Fernet
+    key = config.BINANCE_ENCRYPTION_KEY
+    fernet = Fernet(key)
+    encrypted_api = fernet.encrypt(api_key.encode())
+    encrypted_secret = fernet.encrypt(secret_key.encode())
+    get_or_create_user(cursor, user_id)
+    cursor.execute("UPDATE users SET api_key = ?, secret_key = ? WHERE user_id = ?", (encrypted_api, encrypted_secret, user_id))
+    return wrapper
+
+# --- Wrapper functions for bot commands ---
+@db_connection
+def get_user_tier_db(cursor, user_id: int) -> str:
+    """Decorator-wrapped version for bot usage."""
+    return get_user_tier(cursor, user_id)
+
+@db_connection
+def get_or_create_user_db(cursor, user_id: int):
+    """Decorator-wrapped version for bot usage."""
+    return get_or_create_user(cursor, user_id)
+
+
+CUSTOM_SETTINGS_MAPPING = {
+    'custom_rsi_buy': 'RSI_BUY_THRESHOLD',
+    'custom_rsi_sell': 'RSI_SELL_THRESHOLD',
+    'custom_stop_loss': 'STOP_LOSS_PERCENTAGE',
+    'custom_trailing_activation': 'TRAILING_PROFIT_ACTIVATION_PERCENT',
+    'custom_trailing_drop': 'TRAILING_STOP_DROP_PERCENT',
+}
+
+
+def db_connection(func):
+    """Decorator to handle database connection and cursor management."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        conn = sqlite3.connect('lunara_bot.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        try:
+            result = func(cursor, *args, **kwargs)
+            conn.commit()
+            return result
+        except sqlite3.Error as e:
+            print(f"Database error in {func.__name__}: {e}")
+            conn.rollback()
+            raise  # Re-raise the exception after rollback
+        finally:
+            conn.close()
+    return wrapper
+
+
+def get_or_create_user(cursor, user_id: int):
+    """Gets a user from the DB or creates a new one with default settings."""
+    user = cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
+    if not user:
+        cursor.execute("INSERT INTO users (user_id) VALUES (?)", (user_id,))
+        user = cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
+    return user
+
+
+def get_user_tier(cursor, user_id: int) -> str:
+    """
+    Retrieves a user's subscription tier.
+    Treats the admin/creator as 'PREMIUM' for all commands.
+    """
+    if user_id == getattr(config, 'ADMIN_USER_ID', None):
+        return 'PREMIUM'
+    user = get_or_create_user(cursor, user_id)
+    return user['subscription_tier']
+
+
+@db_connection
+def initialize_database(cursor):
     """Creates the tables if they don't exist."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS trades (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,41 +176,32 @@ def initialize_database():
             closed_at DATETIME
         );
     """)
-    conn.commit()
 
-def migrate_schema():
+
+@db_connection
+def migrate_schema(cursor):
     """
     Checks the database schema and applies any necessary migrations,
     such as adding new columns to existing tables.
     """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    changes_made = False
-
     cursor.execute("PRAGMA table_info(trades)")
     trade_columns = [info[1] for info in cursor.fetchall()]
 
     if 'peak_price' not in trade_columns:
         cursor.execute("ALTER TABLE trades ADD COLUMN peak_price REAL")
-        changes_made = True
     if 'mode' not in trade_columns:
         cursor.execute("ALTER TABLE trades ADD COLUMN mode TEXT DEFAULT 'LIVE'")
         cursor.execute("ALTER TABLE trades ADD COLUMN trade_size_usdt REAL")
-        changes_made = True
     if 'quantity' not in trade_columns:
         cursor.execute("ALTER TABLE trades ADD COLUMN quantity REAL")
-        changes_made = True
     if 'close_reason' not in trade_columns:
         cursor.execute("ALTER TABLE trades ADD COLUMN close_reason TEXT")
-        changes_made = True
     if 'win_loss' not in trade_columns:
         cursor.execute("ALTER TABLE trades ADD COLUMN win_loss TEXT")
         cursor.execute("ALTER TABLE trades ADD COLUMN pnl_percentage REAL")
-        changes_made = True
     if 'dsl_mode' not in trade_columns:
         cursor.execute("ALTER TABLE trades ADD COLUMN dsl_mode TEXT")
         cursor.execute("ALTER TABLE trades ADD COLUMN current_dsl_stage INTEGER DEFAULT 0")
-        changes_made = True
 
     cursor.execute("PRAGMA table_info(users)")
     user_columns = [info[1] for info in cursor.fetchall()]
@@ -124,136 +209,120 @@ def migrate_schema():
     if 'trading_mode' not in user_columns:
         cursor.execute("ALTER TABLE users ADD COLUMN trading_mode TEXT DEFAULT 'LIVE'")
         cursor.execute("ALTER TABLE users ADD COLUMN paper_balance REAL DEFAULT 10000.0")
-        changes_made = True
     if 'custom_stop_loss' not in user_columns:
         cursor.execute("ALTER TABLE users ADD COLUMN custom_rsi_buy REAL")
         cursor.execute("ALTER TABLE users ADD COLUMN custom_rsi_sell REAL")
         cursor.execute("ALTER TABLE users ADD COLUMN custom_stop_loss REAL")
         cursor.execute("ALTER TABLE users ADD COLUMN custom_trailing_activation REAL")
         cursor.execute("ALTER TABLE users ADD COLUMN custom_trailing_drop REAL")
-        changes_made = True
 
-    if changes_made:
-        conn.commit()
 
-# --- Lunara Bot: Modular DB Access ---
-def get_or_create_user(user_id: int):
-    """Gets a user from the DB or creates a new one with default settings."""
-    conn = get_db_connection()
-    user = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
-    if not user:
-        conn.execute("INSERT INTO users (user_id) VALUES (?)", (user_id,))
-        conn.commit()
-        user = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
-    return user
+@db_connection
+def get_all_user_ids(cursor):
+    """Returns a list of all user IDs in the users table."""
+    rows = cursor.execute("SELECT user_id FROM users").fetchall()
+    return [row['user_id'] for row in rows]
 
-def get_autotrade_status(user_id: int):
-    conn = get_db_connection()
-    row = conn.execute("SELECT autotrade_enabled FROM users WHERE user_id = ?", (user_id,)).fetchone()
+
+@db_connection
+def get_trade_by_id(cursor, trade_id: int):
+    """Fetches a trade by its ID."""
+    trade = cursor.execute("SELECT * FROM trades WHERE id = ?", (trade_id,)).fetchone()
+    return trade
+
+
+@db_connection
+def get_autotrade_status(cursor, user_id: int):
+    row = cursor.execute("SELECT autotrade_enabled FROM users WHERE user_id = ?", (user_id,)).fetchone()
     return bool(row['autotrade_enabled']) if row and row['autotrade_enabled'] is not None else False
 
-def set_autotrade_status(user_id: int, enabled: bool):
-    """Set autotrade status for a user in the users table."""
-    get_or_create_user(user_id)
-    conn = get_db_connection()
-    conn.execute("UPDATE users SET autotrade_enabled = ? WHERE user_id = ?", (int(enabled), user_id))
-    conn.commit()
 
-def get_open_trades(user_id: int):
+@db_connection
+def set_autotrade_status(cursor, user_id: int, enabled: bool):
+    """Set autotrade status for a user in the users table."""
+    get_or_create_user(cursor, user_id)  # Ensures user exists
+    cursor.execute("UPDATE users SET autotrade_enabled = ? WHERE user_id = ?", (int(enabled), user_id))
+
+
+@db_connection
+def get_open_trades(cursor, user_id: int):
     """Retrieves all open trades for a specific user."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     cursor.execute(
         "SELECT id, user_id, coin_symbol, buy_price, buy_timestamp, stop_loss_price, take_profit_price FROM trades WHERE user_id = ? AND status = 'open'", (user_id,)
     )
     return cursor.fetchall()
 
-def get_user_trading_mode_and_balance(user_id: int):
+
+@db_connection
+def get_user_trading_mode_and_balance(cursor, user_id: int):
     """Gets the user's trading mode and paper balance."""
-    user = get_or_create_user(user_id)
+    user = get_or_create_user(cursor, user_id)
     return user['trading_mode'], user['paper_balance']
 
 
-def get_watched_items_by_user(user_id: int):
+@db_connection
+def get_watched_items_by_user(cursor, user_id: int):
     """Retrieves all watched symbols for a specific user."""
-    conn = get_db_connection()
-    items = conn.execute(
+    items = cursor.execute(
         "SELECT coin_symbol, add_timestamp FROM watchlist WHERE user_id = ?", (user_id,)
     ).fetchall()
     return items
 
-def get_user_api_keys(user_id: int):
+
+@db_connection
+def get_user_api_keys(cursor, user_id: int):
     """
     Retrieves and decrypts a user's Binance API keys.
     """
-    from security import decrypt_data
-    conn = get_db_connection()
-    row = conn.execute("SELECT api_key, secret_key FROM users WHERE user_id = ?", (user_id,)).fetchone()
+    row = cursor.execute("SELECT api_key, secret_key FROM users WHERE user_id = ?", (user_id,)).fetchone()
     if not row or not row['api_key'] or not row['secret_key']:
         return None, None
     api_key = decrypt_data(row['api_key'])
     secret_key = decrypt_data(row['secret_key'])
     return api_key, secret_key
 
-def get_user_tier(user_id: int) -> str:
-    """
-    Retrieves a user's subscription tier.
-    Treats the admin/creator as 'PREMIUM' for all commands.
-    """
-    import config
-    if user_id == getattr(config, 'ADMIN_USER_ID', None):
-        return 'PREMIUM'
-    user = get_or_create_user(user_id)
-    return user['subscription_tier']
 
-def get_user_effective_settings(user_id: int) -> dict:
+@db_connection
+def get_user_effective_settings(cursor, user_id: int) -> dict:
     """
     Returns the effective settings for a user by layering their custom
     settings over their subscription tier's defaults.
     """
-    import config
-    tier = get_user_tier(user_id)
+    tier = get_user_tier(cursor, user_id)
     settings = config.get_active_settings(tier).copy()  # Start with a copy of tier defaults
-    conn = get_db_connection()
-    user_data = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
+    user_data = cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
     if not user_data:
         return settings
-    user_keys = user_data.keys()
-    # Override defaults with custom settings if they exist (are not NULL)
-    if 'custom_rsi_buy' in user_keys and user_data['custom_rsi_buy'] is not None:
-        settings['RSI_BUY_THRESHOLD'] = user_data['custom_rsi_buy']
-    if 'custom_rsi_sell' in user_keys and user_data['custom_rsi_sell'] is not None:
-        settings['RSI_SELL_THRESHOLD'] = user_data['custom_rsi_sell']
-    if 'custom_stop_loss' in user_keys and user_data['custom_stop_loss'] is not None:
-        settings['STOP_LOSS_PERCENTAGE'] = user_data['custom_stop_loss']
-    if 'custom_trailing_activation' in user_keys and user_data['custom_trailing_activation'] is not None:
-        settings['TRAILING_PROFIT_ACTIVATION_PERCENT'] = user_data['custom_trailing_activation']
-    if 'custom_trailing_drop' in user_keys and user_data['custom_trailing_drop'] is not None:
-        settings['TRAILING_STOP_DROP_PERCENT'] = user_data['custom_trailing_drop']
+
+    for db_key, settings_key in CUSTOM_SETTINGS_MAPPING.items():
+        if db_key in user_data.keys() and user_data[db_key] is not None:
+            settings[settings_key] = user_data[db_key]
+
     return settings
 
-def is_trade_open(user_id: int, coin_symbol: str):
+
+@db_connection
+def is_trade_open(cursor, user_id: int, coin_symbol: str):
     """Checks if a user already has an open trade for a specific symbol."""
-    conn = get_db_connection()
-    trade = conn.execute(
+    trade = cursor.execute(
         "SELECT id FROM trades WHERE user_id = ? AND coin_symbol = ? AND status = 'open'",
         (user_id, coin_symbol)
     ).fetchone()
     return trade is not None
 
 
-def get_closed_trades(user_id: int):
+@db_connection
+def get_closed_trades(cursor, user_id: int):
     """Retrieves all closed trades for a specific user."""
-    conn = get_db_connection()
-    return conn.execute(
+    return cursor.execute(
         "SELECT coin_symbol, buy_price, sell_price FROM trades WHERE user_id = ? AND status = 'closed' AND sell_price IS NOT NULL",
         (user_id,)
     ).fetchall()
 
 
-def get_global_top_trades(limit: int = 3):
+@db_connection
+def get_global_top_trades(cursor, limit: int = 3):
     """Retrieves the top N most profitable closed trades across all users."""
-    conn = get_db_connection()
     query = '''
         SELECT
             user_id,
@@ -266,13 +335,32 @@ def get_global_top_trades(limit: int = 3):
         ORDER BY pnl_percent DESC
         LIMIT ?
     '''
-    return conn.execute(query, (limit,)).fetchall()
+    return cursor.execute(query, (limit,)).fetchall()
 
-def is_on_watchlist(user_id: int, coin_symbol: str):
+
+@db_connection
+def is_on_watchlist(cursor, user_id: int, coin_symbol: str):
     """Checks if a user is already watching a specific symbol."""
-    conn = get_db_connection()
-    item = conn.execute(
+    item = cursor.execute(
         "SELECT id FROM watchlist WHERE user_id = ? AND coin_symbol = ?",
         (user_id, coin_symbol)
     ).fetchone()
     return item is not None
+
+
+@db_connection
+def update_trade_stop_loss(cursor, trade_id: int, new_stop_loss: float):
+    """Updates the stop-loss for a specific trade."""
+    cursor.execute(
+        "UPDATE trades SET stop_loss_price = ? WHERE id = ?",
+        (new_stop_loss, trade_id)
+    )
+
+
+@db_connection
+def update_dsl_stage(cursor, trade_id: int, new_stage: int):
+    """Updates the DSL stage for a specific trade."""
+    cursor.execute(
+        "UPDATE trades SET current_dsl_stage = ? WHERE id = ?",
+        (new_stage, trade_id)
+    )
