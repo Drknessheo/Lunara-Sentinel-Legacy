@@ -726,7 +726,11 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             "**Reset a setting to default:**\n  `/settings <name> reset`\n\n"
             "**Available settings:** rsi_buy, rsi_sell, stop_loss, trailing_activation, trailing_drop"
         )
-        await update.message.reply_text(message, parse_mode='Markdown')
+        def escape_markdown(text):
+            import re
+            return re.sub(r'([_\*\[\]()~`>#+\-=|{}.!])', r'\\\1', text)
+
+        await update.message.reply_text(escape_markdown(message), parse_mode='MarkdownV2')
         return
 
     # Logic to set a value
@@ -734,23 +738,22 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         setting_name = context.args[0].lower()
         value_str = context.args[1].lower()
     except IndexError:
-        await update.message.reply_text("Invalid format. Usage: `/settings <name> <value>`", parse_mode='Markdown')
+        await update.message.reply_text(escape_markdown("Invalid format. Usage: `/settings <name> <value>`"), parse_mode='MarkdownV2')
         return
 
     try:
         if setting_name not in db.SETTING_TO_COLUMN_MAP:
-            await update.message.reply_text(f"Unknown setting '{setting_name}'. Valid settings are: {', '.join(db.SETTING_TO_COLUMN_MAP.keys())}")
+            await update.message.reply_text(escape_markdown(f"Unknown setting '{setting_name}'. Valid settings are: {', '.join(db.SETTING_TO_COLUMN_MAP.keys())}"), parse_mode='MarkdownV2')
             return
 
         new_value = None if value_str == 'reset' else float(value_str)
         if new_value is not None and new_value <= 0:
-            await update.message.reply_text("Value must be a positive number.")
+            await update.message.reply_text(escape_markdown("Value must be a positive number."), parse_mode='MarkdownV2')
             return
-        
         db.update_user_setting(user_id, setting_name, new_value)
-        await update.message.reply_text(f"✅ Successfully updated **{setting_name}** to **{value_str}**.")
+        await update.message.reply_text(escape_markdown(f"✅ Successfully updated **{setting_name}** to **{value_str}**."), parse_mode='MarkdownV2')
     except ValueError:
-        await update.message.reply_text(f"Invalid value '{value_str}'. Please provide a number (e.g., 8.5) or 'reset'.")
+        await update.message.reply_text(escape_markdown(f"Invalid value '{value_str}'. Please provide a number (e.g., 8.5) or 'reset'."), parse_mode='MarkdownV2')
 
 async def autotrade_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Admin command to control the AI autotrading feature."""
