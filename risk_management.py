@@ -7,18 +7,17 @@ def get_trade_size(account_balance, min_trade=5.0, risk_pct=0.05):
 # --- Market Crash/Big Buyer Shield ---
 def is_market_crash_or_big_buyer(prices: dict) -> bool:
     """Detects sudden market crash or big buyer activity."""
-    try:
-        btc_prices = [prices.get('BTCUSDT')] if 'BTCUSDT' in prices else []
-        if not btc_prices:
-            return False
-        btc_now = prices['BTCUSDT']
-        btc_prev = prices.get('BTCUSDT_15min_ago', btc_now)
-        if btc_prev and btc_now < btc_prev * 0.95:
-            return True
-        if btc_prev and btc_now > btc_prev * 1.05:
-            return True
-    except Exception:
+    btc_now = prices.get('BTCUSDT')
+    btc_prev = prices.get('BTCUSDT_15min_ago')
+
+    if btc_now is None or btc_prev is None:
         return False
+
+    if btc_now <= btc_prev * 0.95:  # 5% drop
+        return True
+    if btc_now >= btc_prev * 1.05:  # 5% jump
+        return True
+
     return False
 
 def get_atr_stop(entry_price, atr, multiplier=1.5):

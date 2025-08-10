@@ -8,7 +8,7 @@ import config
 redis_client = redis.Redis(host='localhost', port=6379, db=0)
 
 # Load the encryption key
-key = config.ENCRYPTION_KEY
+key = config.BINANCE_ENCRYPTION_KEY
 fernet = Fernet(key)
 
 def create_and_store_slip(symbol, side, amount, price):
@@ -25,8 +25,22 @@ def create_and_store_slip(symbol, side, amount, price):
     return encrypted_slip
 
 def get_and_decrypt_slip(encrypted_slip):
-    decrypted_slip = fernet.decrypt(encrypted_slip)
-    return json.loads(decrypted_slip.decode())
+    print(f"Attempting to decrypt: {encrypted_slip}")
+    # Retrieve the encrypted value from Redis using the key
+    encrypted_slip_value = redis_client.get(encrypted_slip)
+    if not encrypted_slip_value:
+        print("No value found in Redis for this key.")
+        return None
+    try:
+        decrypted_slip = fernet.decrypt(encrypted_slip_value)
+        return json.loads(decrypted_slip.decode())
+    except Exception as e:
+        print(f"Decryption failed: {e}")
+        return None
+def clear_all_slips():
+    """Delete all slip keys from Redis."""
+    for key in redis_client.keys('*'):
+        redis_client.delete(key)
 
 def delete_slip(encrypted_slip):
     redis_client.delete(encrypted_slip)

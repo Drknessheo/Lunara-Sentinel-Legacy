@@ -1,3 +1,27 @@
+import os
+from dotenv import load_dotenv
+
+# Explicitly load .env from the project root, regardless of working directory
+
+# Debug: Print the .env file path being loaded
+
+# Correct .env path: project root (G:\Lunara Bot\.env)
+
+# Set dotenv_path directly to G:\Lunara Bot\.env
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+print(f"[DEBUG] Loading .env from: {dotenv_path}")
+load_dotenv(dotenv_path=dotenv_path)
+
+# Debug: Print all environment variables after loading
+print(f"[DEBUG] BINANCE_ENCRYPTION_KEY: {os.getenv('BINANCE_ENCRYPTION_KEY')}")
+print(f"[DEBUG] All envs: {dict(os.environ)}")
+
+# For the Binance API setup
+BINANCE_ENCRYPTION_KEY = os.getenv('BINANCE_ENCRYPTION_KEY').encode() if os.getenv('BINANCE_ENCRYPTION_KEY') else None
+
+# For the "sandpaper" data
+SANDPAPER_ENCRYPTION_KEY = os.getenv('SANDPAPER_ENCRYPTION_KEY').encode() if os.getenv('SANDPAPER_ENCRYPTION_KEY') else None
+
 # Coins to monitor for AI trading logic
 AI_MONITOR_COINS = [
     'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'ADAUSDT', 'XRPUSDT', 'DOGEUSDT', 'MATICUSDT', 'DOTUSDT', 'AVAXUSDT',
@@ -12,11 +36,6 @@ PER_TRADE_ALLOCATION_PERCENT = 5.0 # Example: Allocate 5% of available USDT per 
 TELEGRAM_SYNC_LOG_ENABLED = True # Set to True to enable trade sync logs via Telegram
 # Interval (in minutes) for the AI autotrade monitor job
 AI_TRADE_INTERVAL_MINUTES = 10
-import os
-from dotenv import load_dotenv
-
-# Load environment variables from a .env file
-load_dotenv()
 
 # Telegram and Binance API credentials from .env file
 TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -27,6 +46,10 @@ ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID")) if os.getenv("ADMIN_USER_ID") el
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_REFERRAL_CODE = os.getenv("ADMIN_REFERRAL_CODE") # For the /referral command
 GDRIVE_REMOTE_NAME = "LuneesaBook" # For database backups
+
+# --- AI & Caching Configuration ---
+GEMINI_API_URL = os.getenv("GEMINI_API_URL", "https://api.gemini.example/analysis")
+REDIS_URL = os.getenv("REDIS_URL", None) # e.g., "redis://localhost:6379/0"
 
 # --- Database Configuration ---
 DB_NAME = "lunara_bot.db" # Dedicated database file for reliability
@@ -98,6 +121,11 @@ SUBSCRIPTION_TIERS = {
             {'profit': 8.0, 'sl': 3.0},    # At +8% profit, move SL to +3%
             {'profit': 12.0, 'sl': 6.0}    # At +12% profit, move SL to +6%
         ],
+
+        # Volatility-based DSLA settings
+        'DSLA_VOLATILITY_PERIOD': 14,       # ATR period for volatility calculation
+        'DSLA_VOLATILITY_MULTIPLIER': 1.5,  # ATR multiplier for the first ladder step
+        'DSLA_VOLATILITY_STEPS': 3,         # Number of steps in the dynamic ladder
 
         # DeFi & Altcoin Support
         'ALLOWED_COIN_TYPES': ['MAJOR', 'DEFI', 'ALTCOIN'],

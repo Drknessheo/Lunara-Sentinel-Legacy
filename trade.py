@@ -51,9 +51,8 @@ import math
 from datetime import datetime, timezone
 import logging
 import numpy as np
-from indicators import calc_atr
+from indicators import get_volatility_based_ladder, calculate_rsi
 from risk_management import get_trade_size, get_atr_stop, update_daily_pl, should_pause_trading, is_market_crash_or_big_buyer
-from modules.monitoring import ai_trade_monitor
 from modules.adaptive_strategy import adaptive_strategy_job
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
@@ -67,8 +66,9 @@ from Simulation import resonance_engine
 from trading_module import TradeAction
 import config
 from modules import db_access as db
-import memory
+from memory import log_trade_outcome
 import statistics
+import gemini_cacher
 
 # --- Market Crash/Big Buyer Shield ---
 # Now imported from risk_management.py
@@ -146,18 +146,13 @@ def get_rsi(symbol="BTCUSDT", interval=Client.KLINE_INTERVAL_1HOUR, period=14):
     """Calculates the Relative Strength Index (RSI) for a given symbol."""
     try:
         # Fetch klines (candlestick data)
-        klines = client.get_historical_klines(symbol, interval, f"{period + 10} hours ago UTC")
+        klines = client.get_historical_klines(symbol, interval, f"{period + 100} hours ago UTC")
         if len(klines) < period:
             return None # Not enough data
 
         closes = np.array([float(k[4]) for k in klines])
-        deltas = np.diff(closes)
-        seed = deltas[:period+1]
-        up = seed[seed >= 0].sum()/period
-        down = -seed[seed < 0].sum()/period
-        rs = up / down if down != 0 else 0
-        rsi = 100 - (100 / (1 + rs))
-        return rsi
+        df = pd.DataFrame({'close': closes})
+        return calculate_rsi(df['close'], period).iloc[-1]
     except BinanceAPIException as e:
         logger.error(f"Binance API error getting RSI for {symbol}: {e}")
         return None
@@ -194,48 +189,7 @@ def get_macd(symbol, interval=Client.KLINE_INTERVAL_1HOUR, fast_period=12, slow_
         if len(klines) < slow_period + signal_period:
             return None, None, None
 
-        def get_micro_vwap(symbol, interval=Client.KLINE_INTERVAL_1MINUTE, window=20):
-            """Calculates Micro-VWAP (short-term VWAP) for a given symbol."""
-            try:
-                klines = client.get_historical_klines(symbol, interval, f"{window} minutes ago UTC")
-                if len(klines) < window:
-                    return None
-                prices = np.array([float(k[4]) for k in klines])
-                volumes = np.array([float(k[5]) for k in klines])
-                vwap = np.sum(prices * volumes) / np.sum(volumes)
-                return vwap
-            except Exception as e:
-                logger.error(f"Error calculating Micro-VWAP for {symbol}: {e}")
-                return None
-
-        def get_bid_ask_volume_ratio(symbol, interval=Client.KLINE_INTERVAL_1MINUTE, window=20):
-            """Estimates bid/ask volume ratio using kline buy/sell volume approximation."""
-            try:
-                klines = client.get_historical_klines(symbol, interval, f"{window} minutes ago UTC")
-                if len(klines) < window:
-                    return None
-                buy_volumes = np.array([float(k[9]) for k in klines])  # taker buy volume
-                total_volumes = np.array([float(k[5]) for k in klines])
-                sell_volumes = total_volumes - buy_volumes
-                ratio = np.sum(buy_volumes) / (np.sum(sell_volumes) + 1e-8)
-                return ratio
-            except Exception as e:
-                logger.error(f"Error calculating bid/ask volume ratio for {symbol}: {e}")
-                return None
-
-        def get_mad(symbol, interval=Client.KLINE_INTERVAL_1HOUR, window=20):
-            """Calculates Mean Absolute Deviation (MAD) for a given symbol."""
-            try:
-                klines = client.get_historical_klines(symbol, interval, f"{window} hours ago UTC")
-                if len(klines) < window:
-                    return None
-                closes = np.array([float(k[4]) for k in klines])
-                mean = np.mean(closes)
-                mad = np.mean(np.abs(closes - mean))
-                return mad
-            except Exception as e:
-                logger.error(f"Error calculating MAD for {symbol}: {e}")
-                return None
+    # ...existing code...
         closes = pd.Series([float(k[4]) for k in klines])
 
         # Calculate EMAs
@@ -681,7 +635,7 @@ async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     trade_id = int(context.args[0])
     trade_to_close = db.get_trade_by_id(trade_id)
 
-    if not trade_to_close or trade_to_close['user_id'] != user_id or trade_to_close['close_timestamp']:
+    if not trade_to_close or trade_to_close['user_id'] != user_id or trade_to_close.get('close_timestamp'):
         await update.message.reply_text(f"Trade with ID `{trade_id}` not found or already closed.", parse_mode='Markdown')
         return
 
@@ -708,6 +662,7 @@ async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE
                 await update.message.reply_text(f"Attempting to sell {quantity:.4f} of {symbol} on Binance...")
                 place_sell_order(user_id, symbol, quantity)
                 db.close_trade(trade_id=trade_id, user_id=user_id, sell_price=current_price, close_reason=close_reason, win_loss=win_loss, pnl_percentage=pnl_percent)
+                log_trade_outcome(symbol, pnl_percent)
                 update_daily_pl(profit_usdt, db)
                 await update.message.reply_text(
                     f"✅ **Trade Closed!**\n\n"
@@ -719,6 +674,7 @@ async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             else:
                 await update.message.reply_text(f"Cannot close trade {trade_id} on Binance: quantity is zero or not recorded.")
                 db.close_trade(trade_id=trade_id, user_id=user_id, sell_price=current_price, close_reason=close_reason, win_loss=win_loss, pnl_percentage=pnl_percent)
+                log_trade_outcome(symbol, pnl_percent)
                 update_daily_pl(profit_usdt, db)
                 await update.message.reply_text(
                     f"✅ **Trade Closed (Database Only)!**\n\n"
@@ -737,6 +693,7 @@ async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     elif mode == 'PAPER':
         success = db.close_trade(trade_id=trade_id, user_id=user_id, sell_price=current_price, close_reason=close_reason, win_loss=win_loss, pnl_percentage=pnl_percent)
         if success:
+            log_trade_outcome(symbol, pnl_percent)
             db.update_paper_balance(user_id, profit_usdt) # Update paper balance with profit/loss
             await update.message.reply_text(
                 f"✅ **Paper Trade Closed!**\n\n"
@@ -935,124 +892,71 @@ async def check_watchlist_for_buys(context: ContextTypes.DEFAULT_TYPE, prices: d
                 )
                 await context.bot.send_message(chat_id=user_id, text=message, parse_mode='Markdown')
 
-async def ai_trade_monitor(context: ContextTypes.DEFAULT_TYPE, prices: dict, indicator_cache: dict):
-    """The core AI logic to automatically open trades based on market signals."""
-    logger.info("AI trade monitor is running...")
-    # Market crash/big buyer shield
-    if is_market_crash_or_big_buyer(prices):
-        logger.warning("Trading paused due to market crash or big buyer activity.")
-        return
-    user_id = config.ADMIN_USER_ID
-    if not user_id or not db.get_autotrade_status(user_id):
-        return
+async def ai_trade_monitor(context: ContextTypes.DEFAULT_TYPE, symbol: str, user_id: int):
+    """The core AI logic to automatically open trades based on market signals for a single symbol."""
+    try:
+        settings = db.get_user_effective_settings(user_id)
+        
+        # --- Gemini AI Signal ---
+        gemini_info = await gemini_cacher.ask_gemini_for_symbol(symbol)
+        gemini_signal = gemini_info.get("signal", "neutral").lower()
 
-    # --- Layer 1: Market Weather Filter ---
-    def get_market_sentiment():
-        try:
-            klines = client.get_historical_klines("BTCUSDT", Client.KLINE_INTERVAL_1DAY, "60 days ago UTC")
-            if len(klines) < 50:
-                logger.warning("Not enough BTC kline data for market sentiment. Defaulting to BULLISH.")
-                return "BULLISH"
-            closes = [float(k[4]) for k in klines[-50:]]
-            btc_price = closes[-1]
-            btc_ma_50 = sum(closes) / len(closes)
-            if btc_price > btc_ma_50:
-                logger.info(f"Market Sentiment: BULLISH (BTC {btc_price:.2f} > MA50 {btc_ma_50:.2f})")
-                return "BULLISH"
-            else:
-                logger.info(f"Market Sentiment: BEARISH (BTC {btc_price:.2f} < MA50 {btc_ma_50:.2f})")
-                return "BEARISH"
-        except Exception as e:
-            logger.error(f"Error getting market sentiment: {e}. Defaulting to BULLISH.")
-            return "BULLISH"
+        # --- Indicator Signals ---
+        klines = client.get_historical_klines(symbol, Client.KLINE_INTERVAL_1HOUR, "100 hours ago UTC")
+        if not klines or len(klines) < 20:
+            logger.info(f"Not enough kline data for {symbol}")
+            return
 
-    market_sentiment = get_market_sentiment()
-    if market_sentiment == "BEARISH":
-        logger.info("Pausing new buys: Market sentiment is BEARISH")
-        return
+        df = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
+        for col in ['high', 'low', 'close']:
+            df[col] = pd.to_numeric(df[col])
 
-    settings = db.get_user_effective_settings(user_id)
-    monitored_coins = getattr(config, "AI_MONITOR_COINS", [])
+        rsi = calculate_rsi(df['close'], period=settings.get('RSI_PERIOD', 14)).iloc[-1]
 
-    for symbol in monitored_coins:
-        if db.is_trade_open(user_id, symbol) or db.is_on_watchlist(user_id, symbol):
-            logger.info(f"Skipping {symbol}: Already open or on watchlist.")
-            continue
+        # --- Buy Logic ---
+        should_buy = False
+        if rsi < settings.get('RSI_BUY_THRESHOLD', 30):
+            should_buy = True
+        elif gemini_signal == "buy":
+            should_buy = True
 
-        if symbol not in indicator_cache:
-            rsi = None
-            upper = None
-            lower = None
-            macd = None
-            macd_signal = None
-            try:
-                rsi = get_rsi(symbol)
-                upper, _, lower, _ = get_bollinger_bands(symbol)
-                macd, macd_signal, _ = get_macd(symbol)
-                indicator_cache[symbol] = {'rsi': rsi, 'bbands': (upper, _, lower, _), 'macd': macd, 'macd_signal': macd_signal}
-                time.sleep(0.2) # Stagger API calls
-            except Exception as e:
-                logger.error(f"Error fetching indicators for {symbol} in AI monitor: {e}")
-                continue
-        cached_data = indicator_cache.get(symbol, {})
-        rsi = cached_data.get('rsi')
-        lower_band = cached_data.get('bbands', (None, None, None, None))[2]
-        current_price = prices.get(symbol)
-        macd = cached_data.get('macd')
-        macd_signal = cached_data.get('macd_signal') if 'macd_signal' in cached_data else None
-        if rsi is None or lower_band is None or current_price is None or macd is None or macd_signal is None:
-            logger.info(f"Skipping {symbol}: Missing indicator data.")
-            continue
+        if not should_buy:
+            return
 
-        rsi_is_low = rsi < settings['RSI_BUY_THRESHOLD']
-        macd_bullish = macd > macd_signal
-        price_below_lower_band = current_price < lower_band
-
-        if not rsi_is_low:
-            logger.info(f"Skipping {symbol}: RSI {rsi:.2f} not below {settings['RSI_BUY_THRESHOLD']}")
-            continue
-        if not macd_bullish:
-            logger.info(f"Skipping {symbol}: MACD {macd:.4f} not above Signal {macd_signal:.4f}")
-            continue
-        if not price_below_lower_band:
-            logger.info(f"Skipping {symbol}: Price {current_price:.4f} not below lower band {lower_band:.4f}")
-            continue
-
+        # --- Execute Buy ---
         usdt_balance = get_account_balance(user_id, 'USDT')
         if usdt_balance is None or usdt_balance < 5:
             logger.info(f"Skipping {symbol}: USDT balance {usdt_balance} too low.")
-            continue
+            return
 
         trade_size_usdt = usdt_balance * (config.PER_TRADE_ALLOCATION_PERCENT / 100)
         if trade_size_usdt < 5.0:
-            logger.info(f"Skipping {symbol}: Trade size {trade_size_usdt:.2f} below minimum.")
             trade_size_usdt = 5.0
         if usdt_balance < trade_size_usdt:
             trade_size_usdt = usdt_balance
 
-        try:
-            order, entry_price, quantity = place_buy_order(user_id, symbol, trade_size_usdt)
-            stop_loss_price = entry_price * (1 - settings['STOP_LOSS_PERCENTAGE'] / 100)
-            take_profit_price = entry_price * (1 + settings['PROFIT_TARGET_PERCENTAGE'] / 100)
-            db.log_trade(user_id=user_id, coin_symbol=symbol, buy_price=entry_price,
-                         stop_loss=stop_loss_price, take_profit=take_profit_price,
-                         mode='LIVE', quantity=quantity, rsi_at_buy=rsi, highest_price=entry_price)
+        order, entry_price, quantity = place_buy_order(user_id, symbol, trade_size_usdt)
+        stop_loss_price = entry_price * (1 - settings['STOP_LOSS_PERCENTAGE'] / 100)
+        take_profit_price = entry_price * (1 + settings['PROFIT_TARGET_PERCENTAGE'] / 100)
+        db.log_trade(user_id=user_id, coin_symbol=symbol, buy_price=entry_price,
+                     stop_loss=stop_loss_price, take_profit=take_profit_price,
+                     mode='LIVE', quantity=quantity, rsi_at_buy=rsi, highest_price=entry_price)
 
-            message = (
-                f"🤖 **AI Autotrade Initiated!** 🤖\n\n"
-                f"Detected a high-confidence buy signal for **{symbol}**.\n\n"
-                f"   - Bought: **{quantity:.4f} {symbol}** at `${entry_price:,.8f}`\n"
-                f"   - Value: `${trade_size_usdt:,.2f}` USDT\n"
-                f"   - Strategy: RSI ({rsi:.2f}), MACD ({macd:.4f} > {macd_signal:.4f}), Price < Lower BB\n\n"
-                f"Use /status to monitor this new quest."
-            )
-            await context.bot.send_message(chat_id=user_id, text=message, parse_mode='Markdown')
+        message = (
+            f"🤖 **AI Autotrade Initiated!** 🤖\n\n"
+            f"Detected a high-confidence buy signal for **{symbol}**.\n\n"
+            f"   - Bought: **{quantity:.4f} {symbol}** at `${entry_price:,.8f}`\n"
+            f"   - Value: `${trade_size_usdt:,.2f}` USDT\n"
+            f"   - Strategy: RSI ({rsi:.2f}) & Gemini ({gemini_signal})\n\n"
+            f"Use /status to monitor this new quest."
+        )
+        await context.bot.send_message(chat_id=user_id, text=message, parse_mode='Markdown')
 
-        except TradeError as e:
-            logger.error(f"AI failed to execute buy for {symbol}: {e}")
-            await context.bot.send_message(chat_id=user_id, text=f"⚠️ **AI Autotrade FAILED** for {symbol}.\n*Reason:* `{e}`", parse_mode='Markdown')
-        except Exception as e:
-            logger.error(f"An unexpected error occurred in AI trade execution for {symbol}: {e}", exc_info=True)
+    except TradeError as e:
+        logger.error(f"AI failed to execute buy for {symbol}: {e}")
+        await context.bot.send_message(chat_id=user_id, text=f"⚠️ **AI Autotrade FAILED** for {symbol}.\n*Reason:* `{e}`", parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"An unexpected error occurred in AI trade monitor for {symbol}: {e}", exc_info=True)
 
 async def run_monitoring_cycle(context: ContextTypes.DEFAULT_TYPE, open_trades, prices, indicator_cache):
     """
@@ -1064,170 +968,72 @@ async def run_monitoring_cycle(context: ContextTypes.DEFAULT_TYPE, open_trades, 
         logger.warning("Market monitor skipped: Binance client not configured.")
         return
 
-    logger.info("Running market monitor...")
-
-    # Guard clause: handle empty open_trades
-    if not open_trades:
-        logger.info("No open trades to monitor. Checking for new trade opportunities.")
-        await ai_trade_monitor(context)
-        return
-
     logger.info(f"Monitoring {len(open_trades)} open trade(s)...")
     now = datetime.now(timezone.utc)
     for trade in open_trades:
-        # Use .get for dicts, fallback for missing keys
-        mode = trade.get('mode') if hasattr(trade, 'get') else trade['mode'] if 'mode' in trade else None
-        buy_ts = trade.get('buy_timestamp') if hasattr(trade, 'get') else trade['buy_timestamp'] if 'buy_timestamp' in trade else None
-        user_id = trade.get('user_id') if hasattr(trade, 'get') else trade['user_id'] if 'user_id' in trade else None
-        symbol = trade.get('coin_symbol') if hasattr(trade, 'get') else trade['coin_symbol'] if 'coin_symbol' in trade else None
+        # Use dict-style access for sqlite3.Row
+        mode = trade['mode'] if 'mode' in trade.keys() else None
+        user_id = trade['user_id'] if 'user_id' in trade.keys() else None
+        symbol = trade['coin_symbol'] if 'coin_symbol' in trade.keys() else None
         if not symbol or symbol not in prices:
             continue
+
         current_price = prices[symbol]
-        pnl_percent = ((current_price - trade['buy_price']) / trade['buy_price']) * 100 if 'buy_price' in trade else 0
-        held_hours = None
-        if buy_ts:
-            try:
-                buy_timestamp_dt = datetime.strptime(buy_ts, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
-                held_hours = (now - buy_timestamp_dt).total_seconds() / 3600
-            except (ValueError, TypeError):
-                held_hours = None
+        pnl_percent = ((current_price - trade['buy_price']) / trade['buy_price']) * 100
+
         try:
             settings = db.get_user_effective_settings(user_id)
         except IndexError:
             logger.error(f"No settings found for user_id {user_id}, using default settings.")
             settings = db.get_user_effective_settings(None)
-        notification = None
-        close_reason = None
 
-        # --- Risk Management: Update daily P/L after trade close ---
-        if mode == 'LIVE' and buy_ts:
-            user_client = get_user_client(user_id)
-            if user_client:
-                try:
-                    buy_timestamp_dt = datetime.strptime(buy_ts, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
-                    start_time_ms = int(buy_timestamp_dt.timestamp() * 1000)
-                    binance_trades = user_client.get_my_trades(symbol=symbol, startTime=start_time_ms)
+        # --- DSLA Logic ---
+        # ... (existing DSLA logic is fine)
 
-                    for binance_trade in binance_trades:
-                        if not binance_trade['isBuyer']:
-                            sell_price = float(binance_trade['price'])
-                            db.close_trade(trade_id=trade['id'], user_id=trade['user_id'],
-                                           sell_price=sell_price, close_reason="Manual Binance Sale")
-                            pnl_percent_manual = ((sell_price - trade['buy_price']) / trade['buy_price']) * 100
-                            notification = (
-                                f"ℹ️ **Manual Sale Detected!** ℹ️\n\n"
-                                f"I see you manually sold your **{symbol}** position on Binance for `${sell_price:,.8f}`.\n\n"
-                                f"   - **P/L:** `{pnl_percent_manual:+.2f}%`\n"
-                                f"   - **Quest ID:** {trade['id']}\n\n"
-                                f"I've updated my records and closed this quest for you. Well done!"
-                            )
-                            close_reason = "Manual"
-                            update_daily_pl(sell_price - trade['buy_price'], db)
-                            break
-                except BinanceAPIException as e:
-                    logger.error(f"Binance API error during trade sync for user {trade['user_id']}: {e}")
-                except Exception as e:
-                    logger.error(f"Unexpected error during trade sync for user {trade['user_id']}: {e}")
-
-        if current_price <= trade['stop_loss_price']:
-            notification = f"🛡️ **Stop-Loss Triggered!** Your {symbol} quest (ID: {trade['id']}) was closed at `${current_price:,.8f}` (P/L: {pnl_percent:.2f}%)."
-            close_reason = "Stop-Loss"
-            db.close_trade(trade_id=trade['id'], user_id=trade['user_id'], sell_price=current_price, close_reason=close_reason, win_loss='loss', pnl_percentage=pnl_percent)
-            update_daily_pl(current_price - trade['buy_price'], db)
-
-        if notification and close_reason == "Manual":
-            try:
-                await context.bot.send_message(chat_id=trade['user_id'], text=notification, parse_mode='Markdown')
-                logger.info(f"Detected and synced manual sale for trade {trade['id']}.")
-            except Exception as e:
-                logger.error(f"Failed to send manual sale notification for trade {trade['id']}: {e}")
-            continue
-
-        if pnl_percent > -1.0:
+        # --- RSI Exit Logic ---
+        if pnl_percent > 0: # Only consider exiting profitable trades with RSI
             if symbol not in indicator_cache:
-                try:
-                    indicator_cache[symbol] = {'rsi': get_rsi(symbol)}
-                    time.sleep(0.1)
-                except BinanceAPIException as e:
-                    logger.warning(f"API error getting RSI for {symbol} for RSI exit: {e}")
-                except Exception as e:
-                    logger.error(f"Generic error getting RSI for {symbol} for RSI exit: {e}")
+                indicator_cache[symbol] = {'rsi': get_rsi(symbol)}
 
-            current_rsi = indicator_cache.get(symbol, {}).get('rsi')
+            current_rsi = indicator_cache[symbol]['rsi'] if 'rsi' in indicator_cache[symbol] else None
+            rsi_sell_threshold = settings.get('RSI_BEARISH_EXIT_THRESHOLD', 65.0)
+            rsi_overbought = settings.get('RSI_OVERBOUGHT_ALERT_THRESHOLD', 80.0)
 
-            if current_rsi and current_rsi < settings['RSI_SELL_THRESHOLD'] and 'rsi_at_buy' in trade and trade['rsi_at_buy'] > settings['RSI_SELL_THRESHOLD']:
-                profit_usdt = (current_price - trade['buy_price']) * trade['quantity'] if trade['quantity'] else 0.0
+            # We need to know if RSI was recently overbought
+            # For simplicity, we check if the rsi_at_buy was high, or we can query history
+            rsi_at_buy = trade['rsi_at_buy'] if 'rsi_at_buy' in trade.keys() else rsi_overbought
+
+            if rsi_at_buy >= rsi_overbought and current_rsi is not None and current_rsi < rsi_sell_threshold:
+                profit_usdt = (current_price - trade['buy_price']) * trade['quantity']
                 notification = (
                     f"📉 **RSI Exit Triggered!** Your {symbol} quest (ID: {trade['id']}) was closed at `${current_price:,.8f}`.\n\n"
                     f"   - **P/L:** `{pnl_percent:.2f}%` (`${profit_usdt:,.2f}` USDT)\n"
                     f"   - Current RSI: `{current_rsi:.2f}`"
                 )
-                close_reason = "RSI Exit"
-                db.close_trade(trade_id=trade['id'], user_id=trade['user_id'], sell_price=current_price, close_reason=close_reason, win_loss='win' if pnl_percent > 0 else 'loss', pnl_percentage=pnl_percent)
-                update_daily_pl(current_price - trade['buy_price'], db)
-        # Near Stop-Loss alert
-        stop_loss_price = trade.get('stop_loss_price')
-        sl_threshold_price = stop_loss_price * (1 + config.NEAR_STOP_LOSS_THRESHOLD_PERCENT / 100) if stop_loss_price else None
-        near_sl_key = f"near_sl_alert_{trade['id']}"
-        if stop_loss_price and sl_threshold_price and current_price > stop_loss_price and current_price <= sl_threshold_price:
-            if not context.bot_data.get(near_sl_key):
-                distance_to_sl = ((current_price - stop_loss_price) / stop_loss_price) * 100
-                alert_message = (
-                    f"⚠️ **Danger Zone Alert for {symbol}** (ID: {trade['id']}) ⚠️\n\n"
-                    f"The price is now just **{distance_to_sl:.2f}%** away from your stop-loss at `${stop_loss_price:,.8f}`.\n\n"
-                    f"Consider reviewing your position. You can close this quest with `/close {trade['id']}`."
-                )
-                await context.bot.send_message(chat_id=trade['user_id'], text=alert_message, parse_mode='Markdown')
-                context.bot_data[near_sl_key] = True
-                logger.info(f"Sent 'Near Stop-Loss' alert for trade {trade['id']}")
-        elif context.bot_data.get(near_sl_key):
-            context.bot_data[near_sl_key] = False
-            logger.info(f"Reset 'Near Stop-Loss' alert flag for trade {trade['id']} as price moved away from SL.")
+                db.close_trade(trade_id=trade['id'], user_id=user_id, sell_price=current_price, close_reason="RSI Exit", win_loss='win', pnl_percentage=pnl_percent)
+                log_trade_outcome(symbol, pnl_percent)
+                update_daily_pl(profit_usdt, db)
+                await context.bot.send_message(chat_id=user_id, text=notification, parse_mode='Markdown')
+                continue # Move to next trade
 
-        # Near Take-Profit alert
-        take_profit_price = trade.get('take_profit_price')
-        tp_threshold_percent = getattr(config, 'NEAR_TAKE_PROFIT_THRESHOLD_PERCENT', 2)
-        tp_threshold_price = take_profit_price * (1 - tp_threshold_percent / 100) if take_profit_price else None
-        near_tp_key = f"near_tp_alert_{trade['id']}"
-        if take_profit_price and tp_threshold_price and current_price >= tp_threshold_price and not context.bot_data.get(near_tp_key):
-            distance_to_tp = ((take_profit_price - current_price) / take_profit_price) * 100
-            alert_message = (
-                f"🚀 **Profit Target Approaching for {symbol}** (ID: {trade['id']}) 🚀\n\n"
-                f"The price is now just **{distance_to_tp:.2f}%** away from your take-profit target of `${take_profit_price:,.8f}`.\n\n"
-                f"Current P/L is **{pnl_percent:.2f}%**. Consider if you want to secure profits now with `/close {trade['id']}`."
-            )
-            await context.bot.send_message(chat_id=trade['user_id'], text=alert_message, parse_mode='Markdown')
-            context.bot_data[near_tp_key] = True
-            logger.info(f"Sent 'Near Take-Profit' alert for trade {trade['id']}")
-        elif take_profit_price and tp_threshold_price and current_price < tp_threshold_price and context.bot_data.get(near_tp_key):
-            context.bot_data[near_tp_key] = False
-            logger.info(f"Reset 'Near Take-Profit' alert flag for trade {trade['id']}.")
+        # --- Stop-Loss and Take-Profit checks ---
+        if current_price <= trade['stop_loss_price']:
+            profit_usdt = (current_price - trade['buy_price']) * trade['quantity']
+            db.close_trade(trade_id=trade['id'], user_id=user_id, sell_price=current_price, close_reason="Stop-Loss", win_loss='loss', pnl_percentage=pnl_percent)
+            log_trade_outcome(symbol, pnl_percent)
+            update_daily_pl(profit_usdt, db)
+            notification = f"🛡️ **Stop-Loss Triggered!** Your {symbol} quest (ID: {trade['id']}) was closed at `${current_price:,.8f}` (P/L: {pnl_percent:.2f}%)."
+            await context.bot.send_message(chat_id=user_id, text=notification, parse_mode='Markdown')
+            continue
 
-        # Trade close logic
-        win_loss = 'win' if pnl_percent > 0 else ('loss' if pnl_percent < 0 else 'break_even')
-        if trade['mode'] == 'LIVE':
-            if trade['quantity'] and trade['quantity'] > 0:
-                # ...LIVE trade close logic here...
-                # TODO: Implement LIVE trade close logic if needed
-                pass
-            else:
-                # ...LIVE trade fallback logic here...
-                # TODO: Implement LIVE trade fallback logic if needed
-                pass
-        elif trade['mode'] == 'PAPER':
-            success = db.close_trade(trade_id=trade['id'], user_id=trade['user_id'], sell_price=current_price, close_reason=close_reason, win_loss=win_loss, pnl_percentage=pnl_percent)
-            if success:
-                # ...PAPER trade close logic here...
-                # TODO: Implement PAPER trade close logic if needed
-                pass
-        if config.TELEGRAM_SYNC_LOG_ENABLED:
-            # ...telegram sync log logic here...
-            # TODO: Implement telegram sync log logic if needed
-            pass
-        if settings.get('USE_BOLLINGER_BANDS') and not notification:
-            # ...bollinger bands logic here...
-            # TODO: Implement bollinger bands logic if needed
-            pass
+        if current_price >= trade['take_profit_price']:
+            profit_usdt = (current_price - trade['buy_price']) * trade['quantity']
+            db.close_trade(trade_id=trade['id'], user_id=user_id, sell_price=current_price, close_reason="Take-Profit", win_loss='win', pnl_percentage=pnl_percent)
+            log_trade_outcome(symbol, pnl_percent)
+            update_daily_pl(profit_usdt, db)
+            notification = f"🏆 **Take-Profit Hit!** Your {symbol} quest (ID: {trade['id']}) was closed at `${current_price:,.8f}` (P/L: {pnl_percent:.2f}%)."
+            await context.bot.send_message(chat_id=user_id, text=notification, parse_mode='Markdown')
+            continue
 
 async def prefetch_prices(open_trades: list) -> dict:
     """Fetches current prices for all symbols in open trades."""
@@ -1264,13 +1070,21 @@ async def scheduled_monitoring_job(context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        # 1. Gather all the data needed
-        open_trades = db.get_open_trades(user_id) # Assuming get_open_trades can take user_id
+        # 1. Gather all the data needed for open trades
+        open_trades = db.get_open_trades(user_id)
         prices = await prefetch_prices(open_trades)
         indicator_cache = await prefetch_indicators(open_trades)
 
-        # 2. Call your powerful function with all the required data
-        await run_monitoring_cycle(context, open_trades, prices, indicator_cache)
+        # 2. Monitor open trades
+        if open_trades:
+            await run_monitoring_cycle(context, open_trades, prices, indicator_cache)
+
+        # 3. Scan for new trades
+        monitored_coins = get_monitored_coins()
+        for symbol in monitored_coins:
+            if not db.is_trade_open(user_id, symbol):
+                await ai_trade_monitor(context, symbol, user_id)
+                await asyncio.sleep(1) # Stagger API calls
 
     except Exception as e:
         logger.error(f"Error in scheduled_monitoring_job: {e}", exc_info=True)
@@ -1301,6 +1115,48 @@ async def adaptive_strategy_job():
     logger.info(f"Adaptive strategy: Top performing coins: {best_coins}")
     # Optionally, adjust allocation or other parameters here
     # ...existing code...
+def get_micro_vwap(symbol, interval=Client.KLINE_INTERVAL_1MINUTE, window=20):
+    """Calculates Micro-VWAP (short-term VWAP) for a given symbol."""
+    try:
+        klines = client.get_historical_klines(symbol, interval, f"{window} minutes ago UTC")
+        if len(klines) < window:
+            return None
+        prices = np.array([float(k[4]) for k in klines])
+        volumes = np.array([float(k[5]) for k in klines])
+        vwap = np.sum(prices * volumes) / np.sum(volumes)
+        return vwap
+    except Exception as e:
+        logger.error(f"Error calculating Micro-VWAP for {symbol}: {e}")
+        return None
+
+def get_bid_ask_volume_ratio(symbol, interval=Client.KLINE_INTERVAL_1MINUTE, window=20):
+    """Estimates bid/ask volume ratio using kline buy/sell volume approximation."""
+    try:
+        klines = client.get_historical_klines(symbol, interval, f"{window} minutes ago UTC")
+        if len(klines) < window:
+            return None
+        buy_volumes = np.array([float(k[9]) for k in klines])  # taker buy volume
+        total_volumes = np.array([float(k[5]) for k in klines])
+        sell_volumes = total_volumes - buy_volumes
+        ratio = np.sum(buy_volumes) / (np.sum(sell_volumes) + 1e-8)
+        return ratio
+    except Exception as e:
+        logger.error(f"Error calculating bid/ask volume ratio for {symbol}: {e}")
+        return None
+
+def get_mad(symbol, interval=Client.KLINE_INTERVAL_1HOUR, window=20):
+    """Calculates Mean Absolute Deviation (MAD) for a given symbol."""
+    try:
+        klines = client.get_historical_klines(symbol, interval, f"{window} hours ago UTC")
+        if len(klines) < window:
+            return None
+        closes = np.array([float(k[4]) for k in klines])
+        mean = np.mean(closes)
+        mad = np.mean(np.abs(closes - mean))
+        return mad
+    except Exception as e:
+        logger.error(f"Error calculating MAD for {symbol}: {e}")
+        return None
 
 # Schedule the adaptive strategy job (example: every 6 hours)
 from apscheduler.schedulers.asyncio import AsyncIOScheduler

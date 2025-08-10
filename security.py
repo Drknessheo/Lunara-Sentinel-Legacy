@@ -5,11 +5,11 @@ from cryptography.fernet import Fernet
 logger = logging.getLogger(__name__)
 
 # Load the encryption key from environment variables
-ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
-if not ENCRYPTION_KEY:
-    raise ValueError("ENCRYPTION_KEY not found in environment variables. Please generate one and add it to your .env file.")
+BINANCE_ENCRYPTION_KEY = os.getenv("BINANCE_ENCRYPTION_KEY")
+if not BINANCE_ENCRYPTION_KEY:
+    raise ValueError("BINANCE_ENCRYPTION_KEY not found in environment variables. Please generate one and add it to your .env file.")
 
-cipher_suite = Fernet(ENCRYPTION_KEY.encode())
+cipher_suite = Fernet(BINANCE_ENCRYPTION_KEY.encode())
 
 def encrypt_data(data: str) -> bytes:
     """Encrypts a string."""

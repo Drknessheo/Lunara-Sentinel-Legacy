@@ -1,3 +1,38 @@
+async def activate_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin command to activate a user by Telegram ID."""
+    user_id = update.effective_user.id
+    if user_id != config.ADMIN_USER_ID:
+        await update.message.reply_text("This is an admin-only command.")
+        return
+    try:
+        target_id = int(context.args[0])
+    except (IndexError, ValueError):
+        await update.message.reply_text("Usage: /activate <telegram_user_id>")
+        return
+    # Set subscription tier and expiration
+    db.update_user_subscription(target_id, tier="PREMIUM", expires=None)
+    await update.message.reply_text(f"✅ User {target_id} has been activated as PREMIUM.")
+    try:
+        await context.bot.send_message(chat_id=target_id, text="🎉 Your subscription has been activated! You are now a PREMIUM user.")
+    except Exception:
+        pass
+
+async def setapi_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Securely store API keys for premium users."""
+    user_id = update.effective_user.id
+    user_tier = db.get_user_tier_db(user_id)
+    if user_tier != 'PREMIUM':
+        await update.message.reply_text("Upgrade to Premium to link your API keys.")
+        return
+    try:
+        api_key = context.args[0]
+        secret_key = context.args[1]
+    except (IndexError, ValueError):
+        await update.message.reply_text("Usage: /setapi <API_KEY> <SECRET_KEY>")
+        return
+    db.store_user_api_keys(user_id, api_key, secret_key)
+    await update.message.reply_text("✅ Your API keys have been securely stored.")
+
 import os
 from dotenv import load_dotenv
 from telegram import Update
@@ -24,20 +59,13 @@ logger = logging.getLogger(__name__)
 
 import asyncio
 
-# --- Gemini AI Model Initialization ---\nmodel = None
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-if gemini_api_key:
-    genai.configure(api_key=gemini_api_key)
-    model = genai.GenerativeModel('gemini-pro')
-    logger.info("Gemini AI model initialized successfully.")
-else:
-    logger.warning("GEMINI_API_KEY not found in environment variables. AI features will be disabled.")
+## Gemini API keys are now managed in autotrade_jobs.py for multi-key support and fallback
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends a welcome message when the /start command is issued."""
     user_id = update.effective_user.id
-    db.get_or_create_user(user_id) # Ensure user is in the DB
+    db.get_or_create_user_db(user_id) # Ensure user is in the DB
 
     user = update.effective_user
     await update.message.reply_html(
@@ -76,7 +104,7 @@ async def send_daily_status_summary(context: ContextTypes.DEFAULT_TYPE) -> None:
 async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler for the /crypto command. Calls the trade module."""
     user_id = update.effective_user.id
-    user_tier = db.get_user_tier(user_id)
+    user_tier = db.get_user_tier_db(user_id)
     if user_tier != 'PREMIUM':
         # Free users: Only show RSI
         symbol = context.args[0].upper() if context.args else None
@@ -98,7 +126,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     open_trades = db.get_open_trades(user_id)
     watched_items = db.get_watched_items_by_user(user_id)
 
-    user_tier = db.get_user_tier(user_id)
+    user_tier = db.get_user_tier_db(user_id)
     
 
     if not open_trades and not watched_items:
@@ -642,7 +670,7 @@ Here are the commands to guide your journey:
 async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays the user's profile information, including tier and settings."""
     user_id = update.effective_user.id
-    user_tier = db.get_user_tier(user_id)
+    user_tier = db.get_user_tier_db(user_id)
     settings = db.get_user_effective_settings(user_id)
     trading_mode, paper_balance = db.get_user_trading_mode_and_balance(user_id)
 
@@ -672,7 +700,7 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Allows Premium users to view and customize their trading settings."""
     user_id = update.effective_user.id
-    user_tier = db.get_user_tier(user_id)
+    user_tier = db.get_user_tier_db(user_id)
 
     if user_tier != 'PREMIUM':
         await update.message.reply_text("Upgrade to Premium to use this feature.")
@@ -762,7 +790,7 @@ async def autotrade_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def addcoins_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Premium command to add or reset coins for AI monitoring."""
     user_id = update.effective_user.id
-    if user_id != config.ADMIN_USER_ID and db.get_user_tier(user_id) != 'PREMIUM':
+    if user_id != config.ADMIN_USER_ID and db.get_user_tier_db(user_id) != 'PREMIUM':
         await update.message.reply_text("Upgrade to Premium to use this feature.")
         return
 
@@ -819,12 +847,9 @@ async def usercount_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /ask command using Gemini AI for Premium users."""
     user_id = update.effective_user.id
-    user_tier = db.get_user_tier(user_id)
+    user_tier = db.get_user_tier_db(user_id)
     if user_tier != 'PREMIUM':
         await update.message.reply_text("Upgrade to Premium to use the AI Oracle.")
-        return
-    if not model:
-        await update.message.reply_text("Gemini AI is not configured. This feature is currently unavailable.")
         return
     question = " ".join(context.args) if context.args else None
     if not question:
@@ -832,11 +857,14 @@ async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     await update.message.reply_text("Consulting the AI Oracle... Please wait.")
     try:
-        response = await asyncio.to_thread(model.generate_content, question)
-        answer = response.text if hasattr(response, 'text') else str(response)
-        await update.message.reply_text(f"🔮 AI Oracle says:\\n\\n{answer}")
+        from autotrade_jobs import get_ai_suggestions
+        answer = await get_ai_suggestions(question)
+        if answer:
+            await update.message.reply_text(f"🔮 AI Oracle says:\n\n{answer}")
+        else:
+            await update.message.reply_text("The AI Oracle could not answer at this time.")
     except Exception as e:
-        logger.error(f"Gemini AI error: {e}")
+        logger.error(f"AI Oracle error: {e}")
         await update.message.reply_text("The AI Oracle could not answer at this time.")
 
 
@@ -865,6 +893,8 @@ def main() -> None:
     application.add_handler(CommandHandler("quest", quest_command)) # This now handles the main trading logic
     application.add_handler(CommandHandler("import", import_command))
     application.add_handler(CommandHandler("status", status_command))
+    application.add_handler(CommandHandler("activate", activate_user_command))
+    application.add_handler(CommandHandler("setapi", setapi_command))
     application.add_handler(CommandHandler("balance", balance_command))
     application.add_handler(CommandHandler("close", close_command))
     application.add_handler(CommandHandler("review", review_command))
@@ -901,7 +931,7 @@ def main() -> None:
     job_queue.run_repeating(trade.scheduled_monitoring_job, interval=60, first=10) # This job now handles all monitoring
     # Schedule the daily summary job to run at 8:00 AM UTC
     job_queue.run_daily(send_daily_status_summary, time=datetime(1, 1, 1, 8, 0, 0, tzinfo=timezone.utc).time())
-    job_queue.run_repeating(autotrade_jobs.autotrade_cycle, interval=300, first=10)
+    job_queue.run_repeating(autotrade_jobs.autotrade_cycle, interval=900, first=10)  # 15 minutes
     job_queue.run_repeating(autotrade_jobs.monitor_autotrades, interval=60, first=10)
 
     logger.info("Starting bot with market monitor and AI trade monitor jobs scheduled...")
