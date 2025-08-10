@@ -1,3 +1,25 @@
+import sqlite3
+import functools
+
+def db_connection(func):
+    """Decorator to handle database connection and cursor management."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        conn = sqlite3.connect('lunara_bot.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        try:
+            result = func(cursor, *args, **kwargs)
+            conn.commit()
+            return result
+        except sqlite3.Error as e:
+            print(f"Database error in {func.__name__}: {e}")
+            conn.rollback()
+            raise  # Re-raise the exception after rollback
+        finally:
+            conn.close()
+    return wrapper
+
 SETTING_TO_COLUMN_MAP = {
     'rsi_buy': 'custom_rsi_buy',
     'rsi_sell': 'custom_rsi_sell',
@@ -18,6 +40,7 @@ def update_user_setting(cursor, user_id: int, setting_name: str, value):
         cursor.execute(f"UPDATE users SET {column} = NULL WHERE user_id = ?", (user_id,))
     else:
         cursor.execute(f"UPDATE users SET {column} = ? WHERE user_id = ?", (value, user_id))
+
 
 import sqlite3
 import functools
@@ -59,7 +82,6 @@ def store_user_api_keys(cursor, user_id: int, api_key: str, secret_key: str):
     encrypted_secret = fernet.encrypt(secret_key.encode())
     get_or_create_user(cursor, user_id)
     cursor.execute("UPDATE users SET api_key = ?, secret_key = ? WHERE user_id = ?", (encrypted_api, encrypted_secret, user_id))
-    return wrapper
 
 # --- Wrapper functions for bot commands ---
 @db_connection
