@@ -1005,16 +1005,19 @@ async def run_monitoring_cycle(context: ContextTypes.DEFAULT_TYPE, open_trades, 
             rsi_at_buy = trade['rsi_at_buy'] if 'rsi_at_buy' in trade.keys() else rsi_overbought
 
             if rsi_at_buy >= rsi_overbought and current_rsi is not None and current_rsi < rsi_sell_threshold:
-                profit_usdt = (current_price - trade['buy_price']) * trade['quantity']
-                notification = (
-                    f"📉 **RSI Exit Triggered!** Your {symbol} quest (ID: {trade['id']}) was closed at `${current_price:,.8f}`.\n\n"
-                    f"   - **P/L:** `{pnl_percent:.2f}%` (`${profit_usdt:,.2f}` USDT)\n"
-                    f"   - Current RSI: `{current_rsi:.2f}`"
-                )
-                db.close_trade(trade_id=trade['id'], user_id=user_id, sell_price=current_price, close_reason="RSI Exit", win_loss='win', pnl_percentage=pnl_percent)
-                log_trade_outcome(symbol, pnl_percent)
-                update_daily_pl(profit_usdt, db)
-                await context.bot.send_message(chat_id=user_id, text=notification, parse_mode='Markdown')
+                if 'buy_price' in trade and 'quantity' in trade:
+                    profit_usdt = (current_price - trade['buy_price']) * trade['quantity']
+                    notification = (
+                        f"📉 **RSI Exit Triggered!** Your {symbol} quest (ID: {trade['id']}) was closed at `${current_price:,.8f}`.\n\n"
+                        f"   - **P/L:** `{pnl_percent:.2f}%` (`${profit_usdt:,.2f}` USDT)\n"
+                        f"   - Current RSI: `{current_rsi:.2f}`"
+                    )
+                    db.close_trade(trade_id=trade['id'], user_id=user_id, sell_price=current_price, close_reason="RSI Exit", win_loss='win', pnl_percentage=pnl_percent)
+                    log_trade_outcome(symbol, pnl_percent)
+                    update_daily_pl(profit_usdt, db)
+                    await context.bot.send_message(chat_id=user_id, text=notification, parse_mode='Markdown')
+                else:
+                    logger.warning(f"Skipping trade with ID {trade.get('id', 'unknown')} due to missing buy_price or quantity.")
                 continue # Move to next trade
 
         # --- Stop-Loss and Take-Profit checks ---
