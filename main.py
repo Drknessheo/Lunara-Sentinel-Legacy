@@ -1,3 +1,6 @@
+from telegram import Update
+from telegram.ext import ContextTypes
+
 async def activate_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Admin command to activate a user by Telegram ID."""
     user_id = update.effective_user.id
