@@ -713,15 +713,18 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if not context.args:
         settings = db.get_user_effective_settings(user_id)
         message = (
-            "⚙️ **Your Custom Settings** ⚙️\\n\\n"
-            "Here are your current effective trading parameters. You can override the defaults.\\n\\n"
-            f"- `rsi_buy`: {settings['RSI_BUY_THRESHOLD']}\\n"
-            f"- `rsi_sell`: {settings['RSI_SELL_THRESHOLD']}\\n"
-            f"- `stop_loss`: {settings['STOP_LOSS_PERCENTAGE']}%\\n"
-            f"- `trailing_activation`: {settings['TRAILING_PROFIT_ACTIVATION_PERCENT']}%\\n"
-            f"- `trailing_drop`: {settings['TRAILING_STOP_DROP_PERCENT']}%\\n\\n"
-            "**To change a setting:**\\n`/settings <name> <value>`\\n*Example: `/settings stop_loss 8.5`*\\n\\n"
-            "**To reset a setting to default:**\\n`/settings <name> reset`"
+            "⚙️ **Your Custom Trading Settings** ⚙️\n\n"
+            "| Setting              | Value      |\n"
+            "|----------------------|-----------|\n"
+            f"| RSI Buy Threshold    | `{settings['RSI_BUY_THRESHOLD']}`\n"
+            f"| RSI Sell Threshold   | `{settings['RSI_SELL_THRESHOLD']}`\n"
+            f"| Stop Loss (%)        | `{settings['STOP_LOSS_PERCENTAGE']}`\n"
+            f"| Trailing Activation (%) | `{settings['TRAILING_PROFIT_ACTIVATION_PERCENT']}`\n"
+            f"| Trailing Drop (%)    | `{settings['TRAILING_STOP_DROP_PERCENT']}`\n\n"
+            "---\n"
+            "**Change a setting:**\n  `/settings <name> <value>`\n  Example: `/settings rsi_buy 40`\n\n"
+            "**Reset a setting to default:**\n  `/settings <name> reset`\n\n"
+            "**Available settings:** rsi_buy, rsi_sell, stop_loss, trailing_activation, trailing_drop"
         )
         await update.message.reply_text(message, parse_mode='Markdown')
         return

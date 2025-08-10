@@ -1,3 +1,23 @@
+SETTING_TO_COLUMN_MAP = {
+    'rsi_buy': 'custom_rsi_buy',
+    'rsi_sell': 'custom_rsi_sell',
+    'stop_loss': 'custom_stop_loss',
+    'trailing_activation': 'custom_trailing_activation',
+    'trailing_drop': 'custom_trailing_drop',
+}
+
+@db_connection
+def update_user_setting(cursor, user_id: int, setting_name: str, value):
+    """
+    Updates a user's custom setting in the database. If value is None, resets to default.
+    """
+    column = SETTING_TO_COLUMN_MAP.get(setting_name)
+    if not column:
+        raise ValueError(f"Unknown setting: {setting_name}")
+    if value is None:
+        cursor.execute(f"UPDATE users SET {column} = NULL WHERE user_id = ?", (user_id,))
+    else:
+        cursor.execute(f"UPDATE users SET {column} = ? WHERE user_id = ?", (value, user_id))
 import sqlite3
 import functools
 import config
