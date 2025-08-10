@@ -720,11 +720,13 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             f"| RSI Sell Threshold   | `{settings['RSI_SELL_THRESHOLD']}`\n"
             f"| Stop Loss (%)        | `{settings['STOP_LOSS_PERCENTAGE']}`\n"
             f"| Trailing Activation (%) | `{settings['TRAILING_PROFIT_ACTIVATION_PERCENT']}`\n"
-            f"| Trailing Drop (%)    | `{settings['TRAILING_STOP_DROP_PERCENT']}`\n\n"
+            f"| Trailing Drop (%)    | `{settings['TRAILING_STOP_DROP_PERCENT']}`\n"
+            f"| Trade Size (USDT)    | `{settings.get('TRADE_SIZE_USDT', 5.0)}`\n\n"
             "---\n"
             "**Change a setting:**\n  `/settings <name> <value>`\n  Example: `/settings rsi_buy 40`\n\n"
+            "**Set trade size:**\n  `/settings trade_size 10`\n  (Minimum: $5.00)\n\n"
             "**Reset a setting to default:**\n  `/settings <name> reset`\n\n"
-            "**Available settings:** rsi_buy, rsi_sell, stop_loss, trailing_activation, trailing_drop"
+            "**Available settings:** rsi_buy, rsi_sell, stop_loss, trailing_activation, trailing_drop, trade_size"
         )
         def escape_markdown(text):
             import re
@@ -742,10 +744,29 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
 
     try:
-        if setting_name not in db.SETTING_TO_COLUMN_MAP:
-            await update.message.reply_text(escape_markdown(f"Unknown setting '{setting_name}'. Valid settings are: {', '.join(db.SETTING_TO_COLUMN_MAP.keys())}"), parse_mode='MarkdownV2')
+        valid_settings = list(db.SETTING_TO_COLUMN_MAP.keys()) + ['trade_size']
+        if setting_name not in valid_settings:
+            await update.message.reply_text(escape_markdown(f"Unknown setting '{setting_name}'. Valid settings are: {', '.join(valid_settings)}"), parse_mode='MarkdownV2')
             return
 
+        if setting_name == 'trade_size':
+            if value_str == 'reset':
+                db.update_user_setting(user_id, 'trade_size', 5.0)
+                await update.message.reply_text(escape_markdown("Trade size reset to $5.00 (minimum)."), parse_mode='MarkdownV2')
+                return
+            try:
+                new_value = float(value_str)
+            except ValueError:
+                await update.message.reply_text(escape_markdown(f"Invalid value '{value_str}'. Please provide a number (e.g., 8.5) or 'reset'."), parse_mode='MarkdownV2')
+                return
+            if new_value < 5.0:
+                await update.message.reply_text(escape_markdown("Trade size must be at least $5.00."), parse_mode='MarkdownV2')
+                return
+            db.update_user_setting(user_id, 'trade_size', new_value)
+            await update.message.reply_text(escape_markdown(f"✅ Successfully updated trade size to **${new_value:.2f}**."), parse_mode='MarkdownV2')
+            return
+
+        # Existing settings logic
         new_value = None if value_str == 'reset' else float(value_str)
         if new_value is not None and new_value <= 0:
             await update.message.reply_text(escape_markdown("Value must be a positive number."), parse_mode='MarkdownV2')
