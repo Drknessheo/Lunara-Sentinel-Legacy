@@ -436,8 +436,9 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Live mode logic
+    is_admin = user_id == config.ADMIN_USER_ID
     api_key, _ = db.get_user_api_keys(user_id)
-    if not api_key:
+    if not api_key and not is_admin:
         await update.message.reply_text("Your Binance API keys are not set. Please use `/setapi <key> <secret>` in a private chat with me.")
         return
 
