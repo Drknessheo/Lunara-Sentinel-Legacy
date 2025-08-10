@@ -18,6 +18,7 @@ def update_user_setting(cursor, user_id: int, setting_name: str, value):
         cursor.execute(f"UPDATE users SET {column} = NULL WHERE user_id = ?", (user_id,))
     else:
         cursor.execute(f"UPDATE users SET {column} = ? WHERE user_id = ?", (value, user_id))
+
 import sqlite3
 import functools
 import config
