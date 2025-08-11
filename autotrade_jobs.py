@@ -64,20 +64,24 @@ async def get_trade_suggestions_from_gemini(symbols):
     metrics = {}
     for symbol in symbols:
         try:
-            rsi = trade.get_rsi(symbol)
-            upper_band, sma, lower_band, bb_std = trade.get_bollinger_bands(symbol)
-            macd, macd_signal, macd_hist = trade.get_macd(symbol)
-            micro_vwap = trade.get_micro_vwap(symbol)
-            volume_ratio = trade.get_bid_ask_volume_ratio(symbol)
-            mad = trade.get_mad(symbol)
-            metrics[symbol] = {
-                "RSI": rsi,
-                "Bollinger Bands": f"upper={upper_band}, sma={sma}, lower={lower_band}, std={bb_std}",
-                "MACD": f"{macd}, Signal: {macd_signal}, Histogram: {macd_hist}",
-                "Micro-VWAP": micro_vwap,
-                "Bid/Ask Volume Ratio": volume_ratio,
-                "MAD": mad
-            }
+                rsi = trade.get_rsi(symbol)
+                upper_band, sma, lower_band, bb_std = trade.get_bollinger_bands(symbol)
+                macd, macd_signal, macd_hist = trade.get_macd(symbol)
+                micro_vwap = trade.get_micro_vwap(symbol)
+                volume_ratio = trade.get_bid_ask_volume_ratio(symbol)
+                mad = trade.get_mad(symbol)
+                # Gracefully skip if any required metric is None (insufficient kline data)
+                if None in (rsi, upper_band, sma, lower_band, bb_std, macd, macd_signal, macd_hist, micro_vwap, volume_ratio, mad):
+                    logger.info(f"Not enough kline data for {symbol}, skipping.")
+                    continue
+                metrics[symbol] = {
+                    "RSI": rsi,
+                    "Bollinger Bands": f"upper={upper_band}, sma={sma}, lower={lower_band}, std={bb_std}",
+                    "MACD": f"{macd}, Signal: {macd_signal}, Histogram: {macd_hist}",
+                    "Micro-VWAP": micro_vwap,
+                    "Bid/Ask Volume Ratio": volume_ratio,
+                    "MAD": mad
+                }
         except Exception as e:
             logger.error(f"Error gathering metrics for {symbol}: {e}")
 
@@ -135,28 +139,32 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE):
 
 async def monitor_autotrades(context: ContextTypes.DEFAULT_TYPE):
     logger.info("Monitoring open autotrades...")
-    encrypted_slips = slip_manager.redis_client.keys('*')
+    # Only process keys that match the expected trade slip pattern (e.g., start with 'trade:')
+    encrypted_slips = [k for k in slip_manager.redis_client.keys('*') if k.startswith('trade:')]
 
     for encrypted_slip in encrypted_slips:
         try:
-            slip = slip_manager.get_and_decrypt_slip(encrypted_slip)
-            if slip is not None:
-                current_price = trade.get_current_price(slip['symbol'])
-                if not current_price:
+                slip = slip_manager.get_and_decrypt_slip(encrypted_slip)
+                if slip is not None and all(k in slip for k in ('symbol', 'price', 'amount')):
+                    current_price = trade.get_current_price(slip['symbol'])
+                    if not current_price:
+                        continue
+
+                    pnl_percent = ((current_price - slip['price']) / slip['price']) * 100
+
+                    if pnl_percent >= autotrade_db.get_user_effective_settings(config.ADMIN_USER_ID)['PROFIT_TARGET_PERCENTAGE']:
+                        try:
+                            trade.place_sell_order(config.ADMIN_USER_ID, slip['symbol'], slip['amount'])
+                            slip_manager.delete_slip(encrypted_slip)
+                            await context.bot.send_message(
+                                chat_id=config.ADMIN_USER_ID,
+                                text=f"🤖 Autotrade closed: Sold {slip['amount']:.4f} {slip['symbol']} at ${current_price:.8f} for a {pnl_percent:.2f}% gain."
+                            )
+                        except Exception as trade_exc:
+                            logger.error(f"Error placing sell order for {slip['symbol']}: {trade_exc}")
+                else:
+                    # Silently skip invalid or malformed slips
                     continue
-
-                pnl_percent = ((current_price - slip['price']) / slip['price']) * 100
-
-                if pnl_percent >= autotrade_db.get_user_effective_settings(config.ADMIN_USER_ID)['PROFIT_TARGET_PERCENTAGE']:
-                    trade.place_sell_order(config.ADMIN_USER_ID, slip['symbol'], slip['amount'])
-                    slip_manager.delete_slip(encrypted_slip)
-
-                    await context.bot.send_message(
-                        chat_id=config.ADMIN_USER_ID,
-                        text=f"🤖 Autotrade closed: Sold {slip['amount']:.4f} {slip['symbol']} at ${current_price:.8f} for a {pnl_percent:.2f}% gain."
-                    )
-            else:
-                logger.warning(f"Failed to load or decrypt slip: {encrypted_slip}")
         except Exception as e:
             import traceback
             logger.error(f"Error monitoring autotrade: {e}\n{traceback.format_exc()}")
