@@ -51,7 +51,7 @@ import math
 from datetime import datetime, timezone
 import logging
 import numpy as np
-from indicators import get_volatility_based_ladder, calculate_rsi
+from indicators import get_volatility_based_ladder, calculate_rsi, calc_atr
 from risk_management import get_trade_size, get_atr_stop, update_daily_pl, should_pause_trading, is_market_crash_or_big_buyer
 from modules.adaptive_strategy import adaptive_strategy_job
 from binance.client import Client
@@ -534,7 +534,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message, parse_mode='Markdown')
 
 async def import_last_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the /import command to manually add a trade or import from Binance."""
+    """Handles the /import command to manually add a trade or import from Binance.""" 
     user_id = update.effective_user.id
     mode, _ = db.get_user_trading_mode_and_balance(user_id)
 
@@ -832,11 +832,10 @@ async def check_watchlist_for_buys(context: ContextTypes.DEFAULT_TYPE, prices: d
 
             if mode == 'LIVE':
                 usdt_balance = account_balance
-                if usdt_balance is None or usdt_balance < 5:
-                    logger.info(f"User {user_id} has insufficient LIVE USDT balance ({usdt_balance}) to open trade for {symbol}.")
+                trade_size_usdt = float(settings.get('TRADE_SIZE_USDT', 5.0))
+                if usdt_balance is None or usdt_balance < trade_size_usdt:
+                    logger.info(f"User {user_id} has insufficient LIVE USDT balance ({usdt_balance}) to open trade for {symbol} with trade size {trade_size_usdt}.")
                     continue
-
-                trade_size_usdt = get_trade_size(usdt_balance, getattr(config, 'MIN_TRADE_SIZE_USDT', 5.0), getattr(config, 'TRADE_RISK_PERCENT', 0.05))
 
                 # --- ATR-based stop-loss ---
                 klines = client.get_historical_klines(symbol, Client.KLINE_INTERVAL_1HOUR, "30 hours ago UTC")
@@ -925,18 +924,15 @@ async def ai_trade_monitor(context: ContextTypes.DEFAULT_TYPE, symbol: str, user
             return
 
         # --- Execute Buy ---
-        usdt_balance = get_account_balance(user_id, 'USDT')
-        if usdt_balance is None or usdt_balance < 5:
-            logger.info(f"Skipping {symbol}: USDT balance {usdt_balance} too low.")
-            return
-
-        # Use user's configured trade size if available, else fallback to allocation percent
         settings = db.get_user_effective_settings(user_id)
         trade_size_usdt = float(settings.get('TRADE_SIZE_USDT', 5.0))
         if trade_size_usdt < 5.0:
             trade_size_usdt = 5.0
-        if usdt_balance < trade_size_usdt:
-            trade_size_usdt = usdt_balance
+
+        usdt_balance = get_account_balance(user_id, 'USDT')
+        if usdt_balance is None or usdt_balance < trade_size_usdt:
+            logger.info(f"Skipping {symbol}: USDT balance {usdt_balance} too low for trade size {trade_size_usdt}.")
+            return
 
         order, entry_price, quantity = place_buy_order(user_id, symbol, trade_size_usdt)
         stop_loss_price = entry_price * (1 - settings['STOP_LOSS_PERCENTAGE'] / 100)
