@@ -21,7 +21,7 @@ def create_and_store_slip(symbol, side, amount, price):
     }
     json_slip = json.dumps(slip)
     encrypted_slip = fernet.encrypt(json_slip.encode())
-    redis_client.set(encrypted_slip, encrypted_slip, ex=300)  # TTL of 5 minutes
+    redis_client.set(encrypted_slip, encrypted_slip)
     return encrypted_slip
 
 def get_and_decrypt_slip(encrypted_slip):

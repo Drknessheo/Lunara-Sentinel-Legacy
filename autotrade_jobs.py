@@ -140,7 +140,7 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE):
 async def monitor_autotrades(context: ContextTypes.DEFAULT_TYPE):
     logger.info("Monitoring open autotrades...")
     # Only process keys that match the expected trade slip pattern (e.g., start with 'trade:')
-    encrypted_slips = [k for k in slip_manager.redis_client.keys('*') if k.startswith('trade:')]
+    encrypted_slips = [k for k in slip_manager.redis_client.keys('*') if k.startswith(b'trade:')]
 
     for encrypted_slip in encrypted_slips:
         try:
