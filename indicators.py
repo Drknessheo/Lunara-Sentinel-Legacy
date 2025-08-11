@@ -56,7 +56,7 @@ def get_volatility_based_ladder(df: pd.DataFrame, base_multiplier=1.5, steps=3):
 
 # Keep the old calc_atr function for now to avoid breaking other parts of the code
 # that might still use it. I'll rename it to calc_atr_numpy.
-def calc_atr_numpy(klines, period=14):
+def calc_atr(klines, period=14):
     highs = np.array([float(k[2]) for k in klines])
     lows = np.array([float(k[3]) for k in klines])
     closes = np.array([float(k[4]) for k in klines])

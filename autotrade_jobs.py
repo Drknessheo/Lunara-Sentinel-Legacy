@@ -113,6 +113,9 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE):
         logger.info("Autotrade is disabled. Skipping cycle.")
         return
 
+    settings = autotrade_db.get_user_effective_settings(user_id)
+    trade_size = float(settings.get('TRADE_SIZE_USDT', 5.0))
+
     # Prioritize a short list of coins for AI analysis
     prioritized_coins = config.AI_MONITOR_COINS[:5]  # Only analyze top 5 coins
     suggestions = await get_trade_suggestions_from_gemini(prioritized_coins)
@@ -121,11 +124,10 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE):
         if decision == 'buy':
             try:
                 usdt_balance = trade.get_account_balance(user_id, 'USDT')
-                if usdt_balance is None or usdt_balance < 10:
-                    logger.warning(f"Insufficient balance to autotrade {symbol}.")
+                if usdt_balance is None or usdt_balance < trade_size:
+                    logger.warning(f"Insufficient balance to autotrade {symbol}. Balance: {usdt_balance}, Required: {trade_size}")
                     continue
 
-                trade_size = usdt_balance * 0.1  # Use 10% of balance for each trade
                 order, entry_price, quantity = trade.place_buy_order(user_id, symbol, trade_size)
 
                 slip_manager.create_and_store_slip(symbol, 'buy', quantity, entry_price)
@@ -145,6 +147,7 @@ async def monitor_autotrades(context: ContextTypes.DEFAULT_TYPE):
     for encrypted_slip in encrypted_slips:
         try:
                 slip = slip_manager.get_and_decrypt_slip(encrypted_slip)
+                logger.info(f"Processing slip from key {encrypted_slip}: {slip}")
                 if slip is not None and all(k in slip for k in ('symbol', 'price', 'amount')):
                     current_price = trade.get_current_price(slip['symbol'])
                     if not current_price:
