@@ -407,3 +407,13 @@ def update_dsl_stage(cursor, trade_id: int, new_stage: int):
         "UPDATE trades SET current_dsl_stage = ? WHERE id = ?",
         (new_stage, trade_id)
     )
+
+@db_connection
+def log_trade(cursor, user_id: int, coin_symbol: str, buy_price: float, stop_loss: float, take_profit: float, mode: str = 'LIVE', trade_size_usdt: float | None = None, quantity: float | None = None, rsi_at_buy: float | None = None, highest_price: float | None = None):
+    """Logs a new open trade for a user in the database."""
+    # Ensure user exists before logging a trade
+    get_or_create_user(cursor, user_id)
+    cursor.execute(
+        "INSERT INTO trades (user_id, coin_symbol, buy_price, status, stop_loss_price, take_profit_price, mode, trade_size_usdt, quantity, rsi_at_buy, highest_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (user_id, coin_symbol, buy_price, 'open', stop_loss, take_profit, mode, trade_size_usdt, quantity, rsi_at_buy, highest_price)
+    )

@@ -45,6 +45,7 @@ import google.generativeai as genai
 from Simulation import resonance_engine
 import config
 import trade
+import slip_manager # Import slip_manager
 
 # Load environment variables from .env file
 load_dotenv()
@@ -72,13 +73,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     user = update.effective_user
     await update.message.reply_html(
-        rf"🌑 <b>A new trader emerges from the shadows.</b> {user.mention_html()}, you have been summoned by <b>Lunessa Shai'ra Gork</b>, Sorceress of DeFi and guardian of RSI gates.\\n\\n"
-        "🧭 <i>Your journey begins now.</i>\\n"
-        "- Quest 1: Link your API Key (Binance/OKX)\\n"
-        "- Quest 2: Choose your weapon: RSI or Bollinger\\n"
-        "- Quest 3: Survive 3 trades\\n\\n"
-        "Reply with: /linkbinance or /learn\\n\\n"
-        "To unlock the arcane powers, send your Binance API keys in a private message with: <code>/setapi YOUR_API_KEY YOUR_SECRET_KEY</code>\\n\\n"
+        rf"🌑 <b>A new trader emerges from the shadows.</b> {user.mention_html()}, you have been summoned by <b>Lunessa Shai'ra Gork</b>, Sorceress of DeFi and guardian of RSI gates.\n\n"
+        "🧭 <i>Your journey begins now.</i>\n"
+        "- Quest 1: Link your API Key (Binance/OKX)\n"
+        "- Quest 2: Choose your weapon: RSI or Bollinger\n"
+        "- Quest 3: Survive 3 trades\n\n"
+        "Reply with: /linkbinance or /learn\n\n"
+        "To unlock the arcane powers, send your Binance API keys in a private message with: <code>/setapi YOUR_API_KEY YOUR_SECRET_KEY</code>\n\n"
         "Use /help to see all available commands."
     )
 
@@ -118,7 +119,7 @@ async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if rsi is None:
             await update.message.reply_text(f"Could not fetch RSI for {symbol}.")
             return
-        await update.message.reply_text(f"RSI for {symbol}: `{rsi:.2f}`\\nUpgrade to Premium for full analysis.", parse_mode='Markdown')
+        await update.message.reply_text(f"RSI for {symbol}: `{rsi:.2f}`\nUpgrade to Premium for full analysis.", parse_mode='Markdown')
         return
     # Premium: Full analysis
     await trade.quest_command(update, context)
@@ -131,9 +132,17 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     user_tier = db.get_user_tier_db(user_id)
     
+    # Get active slips from Redis
+    active_slips = slip_manager.list_all_slips()
+    active_slip_symbols = {slip['data']['symbol'] for slip in active_slips if 'data' in slip and 'symbol' in slip['data']}
+    active_slip_keys = {slip['key'] for slip in active_slips}
 
-    if not open_trades and not watched_items:
-        await update.message.reply_text("You have no open quests or watched symbols. Use /quest to find an opportunity.")
+    # Filter open_trades to only include those actively monitored by Redis slips
+    monitored_trades = [trade_item for trade_item in open_trades if trade_item['coin_symbol'] in active_slip_symbols]
+    orphaned_trades = [trade_item for trade_item in open_trades if trade_item['coin_symbol'] not in active_slip_symbols]
+
+    if not monitored_trades and not watched_items and not orphaned_trades:
+        await update.message.reply_text("You have no open quests, watched symbols, or orphaned trades. Use /quest to find an opportunity.")
         return
 
     message = ""
@@ -150,45 +159,54 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         else:
             logger.warning(f"Price cache for user {user_id} is stale. Displaying last known data.")
 
-    if open_trades:
-        message += "📜 **Your Open Quests:**\\n"
-        for trade_item in open_trades:
+    if monitored_trades:
+        message += "📜 **Your Open Quests (Monitored):**\n"
+        for trade_item in monitored_trades:
             symbol = trade_item['coin_symbol']
             buy_price = trade_item['buy_price']
             current_price = prices.get(symbol)
             trade_id = trade_item['id']
 
-            message += f"\\n🔹 **{symbol}** (ID: {trade_id})"
+            message += f"\n🔹 **{symbol}** (ID: {trade_id})"
 
             if current_price:
                 pnl_percent = ((current_price - buy_price) / buy_price) * 100
                 pnl_emoji = "📈" if pnl_percent >= 0 else "📉"
                 message += (
-                    f"\\n   {pnl_emoji} P/L: `{pnl_percent:+.2f}%`"
-                    f"\\n   Bought: `${buy_price:,.8f}`"
-                    f"\\n   Current: `${current_price:,.8f}`"
+                    f"\n   {pnl_emoji} P/L: `{pnl_percent:+.2f}%`"
+                    f"\n   Bought: `${buy_price:,.8f}`"
+                    f"\n   Current: `${current_price:,.8f}`"
                 )
                 if user_tier == 'PREMIUM':
                     tp_price = trade_item['take_profit_price']
                     stop_loss = trade_item['stop_loss_price']
                     message += (
-                        f"\\n   ✅ Target: `${tp_price:,.8f}`"
-                        f"\\n   🛡️ Stop: `${stop_loss:,.8f}`"
+                        f"\n   ✅ Target: `${tp_price:,.8f}`"
+                        f"\n   🛡️ Stop: `${stop_loss:,.8f}`"
                     )
             else:
-                message += "\\n   _(Price data is currently being updated)_"
+                message += "\n   _(Price data is currently being updated)_"
 
-        message += "\\n"  # Add a newline for spacing before the watchlist
+        message += "\n"  # Add a newline for spacing before the watchlist
+
+    if orphaned_trades:
+        message += "⚠️ **Orphaned Quests (Not Monitored by Redis):**\n"
+        message += "_These trades are in your database but not actively monitored by the bot. Consider closing them manually if they are no longer active._\n"
+        for trade_item in orphaned_trades:
+            symbol = trade_item['coin_symbol']
+            trade_id = trade_item['id']
+            message += f"\n🔸 **{symbol}** (ID: {trade_id})"
+        message += "\n" # Add a newline for spacing
 
     if watched_items:
-        message += "\\n🔭 **Your Watched Symbols:**\\n"
+        message += "\n🔭 **Your Watched Symbols:**\n"
         for item in watched_items:
             # Calculate time since added
             add_time = datetime.strptime(item['add_timestamp'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
             time_watching = datetime.now(timezone.utc) - add_time
             hours, remainder = divmod(time_watching.total_seconds(), 3600)
             minutes, _ = divmod(remainder, 60)
-            message += f"\\n🔸 **{item['coin_symbol']}** (*Watching for {int(hours)}h {int(minutes)}m*)"
+            message += f"\n🔸 **{item['coin_symbol']}** (*Watching for {int(hours)}h {int(minutes)}m*)"
 
     # The send_premium_message wrapper is overly complex; a direct reply is cleaner.
     await update.message.reply_text(message, parse_mode='Markdown')
@@ -261,7 +279,7 @@ async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         # context.args contains the words after the command, e.g., ['123']
         trade_id = int(context.args[0])
     except (IndexError, ValueError):
-        await update.message.reply_text("Please provide a valid trade ID.\\nUsage: `/close <trade_id>`", parse_mode='Markdown')
+        await update.message.reply_text("Please provide a valid trade ID.\nUsage: `/close <trade_id>`", parse_mode='Markdown')
         return
 
     trade_to_close = db.get_trade_by_id(trade_id=trade_id, user_id=user_id)
@@ -280,7 +298,7 @@ async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     success = db.close_trade(trade_id=trade_id, user_id=user_id, sell_price=current_price)
 
     if success:
-        await update.message.reply_text(f"✅ Quest (ID: {trade_id}) for {symbol} has been completed at a price of ${current_price:,.8f}!\\n\\nUse /review to see your performance.")
+        await update.message.reply_text(f"✅ Quest (ID: {trade_id}) for {symbol} has been completed at a price of ${current_price:,.8f}!\n\nUse /review to see your performance.")
     else:
         await update.message.reply_text("An unexpected error occurred while closing the trade.")
 
@@ -341,17 +359,17 @@ async def wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Sort by USDT value, descending
         valued_assets.sort(key=lambda x: x['usdt_value'], reverse=True)
 
-        message = "💎 **Your Spot Wallet Holdings:**\\n\\n"
+        message = "💎 **Your Spot Wallet Holdings:**\n\n"
         for asset_info in valued_assets:
             balance_str = f"{asset_info['balance']:,.8f}".rstrip('0').rstrip('.')
-            message += f"  - **{asset_info['asset']}**: `{balance_str}` (~${asset_info['usdt_value']:,.2f})\\n"
+            message += f"  - **{asset_info['asset']}**: `{balance_str}` (~${asset_info['usdt_value']:,.2f})\n"
 
-        message += f"\\n*Estimated Total Value:* `${total_usdt_value:,.2f}` USDT"
+        message += f"\n*Estimated Total Value:* `${total_usdt_value:,.2f}` USDT"
 
         await update.message.reply_text(message, parse_mode='Markdown')
 
     except trade.TradeError as e:
-        await update.message.reply_text(f"⚠️ **Error!**\\n\\n*Reason:* `{e}`", parse_mode='Markdown')
+        await update.message.reply_text(f"⚠️ **Error!**\n\n*Reason:* `{e}`", parse_mode='Markdown')
 
 async def import_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Imports all significant holdings from Binance wallet as new quests."""
@@ -410,18 +428,18 @@ async def import_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             imported_count += 1
             message_lines.append(f"  ✅ Imported **{symbol}** (~${usdt_value:,.2f})")
 
-        summary_message = "✨ **Import Complete!** ✨\\n\\n"
+        summary_message = "✨ **Import Complete!** ✨\n\n"
         if message_lines:
-            summary_message += "\\n".join(message_lines) + "\\n\\n"
-        summary_message += f"*Summary:*\\n"
-        summary_message += f"- New Quests Started: `{imported_count}`\\n"
-        summary_message += f"- Already Tracked: `{skipped_count}`\\n\\n"
+            summary_message += "\n".join(message_lines) + "\n\n"
+        summary_message += f"*Summary:*\n"
+        summary_message += f"- New Quests Started: `{imported_count}`\n"
+        summary_message += f"- Already Tracked: `{skipped_count}`\n\n"
         summary_message += "Use /status to see your newly managed quests."
 
         await update.message.reply_text(summary_message, parse_mode='Markdown')
 
     except trade.TradeError as e:
-        await update.message.reply_text(f"⚠️ **Error!**\\n\\n*Reason:* `{e}`", parse_mode='Markdown')
+        await update.message.reply_text(f"⚠️ **Error!**\n\n*Reason:* `{e}`", parse_mode='Markdown')
 
 async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
@@ -440,7 +458,7 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         symbol = context.args[0].upper()
         usdt_amount = float(context.args[1])
     except (IndexError, ValueError):
-        await update.message.reply_text("Please specify a symbol and amount.\\nUsage: `/buy PEPEUSDT 11`", parse_mode='Markdown')
+        await update.message.reply_text("Please specify a symbol and amount.\nUsage: `/buy PEPEUSDT 11`", parse_mode='Markdown')
         return
 
     if db.is_trade_open(user_id, symbol):
@@ -473,10 +491,10 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                      stop_loss=stop_loss_price, take_profit=take_profit_price,
                      mode='LIVE', trade_size_usdt=usdt_amount, quantity=quantity)
 
-        await update.message.reply_text(f"🚀 **Live Quest Started!**\\n\\nSuccessfully bought **{quantity:,.4f} {symbol}** at `${entry_price:,.8f}`.\\n\\nI will now monitor this quest for you. Use /status to see its progress.", parse_mode='Markdown')
+        await update.message.reply_text(f"🚀 **Live Quest Started!**\n\nSuccessfully bought **{quantity:,.4f} {symbol}** at `${entry_price:,.8f}`.\n\nI will now monitor this quest for you. Use /status to see its progress.", parse_mode='Markdown')
 
     except trade.TradeError as e:
-        await update.message.reply_text(f"⚠️ **Quest Failed!**\\n\\n*Reason:* `{e}`", parse_mode='Markdown')
+        await update.message.reply_text(f"⚠️ **Quest Failed!**\n\n*Reason:* `{e}`", parse_mode='Markdown')
 
 async def checked_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Shows which symbols the AI has checked recently."""
@@ -504,7 +522,7 @@ async def checked_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text("The AI has not checked any symbols in the last hour.")
         return
 
-    message = "📈 **AI Oracle's Recent Scans (Last Hour):**\\n\\n" + ", ".join(f"`{s}`" for s in recent_checks)
+    message = "📈 **AI Oracle's Recent Scans (Last Hour):**\n\n" + ", ".join(f"`{s}`" for s in recent_checks)
     await update.message.reply_text(message, parse_mode='Markdown')
 
 async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -547,22 +565,22 @@ async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     avg_pnl_percent = total_profit_percent / total_trades if total_trades > 0 else 0
 
     message = (
-        f"🌟 **Lunessa's Performance Review** 🌟\\n\\n"
-        f"**Completed Quests:** {total_trades}\\n"
-        f"**Victories (Wins):** {wins}\\n"
-        f"**Setbacks (Losses):** {losses}\\n"
-        f"**Win Rate:** {win_rate:.2f}%\\n\\n"
-        f"**Average P/L:** `{avg_pnl_percent:,.2f}%`\\n"
+        f"🌟 **Lunessa's Performance Review** 🌟\n\n"
+        f"**Completed Quests:** {total_trades}\n"
+        f"**Victories (Wins):** {wins}\n"
+        f"**Setbacks (Losses):** {losses}\n"
+        f"**Win Rate:** {win_rate:.2f}%\n\n"
+        f"**Average P/L:** `{avg_pnl_percent:,.2f}%`\n"
     )
 
     if best_trade and worst_trade:
         message += (
-            f"\\n**Top Performers:**\\n"
-            f"🚀 **Best Quest:** {best_trade['coin_symbol']} (`{best_pnl:+.2f}%`)\\n"
-            f"💔 **Worst Quest:** {worst_trade['coin_symbol']} (`{worst_pnl:+.2f}%`)\\n"
+            f"\n**Top Performers:**\n"
+            f"🚀 **Best Quest:** {best_trade['coin_symbol']} (`{best_pnl:+.2f}%`)\n"
+            f"💔 **Worst Quest:** {worst_trade['coin_symbol']} (`{worst_pnl:+.2f}%`)\n"
         )
 
-    message += "\\nKeep honing your skills, seeker. The market's rhythm is complex."
+    message += "\nKeep honing your skills, seeker. The market's rhythm is complex."
     await update.message.reply_text(message, parse_mode='Markdown')
 
 async def top_trades_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -574,14 +592,14 @@ async def top_trades_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("You have no completed profitable quests to rank. Close a winning trade to enter the Hall of Fame!", parse_mode='Markdown')
         return
 
-    message = "🏆 **Your Hall of Fame** 🏆\\n\\n_Here are your most legendary victories:_\\n\\n"
+    message = "🏆 **Your Hall of Fame** 🏆\n\n_Here are your most legendary victories:_\n\n"
     rank_emojis = ["🥇", "🥈", "🥉"]
 
     for i, trade in enumerate(top_trades):
         emoji = rank_emojis[i] if i < len(rank_emojis) else "🔹"
-        message += f"{emoji} **{trade['coin_symbol']}**: `{trade['pnl_percent']:+.2f}%`\\n"
+        message += f"{emoji} **{trade['coin_symbol']}**: `{trade['pnl_percent']:+.2f}%`\n"
 
-    message += "\\nMay your future quests be even more glorious!"
+    message += "\nMay your future quests be even more glorious!"
     await update.message.reply_text(message, parse_mode='Markdown')
 
 async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -593,13 +611,13 @@ async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     referral_link = f"https://www.binance.com/en/activity/referral-entry/CPA?ref={config.ADMIN_REFERRAL_CODE}"
 
     message = (
-        f"🤝 **Invite Friends, Earn Together!** 🤝\\n\\n"
-        f"Refer friends to buy crypto on Binance, and we both get rewarded!\\n\\n"
-        f"**The Deal:**\\n"
-        f"When your friend signs up using the link below and buys over $50 worth of crypto, you both receive a **$100 trading fee rebate voucher**.\\n\\n"
-        f"**Your Tools to Share:**\\n\\n"
-        f"🔗 **Referral Link:**\\n`{referral_link}`\\n\\n"
-        f"🏷️ **Referral Code:**\\n`{config.ADMIN_REFERRAL_CODE}`\\n\\n"
+        f"🤝 **Invite Friends, Earn Together!** 🤝\n\n"
+        f"Refer friends to buy crypto on Binance, and we both get rewarded!\n\n"
+        f"**The Deal:**\n"
+        f"When your friend signs up using the link below and buys over $50 worth of crypto, you both receive a **$100 trading fee rebate voucher**.\n\n"
+        f"**Your Tools to Share:**\n\n"
+        f"🔗 **Referral Link:**\n`{referral_link}`\n\n"
+        f"🏷️ **Referral Code:**\n`{config.ADMIN_REFERRAL_CODE}`\n\n"
         f"Share the link or code with your friends to start earning. Thank you for supporting the Lunessa project!"
     )
     await update.message.reply_text(message, parse_mode='Markdown', disable_web_page_preview=True)
@@ -612,7 +630,7 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("The Hall of Legends is still empty. No legendary quests have been completed yet!", parse_mode='Markdown')
         return
 
-    message = "🏆 **Hall of Legends: Global Top Quests** 🏆\\n\\n_These are the most glorious victories across the realm:_\\n\\n"
+    message = "🏆 **Hall of Legends: Global Top Quests** 🏆\n\n_These are the most glorious victories across the realm:_\n\n"
     rank_emojis = ["🥇", "🥈", "🥉"]
 
     for i, trade in enumerate(top_trades):
@@ -625,9 +643,9 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception as e:
             logger.warning(f"Could not fetch user name for {user_id} for leaderboard: {e}")
 
-        message += f"{emoji} **{trade['coin_symbol']}**: `{trade['pnl_percent']:+.2f}%` (by {user_name})\\n"
+        message += f"{emoji} **{trade['coin_symbol']}**: `{trade['pnl_percent']:+.2f}%` (by {user_name})\n"
 
-    message += "\\nWill your name be etched into legend?"
+    message += "\nWill your name be etched into legend?"
     await update.message.reply_text(message, parse_mode='Markdown')
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -705,6 +723,10 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     user_id = update.effective_user.id
     user_tier = db.get_user_tier_db(user_id)
 
+    def escape_markdown(text):
+        import re
+        return re.sub(r'([_\*\[\]()~`>#+\-=|{}.!])', r'\\\1', text)
+
     if user_tier != 'PREMIUM':
         await update.message.reply_text("Upgrade to Premium to use this feature.")
         return
@@ -728,9 +750,6 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             "**Reset a setting to default:**\n  `/settings <name> reset`\n\n"
             "**Available settings:** rsi_buy, rsi_sell, stop_loss, trailing_activation, trailing_drop, trade_size"
         )
-        def escape_markdown(text):
-            import re
-            return re.sub(r'([_\*\[\]()~`>#+\-=|{}.!])', r'\\\1', text)
 
         await update.message.reply_text(escape_markdown(message), parse_mode='MarkdownV2')
         return
@@ -788,10 +807,10 @@ async def autotrade_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         coins = getattr(config, "AI_MONITOR_COINS", [])
         coins_str = ", ".join(coins) if coins else "None"
         await update.message.reply_text(
-            f"🤖 **AI Autotrade Status:** `{status}`\\n\\n"
-            f"<b>Monitored Coins:</b> {coins_str}\\n"
-            "<b>What is Autotrade?</b>\\n"
-            "When enabled, the bot will automatically scan for strong buy signals and execute trades for you. You will be notified of all actions.\\n"
+            f"🤖 **AI Autotrade Status:** `{status}`\n\n"
+            f"<b>Monitored Coins:</b> {coins_str}\n"
+            "<b>What is Autotrade?</b>\n"
+            "When enabled, the bot will automatically scan for strong buy signals and execute trades for you. You will be notified of all actions.\n"
             "Use <code>/autotrade on</code> to enable, or <code>/autotrade off</code> to disable.",
             parse_mode=ParseMode.HTML
         )
@@ -801,16 +820,16 @@ async def autotrade_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if sub_command == 'on':
         db.set_autotrade_status(user_id, True)
         await update.message.reply_text(
-            "🤖 <b>AI Autotrade has been ENABLED.</b>\\n\\n"
-            "The bot will now scan for strong buy signals and execute trades for you automatically. You will receive notifications for every action taken.\\n\\n"
+            "🤖 <b>AI Autotrade has been ENABLED.</b>\n\n"
+            "The bot will now scan for strong buy signals and execute trades for you automatically. You will receive notifications for every action taken.\n\n"
             "To disable, use <code>/autotrade off</code>.",
             parse_mode=ParseMode.HTML
         )
     elif sub_command == 'off':
         db.set_autotrade_status(user_id, False)
         await update.message.reply_text(
-            "🤖 <b>AI Autotrade has been DISABLED.</b>\\n\\n"
-            "The bot will no longer execute trades automatically. You are now in manual mode.\\n\\n"
+            "🤖 <b>AI Autotrade has been DISABLED.</b>\n\n"
+            "The bot will no longer execute trades automatically. You are now in manual mode.\n\n"
             "To enable again, use <code>/autotrade on</code>.",
             parse_mode=ParseMode.HTML
         )
@@ -829,7 +848,7 @@ async def addcoins_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         coins = getattr(config, "AI_MONITOR_COINS", [])
         coins_str = ", ".join(coins) if coins else "None"
         await update.message.reply_text(
-            f"Current monitored coins: {coins_str}\\nUsage: /addcoins OMbtc, ARBUSDT, ... or /addcoins reset",
+            f"Current monitored coins: {coins_str}\nUsage: /addcoins OMbtc, ARBUSDT, ... or /addcoins reset",
             parse_mode='Markdown'
         )
         return
@@ -954,11 +973,12 @@ def main() -> None:
     application.add_handler(CommandHandler("wallet", wallet_command))
     application.add_handler(CommandHandler("checked", checked_command))
     application.add_handler(CommandHandler("autotrade", autotrade_command))
+    application.add_handler(CommandHandler("cleanslips", clean_slips_command))
 
     # --- Set up background jobs ---
     job_queue = application.job_queue
     # Schedule the auto-scan job to run every 10 minutes (600 seconds).
-    job_queue.run_repeating(trade.scheduled_monitoring_job, interval=60, first=10) # This job now handles all monitoring
+    job_queue.run_repeating(trade.scheduled_monitoring_job, interval=config.AI_TRADE_INTERVAL_MINUTES * 60, first=10) # This job now handles all monitoring
     # Schedule the daily summary job to run at 8:00 AM UTC
     job_queue.run_daily(send_daily_status_summary, time=datetime(1, 1, 1, 8, 0, 0, tzinfo=timezone.utc).time())
     job_queue.run_repeating(autotrade_jobs.autotrade_cycle, interval=900, first=10)  # 15 minutes
@@ -966,6 +986,43 @@ def main() -> None:
 
     logger.info("Starting bot with market monitor and AI trade monitor jobs scheduled...")
     application.run_polling()
+
+async def clean_slips_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin command to list and optionally delete Redis trade slips."""
+    user_id = update.effective_user.id
+    if user_id != config.ADMIN_USER_ID:
+        await update.message.reply_text("This is an admin-only command.")
+        return
+
+    if not context.args:
+        # List all slips
+        slips = slip_manager.list_all_slips()
+        if not slips:
+            await update.message.reply_text("No trade slips found in Redis.")
+            return
+
+        message = "📜 **Current Redis Trade Slips:**\n\n"
+        for slip in slips:
+            key = slip['key']
+            data = slip.get('data', {})
+            symbol = data.get('symbol', 'N/A')
+            timestamp = data.get('timestamp', 'N/A')
+            message += f"- `{key}` (Symbol: {symbol}, Time: {timestamp})\n"
+        message += "\nTo delete a slip, use: `/cleanslips <full_slip_key>`"
+        await update.message.reply_text(message, parse_mode='Markdown')
+    else:
+        # Delete a specific slip
+        slip_key_to_delete = context.args[0]
+        try:
+            # Ensure the key is bytes as Redis keys are bytes
+            if not slip_key_to_delete.startswith("trade:"):
+                slip_key_to_delete = "trade:" + slip_key_to_delete
+            
+            slip_manager.cleanup_slip(slip_key_to_delete.encode())
+            await update.message.reply_text(f"✅ Slip `{slip_key_to_delete}` deleted from Redis.")
+        except Exception as e:
+            logger.error(f"Error deleting slip {slip_key_to_delete}: {e}")
+            await update.message.reply_text(f"⚠️ Failed to delete slip `{slip_key_to_delete}`. Error: {e}")
 
 if __name__ == "__main__":
     asyncio.run(main())
