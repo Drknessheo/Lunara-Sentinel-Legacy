@@ -125,10 +125,25 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE):
             try:
                 usdt_balance = trade.get_account_balance(user_id, 'USDT')
                 if usdt_balance is None or usdt_balance < trade_size:
-                    logger.warning(f"Insufficient balance to autotrade {symbol}. Balance: {usdt_balance}, Required: {trade_size}")
+                    logger.warning(f"Insufficient balance to autotrade {symbol}. Current USDT: {usdt_balance:.2f}, Required: {trade_size:.2f}. Skipping buy.")
                     continue
 
                 order, entry_price, quantity = trade.place_buy_order(user_id, symbol, trade_size)
+
+                # Log the trade to the database
+                settings = autotrade_db.get_user_effective_settings(user_id)
+                stop_loss_price = entry_price * (1 - settings['STOP_LOSS_PERCENTAGE'] / 100)
+                take_profit_price = entry_price * (1 + settings['PROFIT_TARGET_PERCENTAGE'] / 100)
+                autotrade_db.log_trade(
+                    user_id=user_id,
+                    coin_symbol=symbol,
+                    buy_price=entry_price,
+                    stop_loss=stop_loss_price,
+                    take_profit=take_profit_price,
+                    mode='LIVE',
+                    quantity=quantity,
+                    trade_size_usdt=trade_size
+                )
 
                 slip_manager.create_and_store_slip(symbol, 'buy', quantity, entry_price)
 
