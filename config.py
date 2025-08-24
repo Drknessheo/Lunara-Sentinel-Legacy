@@ -1,20 +1,41 @@
 import os
 from dotenv import load_dotenv
 
+def safe_print_config():
+    """
+    Prints a sanitized version of the environment variables for debugging,
+    masking sensitive keys to prevent them from being exposed in logs.
+    """
+    print("[DEBUG] Sanitized Environment Variables:")
+    safe_keys = [
+        'MODE', 'ENV', 'VERSION', 'CHAT_ID', 'ADMIN_USER_ID',
+        'GDRIVE_REMOTE_NAME', 'DB_NAME', 'AI_TRADE_INTERVAL_MINUTES',
+        'TELEGRAM_SYNC_LOG_ENABLED', 'BTC_ALERT_THRESHOLD_PERCENT',
+        'HELD_TOO_LONG_HOURS', 'NEAR_STOP_LOSS_THRESHOLD_PERCENT',
+        'NEAR_TAKE_PROFIT_THRESHOLD_PERCENT', 'RSI_BUY_RECOVERY_THRESHOLD',
+        'WATCHLIST_TIMEOUT_HOURS', 'PAPER_TRADE_SIZE_USDT',
+        'PAPER_STARTING_BALANCE'
+    ]
+    for key, value in os.environ.items():
+        # Check if the key is in the safe list or doesn't appear to be sensitive
+        is_safe = key.upper() in safe_keys or \
+                    ("API" not in key.upper() and \
+                     "KEY" not in key.upper() and \
+                     "TOKEN" not in key.upper() and \
+                     "SECRET" not in key.upper())
+
+        if is_safe:
+            print(f"  - {key}: {value}")
+        else:
+            print(f"  - {key}: **** MASKED ****")
+
 # Explicitly load .env from the project root, regardless of working directory
-
-# Debug: Print the .env file path being loaded
-
-# Correct .env path: project root (G:\Lunara Bot\.env)
-
-# Set dotenv_path directly to G:\Lunara Bot\.env
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 print(f"[DEBUG] Loading .env from: {dotenv_path}")
 load_dotenv(dotenv_path=dotenv_path)
 
-# Debug: Print all environment variables after loading
-print(f"[DEBUG] BINANCE_ENCRYPTION_KEY: {os.getenv('BINANCE_ENCRYPTION_KEY')}")
-print(f"[DEBUG] All envs: {dict(os.environ)}")
+# Debug: Print sanitized environment variables after loading
+safe_print_config()
 
 # For the Binance API setup
 BINANCE_ENCRYPTION_KEY = os.getenv('BINANCE_ENCRYPTION_KEY').encode() if os.getenv('BINANCE_ENCRYPTION_KEY') else None
@@ -26,7 +47,7 @@ SANDPAPER_ENCRYPTION_KEY = os.getenv('SANDPAPER_ENCRYPTION_KEY').encode() if os.
 AI_MONITOR_COINS = [
     'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'ADAUSDT', 'XRPUSDT', 'DOGEUSDT', 'DOTUSDT', 'AVAXUSDT',
     'LINKUSDT', 'ARBUSDT', 'OPUSDT', 'LTCUSDT', 'TRXUSDT', 'SHIBUSDT', 'PEPEUSDT', 'UNIUSDT', 'SUIUSDT', 'INJUSDT',
-    'CTKUSDT', 'ENAUSDT' 
+    'CTKUSDT', 'ENAUSDT'
 ]
 
 # --- Per-trade allocation limit (as a percentage of available USDT balance) ---

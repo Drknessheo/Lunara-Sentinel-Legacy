@@ -994,7 +994,11 @@ async def run_monitoring_cycle(context: ContextTypes.DEFAULT_TYPE, open_trades, 
 
         # Validate trade object for required keys
         if 'quantity' not in trade or trade['quantity'] is None:
-            logger.error(f"[user_id={user_id}][trade_id={trade.get('id')}] Missing quantity in trade: {trade}")
+            try:
+                trade_id = trade['id']
+            except KeyError:
+                trade_id = 'unknown'
+            logger.error(f"[user_id={user_id}][trade_id={trade_id}] Missing quantity in trade: {trade}")
             continue
 
         # Notional guard before any sell/close logic
