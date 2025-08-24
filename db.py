@@ -251,13 +251,12 @@ def get_all_open_trades():
     conn = get_db_connection()
     return conn.execute("SELECT id, user_id, coin_symbol, buy_price, stop_loss_price, take_profit_price, peak_price, mode, trade_size_usdt, quantity, buy_timestamp FROM trades WHERE status = 'open'").fetchall()
 
-def get_trade_by_id(trade_id: int, user_id: int):
+def get_trade_by_id(trade_id: int):
     """
-    Retrieves a specific open trade by its ID for a specific user.
-    Used by the /close command to ensure a user can only close their own trade.
+    Retrieves a specific open trade by its ID.
     """
     conn = get_db_connection()
-    return conn.execute("SELECT * FROM trades WHERE id = ? AND user_id = ?", (trade_id, user_id)).fetchone()
+    return conn.execute("SELECT * FROM trades WHERE id = ?", (trade_id,)).fetchone()
 
 def get_open_trade_by_symbol(user_id: int, symbol: str):
     """Retrieves an open trade by its symbol for a specific user."""

@@ -151,8 +151,9 @@ def get_rsi(symbol="BTCUSDT", interval=Client.KLINE_INTERVAL_1HOUR, period=14):
             return None # Not enough data
 
         closes = np.array([float(k[4]) for k in klines])
-        df = pd.DataFrame({'close': closes})
-        return calculate_rsi(df['close'], period).iloc[-1]
+        # Create a Series from the numpy array without copying data
+        close_series = pd.Series(closes, copy=False)
+        return calculate_rsi(close_series, period).iloc[-1]
     except BinanceAPIException as e:
         logger.error(f"Binance API error getting RSI for {symbol}: {e}")
         return None

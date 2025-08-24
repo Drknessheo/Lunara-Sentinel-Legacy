@@ -650,7 +650,8 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays a help message with all available commands."""
-    help_text = """<b>Lunessa's Guide 🔮</b>
+    help_text = """
+<b>Lunessa's Guide 🔮</b>
 
 Here are the commands to guide your journey:
 
@@ -725,7 +726,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     def escape_markdown(text):
         import re
-        return re.sub(r'([_\*\[\]()~`>#+\-=|{}.!])', r'\\\1', text)
+        return re.sub(r'([_\*\-\[\]()~`>#+\|= {{}}.!])', r'\\\1', text)
 
     if user_tier != 'PREMIUM':
         await update.message.reply_text("Upgrade to Premium to use this feature.")
@@ -892,7 +893,8 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def usercount_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("User count is a Premium feature.")
 
-# --- Restore previous /ask command logic ---
+# ---
+# Restore previous /ask command logic ---
 async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /ask command using Gemini AI for Premium users."""
     user_id = update.effective_user.id
@@ -917,7 +919,8 @@ async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.message.reply_text("The AI Oracle could not answer at this time.")
 
 
-# --- Placeholder Command Handlers ---
+# ---
+# Placeholder Command Handlers ---
 async def subscribe_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("This is a placeholder for the subscribe command.")
 
@@ -975,7 +978,8 @@ def main() -> None:
     application.add_handler(CommandHandler("autotrade", autotrade_command))
     application.add_handler(CommandHandler("cleanslips", clean_slips_command))
 
-    # --- Set up background jobs ---
+    # ---
+    # Set up background jobs ---
     job_queue = application.job_queue
     # Schedule the auto-scan job to run every 10 minutes (600 seconds).
     job_queue.run_repeating(trade.scheduled_monitoring_job, interval=config.AI_TRADE_INTERVAL_MINUTES * 60, first=10) # This job now handles all monitoring

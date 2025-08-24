@@ -7,3 +7,5 @@ matplotlib
 cryptography
 filelock
 pandas
+pyarrow
+apscheduler
