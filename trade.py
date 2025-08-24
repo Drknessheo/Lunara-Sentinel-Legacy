@@ -48,6 +48,7 @@ import numpy as np
 import time
 import asyncio
 import math
+from trade_guard import TradeValidator
 from datetime import datetime, timezone
 import logging
 import numpy as np
@@ -335,6 +336,10 @@ def place_sell_order(user_id: int, symbol: str, quantity: float):
     formatted_quantity = f"{quantity:.{precision}f}"
 
     try:
+        # Notional check before placing order
+        current_price = get_current_price(symbol)
+        if not TradeValidator.is_trade_valid(symbol, float(formatted_quantity), current_price, user_id=user_id):
+            raise TradeError(f"Trade skipped: Notional value too low for {symbol} (user {user_id})")
         logger.info(f"Attempting to SELL {formatted_quantity} of {symbol} for user {user_id}...")
         order = user_client.order_market_sell(symbol=symbol, quantity=formatted_quantity)
         logger.info(f"LIVE SELL order successful for {symbol} for user {user_id}: {order}")
@@ -986,6 +991,16 @@ async def run_monitoring_cycle(context: ContextTypes.DEFAULT_TYPE, open_trades, 
         except IndexError:
             logger.error(f"No settings found for user_id {user_id}, using default settings.")
             settings = db.get_user_effective_settings(None)
+
+        # Validate trade object for required keys
+        if 'quantity' not in trade or trade['quantity'] is None:
+            logger.error(f"[user_id={user_id}][trade_id={trade.get('id')}] Missing quantity in trade: {trade}")
+            continue
+
+        # Notional guard before any sell/close logic
+        notional = trade['quantity'] * current_price
+        if not TradeValidator.is_trade_valid(symbol, trade['quantity'], current_price, user_id=user_id, slip_id=trade.get('id')):
+            continue
 
         # --- DSLA Logic ---
         # ... (existing DSLA logic is fine)
