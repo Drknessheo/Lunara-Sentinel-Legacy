@@ -1,0 +1,9 @@
+# PATCH PLAN: Restore real Binance integration for /status and /close
+
+1. Add Binance client setup to trade.py using API keys from config or .env.
+2. Implement get_all_spot_balances to fetch real balances from Binance.
+3. Implement get_current_price to fetch real price from Binance.
+4. Ensure all admin/creator logic is preserved.
+5. Remove any stub/mock logic for admin wallet.
+
+# Next step: Apply these changes to trade.py.

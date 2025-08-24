@@ -1,5 +1,7 @@
 import sqlite3
 import functools
+import config
+from security import decrypt_data
 
 def db_connection(func):
     """Decorator to handle database connection and cursor management."""
@@ -28,6 +30,14 @@ SETTING_TO_COLUMN_MAP = {
     'trailing_drop': 'custom_trailing_drop',
 }
 
+CUSTOM_SETTINGS_MAPPING = {
+    'custom_rsi_buy': 'RSI_BUY_THRESHOLD',
+    'custom_rsi_sell': 'RSI_SELL_THRESHOLD',
+    'custom_stop_loss': 'STOP_LOSS_PERCENTAGE',
+    'custom_trailing_activation': 'TRAILING_PROFIT_ACTIVATION_PERCENT',
+    'custom_trailing_drop': 'TRAILING_STOP_DROP_PERCENT',
+}
+
 @db_connection
 def update_user_setting(cursor, user_id: int, setting_name: str, value):
     """
@@ -41,32 +51,6 @@ def update_user_setting(cursor, user_id: int, setting_name: str, value):
     else:
         cursor.execute(f"UPDATE users SET {column} = ? WHERE user_id = ?", (value, user_id))
 
-
-import sqlite3
-import functools
-import config
-from security import decrypt_data
-
-def db_connection(func):
-    """Decorator to handle database connection and cursor management."""
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        conn = sqlite3.connect('lunara_bot.db')
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        try:
-            result = func(cursor, *args, **kwargs)
-            conn.commit()
-            return result
-        except sqlite3.Error as e:
-            print(f"Database error in {func.__name__}: {e}")
-            conn.rollback()
-            raise  # Re-raise the exception after rollback
-        finally:
-            conn.close()
-    return wrapper
-
-# --- Admin and API Key Management ---
 def update_user_subscription(cursor, user_id: int, tier: str = "PREMIUM", expires: str = None):
     """Update a user's subscription tier and expiration."""
     get_or_create_user(cursor, user_id)
@@ -83,7 +67,6 @@ def store_user_api_keys(cursor, user_id: int, api_key: str, secret_key: str):
     get_or_create_user(cursor, user_id)
     cursor.execute("UPDATE users SET api_key = ?, secret_key = ? WHERE user_id = ?", (encrypted_api, encrypted_secret, user_id))
 
-# --- Wrapper functions for bot commands ---
 @db_connection
 def get_user_tier_db(cursor, user_id: int) -> str:
     """Decorator-wrapped version for bot usage."""
@@ -94,36 +77,6 @@ def get_or_create_user_db(cursor, user_id: int):
     """Decorator-wrapped version for bot usage."""
     return get_or_create_user(cursor, user_id)
 
-
-CUSTOM_SETTINGS_MAPPING = {
-    'custom_rsi_buy': 'RSI_BUY_THRESHOLD',
-    'custom_rsi_sell': 'RSI_SELL_THRESHOLD',
-    'custom_stop_loss': 'STOP_LOSS_PERCENTAGE',
-    'custom_trailing_activation': 'TRAILING_PROFIT_ACTIVATION_PERCENT',
-    'custom_trailing_drop': 'TRAILING_STOP_DROP_PERCENT',
-}
-
-
-def db_connection(func):
-    """Decorator to handle database connection and cursor management."""
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        conn = sqlite3.connect('lunara_bot.db')
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        try:
-            result = func(cursor, *args, **kwargs)
-            conn.commit()
-            return result
-        except sqlite3.Error as e:
-            print(f"Database error in {func.__name__}: {e}")
-            conn.rollback()
-            raise  # Re-raise the exception after rollback
-        finally:
-            conn.close()
-    return wrapper
-
-
 def get_or_create_user(cursor, user_id: int):
     """Gets a user from the DB or creates a new one with default settings."""
     user = cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
@@ -131,7 +84,6 @@ def get_or_create_user(cursor, user_id: int):
         cursor.execute("INSERT INTO users (user_id) VALUES (?)", (user_id,))
         user = cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
     return user
-
 
 def get_user_tier(cursor, user_id: int) -> str:
     """
@@ -142,7 +94,6 @@ def get_user_tier(cursor, user_id: int) -> str:
         return 'PREMIUM'
     user = get_or_create_user(cursor, user_id)
     return user['subscription_tier']
-
 
 @db_connection
 def initialize_database(cursor):
@@ -220,7 +171,6 @@ def initialize_database(cursor):
         );
     """)
 
-
 @db_connection
 def migrate_schema(cursor):
     """
@@ -259,33 +209,28 @@ def migrate_schema(cursor):
         cursor.execute("ALTER TABLE users ADD COLUMN custom_trailing_activation REAL")
         cursor.execute("ALTER TABLE users ADD COLUMN custom_trailing_drop REAL")
 
-
 @db_connection
 def get_all_user_ids(cursor):
     """Returns a list of all user IDs in the users table."""
     rows = cursor.execute("SELECT user_id FROM users").fetchall()
     return [row['user_id'] for row in rows]
 
-
 @db_connection
-def get_trade_by_id(cursor, trade_id: int):
-    """Fetches a trade by its ID."""
-    trade = cursor.execute("SELECT * FROM trades WHERE id = ?", (trade_id,)).fetchone()
+def get_trade_by_id(cursor, trade_id: int, user_id: int):
+    """Fetches a trade by its ID and user ID."""
+    trade = cursor.execute("SELECT * FROM trades WHERE id = ? AND user_id = ?", (trade_id, user_id)).fetchone()
     return trade
-
 
 @db_connection
 def get_autotrade_status(cursor, user_id: int):
     row = cursor.execute("SELECT autotrade_enabled FROM users WHERE user_id = ?", (user_id,)).fetchone()
     return bool(row['autotrade_enabled']) if row and row['autotrade_enabled'] is not None else False
 
-
 @db_connection
 def set_autotrade_status(cursor, user_id: int, enabled: bool):
     """Set autotrade status for a user in the users table."""
     get_or_create_user(cursor, user_id)  # Ensures user exists
     cursor.execute("UPDATE users SET autotrade_enabled = ? WHERE user_id = ?", (int(enabled), user_id))
-
 
 @db_connection
 def get_open_trades(cursor, user_id: int):
@@ -295,13 +240,11 @@ def get_open_trades(cursor, user_id: int):
     )
     return cursor.fetchall()
 
-
 @db_connection
 def get_user_trading_mode_and_balance(cursor, user_id: int):
     """Gets the user's trading mode and paper balance."""
     user = get_or_create_user(cursor, user_id)
     return user['trading_mode'], user['paper_balance']
-
 
 @db_connection
 def get_watched_items_by_user(cursor, user_id: int):
@@ -310,7 +253,6 @@ def get_watched_items_by_user(cursor, user_id: int):
         "SELECT coin_symbol, add_timestamp FROM watchlist WHERE user_id = ?", (user_id,)
     ).fetchall()
     return items
-
 
 @db_connection
 def get_user_api_keys(cursor, user_id: int):
@@ -323,7 +265,6 @@ def get_user_api_keys(cursor, user_id: int):
     api_key = decrypt_data(row['api_key'])
     secret_key = decrypt_data(row['secret_key'])
     return api_key, secret_key
-
 
 @db_connection
 def get_user_effective_settings(cursor, user_id: int) -> dict:
@@ -343,7 +284,6 @@ def get_user_effective_settings(cursor, user_id: int) -> dict:
 
     return settings
 
-
 @db_connection
 def is_trade_open(cursor, user_id: int, coin_symbol: str):
     """Checks if a user already has an open trade for a specific symbol."""
@@ -353,7 +293,6 @@ def is_trade_open(cursor, user_id: int, coin_symbol: str):
     ).fetchone()
     return trade is not None
 
-
 @db_connection
 def get_closed_trades(cursor, user_id: int):
     """Retrieves all closed trades for a specific user."""
@@ -361,7 +300,6 @@ def get_closed_trades(cursor, user_id: int):
         "SELECT coin_symbol, buy_price, sell_price FROM trades WHERE user_id = ? AND status = 'closed' AND sell_price IS NOT NULL",
         (user_id,)
     ).fetchall()
-
 
 @db_connection
 def get_global_top_trades(cursor, limit: int = 3):
@@ -380,7 +318,6 @@ def get_global_top_trades(cursor, limit: int = 3):
     '''
     return cursor.execute(query, (limit,)).fetchall()
 
-
 @db_connection
 def is_on_watchlist(cursor, user_id: int, coin_symbol: str):
     """Checks if a user is already watching a specific symbol."""
@@ -390,7 +327,6 @@ def is_on_watchlist(cursor, user_id: int, coin_symbol: str):
     ).fetchone()
     return item is not None
 
-
 @db_connection
 def update_trade_stop_loss(cursor, trade_id: int, new_stop_loss: float):
     """Updates the stop-loss for a specific trade."""
@@ -398,7 +334,6 @@ def update_trade_stop_loss(cursor, trade_id: int, new_stop_loss: float):
         "UPDATE trades SET stop_loss_price = ? WHERE id = ?",
         (new_stop_loss, trade_id)
     )
-
 
 @db_connection
 def update_dsl_stage(cursor, trade_id: int, new_stage: int):
@@ -417,3 +352,17 @@ def log_trade(cursor, user_id: int, coin_symbol: str, buy_price: float, stop_los
         "INSERT INTO trades (user_id, coin_symbol, buy_price, status, stop_loss_price, take_profit_price, mode, trade_size_usdt, quantity, rsi_at_buy, highest_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (user_id, coin_symbol, buy_price, 'open', stop_loss, take_profit, mode, trade_size_usdt, quantity, rsi_at_buy, highest_price)
     )
+
+@db_connection
+def close_trade(cursor, trade_id: int, user_id: int, sell_price: float) -> bool:
+    import datetime
+    now = datetime.datetime.utcnow().isoformat()
+    cursor.execute(
+        """
+        UPDATE trades
+        SET status = 'closed', sell_price = ?, closed_at = ?
+        WHERE id = ? AND user_id = ? AND status = 'open'
+        """,
+        (sell_price, now, trade_id, user_id)
+    )
+    return cursor.rowcount > 0
