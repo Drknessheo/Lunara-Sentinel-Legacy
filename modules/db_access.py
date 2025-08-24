@@ -1,7 +1,10 @@
 import sqlite3
 import functools
+import logging
 import config
 from security import decrypt_data
+
+logger = logging.getLogger(__name__)
 
 def db_connection(func):
     """Decorator to handle database connection and cursor management."""
@@ -346,6 +349,11 @@ def update_dsl_stage(cursor, trade_id: int, new_stage: int):
 @db_connection
 def log_trade(cursor, user_id: int, coin_symbol: str, buy_price: float, stop_loss: float, take_profit: float, mode: str = 'LIVE', trade_size_usdt: float | None = None, quantity: float | None = None, rsi_at_buy: float | None = None, highest_price: float | None = None):
     """Logs a new open trade for a user in the database."""
+    if trade_size_usdt is not None and trade_size_usdt < 5:
+        logger.warning(f"Trade for user {user_id} on {coin_symbol} below notional threshold: {trade_size_usdt}")
+        return
+
+    logger.info(f"Processing trade for user {user_id}, symbol {coin_symbol}...")
     # Ensure user exists before logging a trade
     get_or_create_user(cursor, user_id)
     cursor.execute(
