@@ -88,7 +88,7 @@ def run_resonance_simulation(user_id: int, symbol: str | None = None, indicators
 
     # Build the narrative message
     narrative = (
-        f"**Lunessa's Resonance Transmission for {symbol or 'the General Market'}**\n\n"
+        f"**LunessaSignals's Resonance Transmission for {symbol or 'the General Market'}**\n\n"
         f"I have attuned my senses to the asset's vibration... The spacetime metric is fluctuating.\n\n"
         f"  - **Resonance Level:** `{resonance_level}` (Attunement: {'Low' if resonance_level < 1.0 else 'Normal' if resonance_level < 1.8 else 'Heightened'})\n"
         f"  - **Waveform Analysis:** The metric perturbation shows {'minor' if resonance_level < 1.2 else 'significant'} ripples, indicating a period of {'low' if resonance_level < 1.2 else 'high'} potential energy.\n"
