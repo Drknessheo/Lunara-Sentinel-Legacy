@@ -39,7 +39,7 @@ def generate_daily_summary():
         with open(analytics_file, 'r') as f:
             data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        send_telegram_message(BOT_TOKEN, CREATOR_ID, "Lunessa Report: Analytics file not found or is empty.")
+        send_telegram_message(BOT_TOKEN, CREATOR_ID, "LunessaSignals Report: Analytics file not found or is empty.")
         return
 
     yesterday_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime('%Y-%m-%d')

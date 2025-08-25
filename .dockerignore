@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# Docker
+.dockerignore
+Dockerfile
+render.yaml
+
+# Python virtual environments
+.venv
+venv
+*.pyc
+__pycache__/
+
+# IDE and OS files
+.vscode/
+.idea/
+*.code-workspace
+*.DS_Store
+
+# Local development files
+.env
+*.log
+*.db
+*.db-journal
+
+# Test and cache files
+.pytest_cache/
+.ruff_cache/
+
+# Documentation
+docs/
