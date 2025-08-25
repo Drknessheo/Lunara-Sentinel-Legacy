@@ -1,9 +1,31 @@
 import redis
+import os
+from dotenv import load_dotenv
 
-r = redis.Redis(host='localhost', port=6379, db=0)
+# Load .env file from the project root
+dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+load_dotenv(dotenv_path=dotenv_path)
 
-r.set('lunessasignals:status', 'connected and running')
-print("Set 'lunessasignals:status' to 'connected and running'")
+redis_url = os.getenv("REDIS_URL")
 
-status = r.get('lunessasignals:status')
-print(f"Retrieved status: {status.decode('utf-8')}")
+if not redis_url:
+    print("Error: REDIS_URL not found in environment.")
+    print(f"Please ensure it is set in {dotenv_path}")
+else:
+    print(f"Connecting to Redis at {redis_url}...")
+    try:
+        # Use from_url to connect
+        r = redis.Redis.from_url(redis_url, decode_responses=True)
+        
+        # Test connection and operations
+        r.ping()
+        print("Connection successful.")
+
+        r.set('lunessasignals:status', 'connected and running')
+        print("Set 'lunessasignals:status' to 'connected and running'")
+
+        status = r.get('lunessasignals:status')
+        print(f"Retrieved status: {status}")
+
+    except redis.exceptions.ConnectionError as e:
+        print(f"Failed to connect to Redis: {e}")

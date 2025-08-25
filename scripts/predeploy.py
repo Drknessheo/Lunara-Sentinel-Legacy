@@ -9,17 +9,20 @@ def run_predeploy_tasks():
     - Clears specified Redis keys for a clean state.
     - Loads trading pairs from a JSON config file into Redis.
     """
-    redis_host = os.getenv('REDIS_HOST', 'localhost')
-    redis_port = int(os.getenv('REDIS_PORT', 6379))
+    redis_url = os.getenv('REDIS_URL')
+    if not redis_url:
+        print("Error: REDIS_URL environment variable not set.")
+        print("Please set it in your .env file or environment.")
+        return
 
-    print(f"Connecting to Redis at {redis_host}:{redis_port}...")
+    print(f"Connecting to Redis via URL...")
     try:
-        r = redis.Redis(host=redis_host, port=redis_port, db=0, decode_responses=True)
-        r.ping() # Check the connection
+        r = redis.Redis.from_url(redis_url, decode_responses=True)
+        r.ping()  # Check the connection
         print("Redis connection successful.")
     except redis.exceptions.ConnectionError as e:
         print(f"Error connecting to Redis: {e}")
-        print("Please ensure Redis is running and accessible.")
+        print("Please ensure your REDIS_URL is correct and the service is accessible.")
         return
 
     # 1. Clear outdated Redis keys
