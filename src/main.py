@@ -566,7 +566,6 @@ async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     message = (
         f"🌟 **LunessaSignals Performance Review** 🌟\n\n"
-    )
         f"**Completed Quests:** {total_trades}\n"
         f"**Victories (Wins):** {wins}\n"
         f"**Setbacks (Losses):** {losses}\n"
