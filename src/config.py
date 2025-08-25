@@ -66,7 +66,7 @@ CHAT_ID = os.getenv("CHAT_ID") # For global bot alerts
 ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID")) if os.getenv("ADMIN_USER_ID") else None
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_REFERRAL_CODE = os.getenv("ADMIN_REFERRAL_CODE") # For the /referral command
-GDRIVE_REMOTE_NAME = "LunessaSignalsBook" # For database backups
+GDRIVE_REMOTE_NAME = "LunessaSignals" # For database backups
 
 # --- AI & Caching Configuration ---
 GEMINI_API_URL = os.getenv("GEMINI_API_URL", "https://api.gemini.example/analysis")
