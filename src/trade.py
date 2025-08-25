@@ -13,27 +13,24 @@ class TradeError(Exception):
 
 from telegram import Update
 from telegram.ext import CommandHandler, ContextTypes
-HELP_MESSAGE = (
-    "🤖 *Lunessa Shai'ra Gork* (@Srskat_bot) – Automated Crypto Trading by LunessaSignals\n\n" \
-    "*Features:*
-" \
-    "- Rule-driven signals (RSI, MACD, Bollinger Bands)\n" \
-    "- Risk controls: stop-loss, trailing stop, allocation\n" \
-    "- LIVE/TEST modes\n" \
-    "- Telegram alerts and remote control\n\n" \
-    "*Main Commands:*
-" \
-    "/help – Show usage and features\n" \
-    "/status – Show wallet and trade status\n" \
-    "/import – Import trades manually\n" \
-    /about – Learn more about LunessaSignals
+HELP_MESSAGE = """🤖 *Lunessa Shai'ra Gork* (@Srskat_bot) – Automated Crypto Trading by LunessaSignals
 
+*Features:*
+- Rule-driven signals (RSI, MACD, Bollinger Bands)
+- Risk controls: stop-loss, trailing stop, allocation
+- LIVE/TEST modes
+- Telegram alerts and remote control
 
-    "*Supported Coins:*
-" \
-    "BTCUSDT, ETHUSDT, BNBUSDT, SOLUSDT, ADAUSDT, XRPUSDT, DOGEUSDT, MATICUSDT, DOTUSDT, AVAXUSDT, LINKUSDT, ARBUSDT, OPUSDT, LTCUSDT, TRXUSDT, SHIBUSDT, PEPEUSDT, UNIUSDT, SUIUSDT, INJUSDT, RNDRUSDT, PENGUUSDT, CTKUSDT, OMBTC, ENAUSDT, HYPERUSDT, BABYUSDT, KAITOUSDT\n\n" \
-    "*Get started:* Add your Binance API keys and Telegram bot token, then run the bot!"
-)
+*Main Commands:*
+/help – Show usage and features
+/status – Show wallet and trade status
+/import – Import trades manually
+/about – Learn more about LunessaSignals
+
+*Supported Coins:*
+BTCUSDT, ETHUSDT, BNBUSDT, SOLUSDT, ADAUSDT, XRPUSDT, DOGEUSDT, MATICUSDT, DOTUSDT, AVAXUSDT, LINKUSDT, ARBUSDT, OPUSDT, LTCUSDT, TRXUSDT, SHIBUSDT, PEPEUSDT, UNIUSDT, SUIUSDT, INJUSDT, RNDRUSDT, PENGUUSDT, CTKUSDT, OMBTC, ENAUSDT, HYPERUSDT, BABYUSDT, KAITOUSDT
+
+*Get started:* Add your Binance API keys and Telegram bot token, then run the bot!"""
 
 ABOUT_MESSAGE = (
     "*About Lunessa Shai'ra Gork* (@Srskat_bot)\n\n" \
