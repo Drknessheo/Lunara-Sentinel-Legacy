@@ -48,12 +48,12 @@ async def get_ai_suggestions(prompt):
 
 import logging
 from telegram.ext import ContextTypes
-import trade
-import slip_manager
-import config
+from src import trade
+from src import slip_manager
+from src import config
 import google.generativeai as genai
 import asyncio
-import modules.db_access as autotrade_db
+from src.modules import db_access as autotrade_db
 
 logger = logging.getLogger(__name__)
 

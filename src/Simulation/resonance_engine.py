@@ -9,11 +9,11 @@ import numpy as np
 # Add parent directory to path to allow imports from the root `g:\Lunara Bot` directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from .stochastic_simulation import run_metric_perturbation_simulation
-from .quantum_clock import run_quantum_clock_phase
-from .plot_utilities import plot_metric_perturbation, plot_clock_phase
+from src.Simulation.stochastic_simulation import run_metric_perturbation_simulation
+from src.Simulation.quantum_clock import run_quantum_clock_phase
+from src.Simulation.plot_utilities import plot_metric_perturbation, plot_clock_phase
 ## Do not import trade functions at the top to avoid circular import
-from trading_module import get_trade_suggestion, TradeAction
+from src.trading_module import get_trade_suggestion, TradeAction
 
 def run_resonance_simulation(user_id: int, symbol: str | None = None, indicators: dict | None = None):
     """
