@@ -947,7 +947,7 @@ async def ai_trade_monitor(context: ContextTypes.DEFAULT_TYPE, symbol: str, user
         take_profit_price = entry_price * (1 + settings['PROFIT_TARGET_PERCENTAGE'] / 100)
         db.log_trade(user_id=user_id, coin_symbol=symbol, buy_price=entry_price,
                      stop_loss=stop_loss_price, take_profit=take_profit_price,
-                     mode='LIVE', quantity=quantity, rsi_at_buy=rsi, highest_price=entry_price)
+                     mode='LIVE', quantity=quantity, rsi_at_buy=rsi, peak_price=entry_price)
 
         message = (
             f"🤖 **AI Autotrade Initiated!** 🤖\n\n"
@@ -1089,8 +1089,15 @@ async def scheduled_monitoring_job(context: ContextTypes.DEFAULT_TYPE):
     """
     logger.info("Running scheduled_monitoring_job...")
     user_id = config.ADMIN_USER_ID # Assuming monitoring is for the admin user
-    if not user_id or not db.get_autotrade_status(user_id):
-        logger.info("Scheduled monitoring skipped: Admin user not set or autotrade disabled.")
+    logger.info(f"Admin user ID from config: {user_id}")
+    if user_id:
+        autotrade_status = db.get_autotrade_status(user_id)
+        logger.info(f"Autotrade status for admin user: {autotrade_status}")
+        if not autotrade_status:
+            logger.info("Scheduled monitoring skipped: Autotrade disabled for admin user.")
+            return
+    else:
+        logger.info("Scheduled monitoring skipped: Admin user not set.")
         return
 
     try:

@@ -2,7 +2,7 @@
 import redis
 from cryptography.fernet import Fernet
 import json
-import config
+from src import config
 from datetime import datetime
 import logging
 
@@ -14,16 +14,43 @@ if not logger.hasHandlers():
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-# Connect to Redis
-# Check if REDIS_URL is set in config, otherwise default to localhost
-redis_url = config.REDIS_URL if hasattr(config, 'REDIS_URL') and config.REDIS_URL else 'redis://localhost:6379/0'
-redis_client = redis.from_url(redis_url)
+import os
 
-# Load the encryption key
-key = config.BINANCE_ENCRYPTION_KEY
-fernet = Fernet(key)
+# Connect to Redis
+redis_url = os.getenv("REDIS_URL", 'redis://localhost:6379/0')
+
+# Sanitize the Redis URL to remove any duplicate schemes
+if redis_url.count("rediss://") > 1:
+    redis_url = "rediss://" + redis_url.rsplit("rediss://", 1)[-1]
+elif redis_url.count("redis://") > 1:
+    redis_url = "redis://" + redis_url.rsplit("redis://", 1)[-1]
+
+# Mask the Redis URL for logging
+masked_url = redis_url
+if "@" in masked_url:
+    protocol, _, rest = redis_url.partition("://")
+    _, _, host_part = rest.partition("@")
+    masked_url = f"{protocol}://***:***@{host_part}"
+
+logger.info(f"Connecting to Redis at {masked_url}")
+try:
+    redis_client = redis.from_url(redis_url, ssl_cert_reqs='none')
+except Exception as e:
+    logger.error(f"Failed to connect to Redis at {masked_url}. Error: {e}")
+    raise ConnectionError(f"Failed to connect to Redis at {masked_url}.") from e
+
+import functools
+
+@functools.lru_cache()
+def get_fernet():
+    """Creates and caches the Fernet instance to avoid re-reading config."""
+    key = config.BINANCE_ENCRYPTION_KEY
+    if not key:
+        raise ValueError("BINANCE_ENCRYPTION_KEY is not configured. Cannot proceed with encryption/decryption.")
+    return Fernet(key)
 
 def create_and_store_slip(symbol, side, amount, price):
+    fernet = get_fernet()
     slip = {
         "symbol": symbol,
         "side": side,
@@ -38,6 +65,7 @@ def create_and_store_slip(symbol, side, amount, price):
     return encrypted_slip
 
 def get_and_decrypt_slip(encrypted_slip_key):
+    fernet = get_fernet()
     logger.info(f"Attempting to decrypt slip: {encrypted_slip_key}")
     encrypted_slip_value = redis_client.get(encrypted_slip_key)
     if not encrypted_slip_value:

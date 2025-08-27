@@ -1,54 +1,14 @@
 from telegram import Update
-from telegram.ext import ContextTypes
-
-async def activate_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Admin command to activate a user by Telegram ID."""
-    user_id = update.effective_user.id
-    if user_id != config.ADMIN_USER_ID:
-        await update.message.reply_text("This is an admin-only command.")
-        return
-    try:
-        target_id = int(context.args[0])
-    except (IndexError, ValueError):
-        await update.message.reply_text("Usage: /activate <telegram_user_id>")
-        return
-    # Set subscription tier and expiration
-    db.update_user_subscription(target_id, tier="PREMIUM", expires=None)
-    await update.message.reply_text(f"✅ User {target_id} has been activated as PREMIUM.")
-    try:
-        await context.bot.send_message(chat_id=target_id, text="🎉 Your subscription has been activated! You are now a PREMIUM user.")
-    except Exception:
-        pass
-
-async def setapi_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Securely store API keys for premium users."""
-    user_id = update.effective_user.id
-    user_tier = db.get_user_tier_db(user_id)
-    if user_tier != 'PREMIUM':
-        await update.message.reply_text("Upgrade to Premium to link your API keys.")
-        return
-    try:
-        api_key = context.args[0]
-        secret_key = context.args[1]
-    except (IndexError, ValueError):
-        await update.message.reply_text("Usage: /setapi <API_KEY> <SECRET_KEY>")
-        return
-    db.store_user_api_keys(user_id, api_key, secret_key)
-    await update.message.reply_text("✅ Your API keys have been securely stored.")
-
-import os
-from dotenv import load_dotenv
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from slip_parser import parse_slip, SlipParseError
+import trade_executor
+import redis_validator
 from telegram.constants import ParseMode
 import google.generativeai as genai
 from Simulation import resonance_engine
 import config
 import trade
 import slip_manager # Import slip_manager
-
-# Load environment variables from .env file
-load_dotenv()
 
 from handlers import *
 from jobs import *
@@ -276,7 +236,6 @@ async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """Closes an open trade. Usage: /close <trade_id>"""
     user_id = update.effective_user.id
     try:
-        # context.args contains the words after the command, e.g., ['123']
         trade_id = int(context.args[0])
     except (IndexError, ValueError):
         await update.message.reply_text("Please provide a valid trade ID.\nUsage: `/close <trade_id>`", parse_mode='Markdown')
@@ -288,19 +247,36 @@ async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.message.reply_text("Could not find an open trade with that ID under your name. Check `/status`.", parse_mode='Markdown')
         return
 
-    # Now fetch the price for that specific symbol
     symbol = trade_to_close['coin_symbol']
+    buy_price = trade_to_close['buy_price']
     current_price = trade.get_current_price(symbol)
     if current_price is None:
         await update.message.reply_text(f"Could not fetch the current price for {symbol} to close the trade. Please try again.")
         return
 
-    success = db.close_trade(trade_id=trade_id, user_id=user_id, sell_price=current_price)
+    pnl_percentage = ((current_price - buy_price) / buy_price) * 100
+    win_loss = 'win' if pnl_percentage > 0 else 'loss' if pnl_percentage < 0 else 'breakeven'
+    close_reason = 'manual'
+    closed_by = update.effective_user.username or update.effective_user.first_name
+
+    success = db.close_trade(
+        trade_id=trade_id,
+        user_id=user_id,
+        sell_price=current_price,
+        close_reason=close_reason,
+        win_loss=win_loss,
+        pnl_percentage=pnl_percentage,
+        closed_by=closed_by
+    )
 
     if success:
-        await update.message.reply_text(f"✅ Quest (ID: {trade_id}) for {symbol} has been completed at a price of ${current_price:,.8f}!\n\nUse /review to see your performance.")
+        await update.message.reply_text(
+            f"Trade #{trade_id} closed by @{closed_by}\n"
+            f"Reason: {close_reason}\n"
+            f"Result: {win_loss} ({pnl_percentage:.2f}%)"
+        )
     else:
-        await update.message.reply_text("An unexpected error occurred while closing the trade.")
+        await update.message.reply_text("Failed to close the trade.")
 
 async def wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays the user's current spot wallet balances on Binance."""
@@ -431,7 +407,8 @@ async def import_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         summary_message = "✨ **Import Complete!** ✨\n\n"
         if message_lines:
             summary_message += "\n".join(message_lines) + "\n\n"
-        summary_message += f"*Summary:*\n"
+        summary_message += f"*Summary:*
+"
         summary_message += f"- New Quests Started: `{imported_count}`\n"
         summary_message += f"- Already Tracked: `{skipped_count}`\n\n"
         summary_message += "Use /status to see your newly managed quests."
@@ -650,7 +627,7 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays a help message with all available commands."""
-    help_text = """
+    help_text = ""
 <b>LunessaSignals's Guide 🔮</b>
 
 Here are the commands to guide your journey:
@@ -686,7 +663,7 @@ Here are the commands to guide your journey:
 <b>/safety</b> - Read important trading advice
 <b>/resonate</b> - A word of wisdom from LunessaSignals
 <b>/help</b> - Show this help message
-"""
+""
     await update.message.reply_text(help_text, parse_mode=ParseMode.HTML)
 
 async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -726,7 +703,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     def escape_markdown(text):
         import re
-        return re.sub(r'([_\*\-\[\]()~`>#+\|= {{}}.!])', r'\\\1', text)
+        return re.sub(r'([_\*\-\-\[\]()~`>#+\|= {{}}.!])', r'\\\1', text)
 
     if user_tier != 'PREMIUM':
         await update.message.reply_text("Upgrade to Premium to use this feature.")
@@ -966,6 +943,7 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def usercount_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("User count is a Premium feature.")
 
+
 # ---
 # Restore previous /ask command logic ---
 async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1032,6 +1010,43 @@ async def learn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await update.message.reply_text("This is a placeholder for the learn command.")
 
 
+async def slip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handles incoming trade slips sent as text messages.
+    """
+    logger.info("Slip message received.")
+    if not update.message or not update.message.text:
+        return
+
+    slip_text = update.message.text
+    user_id = update.effective_user.id
+
+    try:
+        # 1. Parse the slip
+        slip_data = parse_slip(slip_text)
+        logger.info(f"Successfully parsed slip for user {user_id}: {slip_data}")
+        slip_data['user_id'] = user_id
+
+        # 2. Validate the trade
+        is_valid, reason = redis_validator.validate_trade(slip_data)
+        if not is_valid:
+            await update.message.reply_text(f"❌ Trade validation failed: {reason}")
+            return
+
+        # 3. Execute the trade (placeholder)
+        execution_result = trade_executor.execute_trade(slip_data)
+        
+        # 4. Log and Notify
+        await update.message.reply_text(execution_result)
+
+    except SlipParseError as e:
+        logger.error(f"Failed to parse slip for user {user_id}. Error: {e}")
+        await update.message.reply_text(f"⚠️ Invalid slip format: {e}")
+    except Exception as e:
+        logger.error(f"An unexpected error occurred handling slip for user {user_id}: {e}", exc_info=True)
+        await update.message.reply_text("An unexpected server error occurred while processing your slip.")
+
+
 def main() -> None:
     """Start the bot."""
     db.initialize_database()
@@ -1078,6 +1093,9 @@ def main() -> None:
     application.add_handler(CommandHandler("checked", checked_command))
     application.add_handler(CommandHandler("autotrade", autotrade_command))
     application.add_handler(CommandHandler("cleanslips", clean_slips_command))
+
+    # Add the slip handler for text messages starting with 'SLIP:'
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)^SLIP:'), slip_handler))
 
     # ---
     # Set up background jobs ---

@@ -1,8 +1,8 @@
 import sqlite3
 import functools
 import logging
-import config
-from security import decrypt_data
+from src import config
+from src.security import decrypt_data
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +108,7 @@ def initialize_database(cursor):
             coin_symbol TEXT NOT NULL,
             buy_price REAL NOT NULL,
             buy_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            closed_at DATETIME,
             status TEXT NOT NULL,
             sell_price REAL,
             stop_loss_price REAL,
@@ -119,7 +120,8 @@ def initialize_database(cursor):
             close_reason TEXT,
             win_loss TEXT,
             pnl_percentage REAL,
-            rsi_at_buy REAL
+            rsi_at_buy REAL,
+            closed_by TEXT
         );
     """)
     cursor.execute("""
@@ -185,6 +187,8 @@ def migrate_schema(cursor):
 
     if 'peak_price' not in trade_columns:
         cursor.execute("ALTER TABLE trades ADD COLUMN peak_price REAL")
+    if 'closed_at' not in trade_columns:
+        cursor.execute("ALTER TABLE trades ADD COLUMN closed_at DATETIME")
     if 'mode' not in trade_columns:
         cursor.execute("ALTER TABLE trades ADD COLUMN mode TEXT DEFAULT 'LIVE'")
         cursor.execute("ALTER TABLE trades ADD COLUMN trade_size_usdt REAL")
@@ -198,6 +202,8 @@ def migrate_schema(cursor):
     if 'dsl_mode' not in trade_columns:
         cursor.execute("ALTER TABLE trades ADD COLUMN dsl_mode TEXT")
         cursor.execute("ALTER TABLE trades ADD COLUMN current_dsl_stage INTEGER DEFAULT 0")
+    if 'closed_by' not in trade_columns:
+        cursor.execute("ALTER TABLE trades ADD COLUMN closed_by TEXT")
 
     cursor.execute("PRAGMA table_info(users)")
     user_columns = [info[1] for info in cursor.fetchall()]
@@ -347,7 +353,7 @@ def update_dsl_stage(cursor, trade_id: int, new_stage: int):
     )
 
 @db_connection
-def log_trade(cursor, user_id: int, coin_symbol: str, buy_price: float, stop_loss: float, take_profit: float, mode: str = 'LIVE', trade_size_usdt: float | None = None, quantity: float | None = None, rsi_at_buy: float | None = None, highest_price: float | None = None):
+def log_trade(cursor, user_id: int, coin_symbol: str, buy_price: float, stop_loss: float, take_profit: float, mode: str = 'LIVE', trade_size_usdt: float | None = None, quantity: float | None = None, rsi_at_buy: float | None = None, peak_price: float | None = None):
     """Logs a new open trade for a user in the database."""
     if trade_size_usdt is not None and trade_size_usdt < 5:
         logger.warning(f"Trade for user {user_id} on {coin_symbol} below notional threshold: {trade_size_usdt}")
@@ -357,20 +363,21 @@ def log_trade(cursor, user_id: int, coin_symbol: str, buy_price: float, stop_los
     # Ensure user exists before logging a trade
     get_or_create_user(cursor, user_id)
     cursor.execute(
-        "INSERT INTO trades (user_id, coin_symbol, buy_price, status, stop_loss_price, take_profit_price, mode, trade_size_usdt, quantity, rsi_at_buy, highest_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (user_id, coin_symbol, buy_price, 'open', stop_loss, take_profit, mode, trade_size_usdt, quantity, rsi_at_buy, highest_price)
+        "INSERT INTO trades (user_id, coin_symbol, buy_price, status, stop_loss_price, take_profit_price, mode, trade_size_usdt, quantity, rsi_at_buy, peak_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (user_id, coin_symbol, buy_price, 'open', stop_loss, take_profit, mode, trade_size_usdt, quantity, rsi_at_buy, peak_price)
     )
+    return cursor.lastrowid
 
 @db_connection
-def close_trade(cursor, trade_id: int, user_id: int, sell_price: float) -> bool:
+def close_trade(cursor, trade_id: int, user_id: int, sell_price: float, close_reason: str, win_loss: str, pnl_percentage: float, closed_by: str) -> bool:
     import datetime
     now = datetime.datetime.utcnow().isoformat()
     cursor.execute(
         """
         UPDATE trades
-        SET status = 'closed', sell_price = ?, closed_at = ?
+        SET status = 'closed', sell_price = ?, close_reason = ?, win_loss = ?, pnl_percentage = ?, closed_at = ?, closed_by = ?
         WHERE id = ? AND user_id = ? AND status = 'open'
         """,
-        (sell_price, now, trade_id, user_id)
+        (sell_price, close_reason, win_loss, pnl_percentage, now, closed_by, trade_id, user_id)
     )
     return cursor.rowcount > 0

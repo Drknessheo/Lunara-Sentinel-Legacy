@@ -47,7 +47,8 @@ def initialize_database():
             close_reason TEXT,
             win_loss TEXT, -- 'win' or 'loss'
             pnl_percentage REAL, -- Profit/Loss percentage
-            rsi_at_buy REAL -- RSI value at the time of buy
+            rsi_at_buy REAL, -- RSI value at the time of buy
+            closed_by TEXT -- User or process that closed the trade
         );
     """)
     # Add a new table for coin performance tracking
@@ -140,6 +141,11 @@ def migrate_schema():
         logger.info("Migrating database: Adding 'dsl_mode' and 'current_dsl_stage' columns to 'trades' table.")
         cursor.execute("ALTER TABLE trades ADD COLUMN dsl_mode TEXT")
         cursor.execute("ALTER TABLE trades ADD COLUMN current_dsl_stage INTEGER DEFAULT 0")
+        changes_made = True
+
+    if 'closed_by' not in trade_columns:
+        logger.info("Migrating database: Adding 'closed_by' column to 'trades' table.")
+        cursor.execute("ALTER TABLE trades ADD COLUMN closed_by TEXT")
         changes_made = True
 
     # --- Schema Migration for users table ---

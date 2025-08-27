@@ -30,7 +30,8 @@ def safe_print_config():
             print(f"  - {key}: **** MASKED ****")
 
 # Explicitly load .env from the project root, regardless of working directory
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+# Correctly locate the .env file by going up one directory from src
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
 print(f"[DEBUG] Loading .env from: {dotenv_path}")
 load_dotenv(dotenv_path=dotenv_path)
 
