@@ -1,3 +1,4 @@
+import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from slip_parser import parse_slip, SlipParseError
@@ -33,14 +34,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     user = update.effective_user
     await update.message.reply_html(
-        rf"🌑 <b>A new trader emerges from the shadows.</b> {user.mention_html()}, you have been summoned by <b>Lunessa Shai'ra Gork</b> (@Srskat_bot), Sorceress of DeFi and guardian of RSI gates.\n\n"
-        "🧭 <i>Your journey begins now.</i>\n"
-        "- Quest 1: Link your API Key (Binance/OKX)\n"
-        "- Quest 2: Choose your weapon: RSI or Bollinger\n"
-        "- Quest 3: Survive 3 trades\n\n"
-        "Reply with: /linkbinance or /learn\n\n"
-        "To unlock the arcane powers, send your Binance API keys in a private message with: <code>/setapi YOUR_API_KEY YOUR_SECRET_KEY</code>\n\n"
-        "Use /help to see all available commands."
+        rf"""🌑 <b>A new trader emerges from the shadows.</b> {user.mention_html()}, you have been summoned by <b>Lunessa Shai'ra Gork</b> (@Srskat_bot), Sorceress of DeFi and guardian of RSI gates.
+
+🧭 <i>Your journey begins now.</i>
+- Quest 1: Link your API Key (Binance/OKX)
+- Quest 2: Choose your weapon: RSI or Bollinger
+- Quest 3: Survive 3 trades
+
+Reply with: /linkbinance or /learn
+
+To unlock the arcane powers, send your Binance API keys in a private message with: <code>/setapi YOUR_API_KEY YOUR_SECRET_KEY</code>
+
+Use /help to see all available commands."""
     )
 
 # TODO: In /status, alert user about market position, best moves, or when the user might hit a target time. If a position is held too long, alert to sell near stop loss, and suggest trailing stop activation. The bot should help give the user better options.
@@ -120,7 +125,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             logger.warning(f"Price cache for user {user_id} is stale. Displaying last known data.")
 
     if monitored_trades:
-        message += "📜 **Your Open Quests (Monitored):**\n"
+        message += "**Your Open Quests (Monitored):**\n"
         for trade_item in monitored_trades:
             symbol = trade_item['coin_symbol']
             buy_price = trade_item['buy_price']
@@ -200,8 +205,9 @@ async def resonate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text(narrative, parse_mode=ParseMode.MARKDOWN)
 
         # Send the plots
-        await update.message.reply_photo(photo=open(metric_plot_path, 'rb'), caption="Soul Waveform Analysis")
-        await update.message.reply_photo(photo=open(clock_plot_path, 'rb'), caption="Clock Phase Distortions")
+        with open(metric_plot_path, 'rb') as photo1, open(clock_plot_path, 'rb') as photo2:
+            await update.message.reply_photo(photo=photo1, caption="Soul Waveform Analysis")
+            await update.message.reply_photo(photo=photo2, caption="Clock Phase Distortions")
 
     except Exception as e:
         logger.error(f"Error running resonance simulation for user {user_id}: {e}", exc_info=True)
@@ -407,16 +413,14 @@ async def import_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         summary_message = "✨ **Import Complete!** ✨\n\n"
         if message_lines:
             summary_message += "\n".join(message_lines) + "\n\n"
-        summary_message += f"*Summary:*
-"
-        summary_message += f"- New Quests Started: `{imported_count}`\n"
-        summary_message += f"- Already Tracked: `{skipped_count}`\n\n"
+        summary_message += f"""*Summary:*\n- New Quests Started: `{imported_count}`\n- Already Tracked: `{skipped_count}`\n\n"""
         summary_message += "Use /status to see your newly managed quests."
 
         await update.message.reply_text(summary_message, parse_mode='Markdown')
 
     except trade.TradeError as e:
         await update.message.reply_text(f"⚠️ **Error!**\n\n*Reason:* `{e}`", parse_mode='Markdown')
+
 
 async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
@@ -542,19 +546,25 @@ async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     avg_pnl_percent = total_profit_percent / total_trades if total_trades > 0 else 0
 
     message = (
-        f"🌟 **LunessaSignals Performance Review** 🌟\n\n"
-        f"**Completed Quests:** {total_trades}\n"
-        f"**Victories (Wins):** {wins}\n"
-        f"**Setbacks (Losses):** {losses}\n"
-        f"**Win Rate:** {win_rate:.2f}%\n\n"
-        f"**Average P/L:** `{avg_pnl_percent:,.2f}%`\n"
+        f"""🌟 **LunessaSignals Performance Review** 🌟
+
+**Completed Quests:** {total_trades}
+**Victories (Wins):** {wins}
+**Setbacks (Losses):** {losses}
+**Win Rate:** {win_rate:.2f}%
+
+**Average P/L:** `{avg_pnl_percent:,.2f}%`
+"""
     )
 
     if best_trade and worst_trade:
         message += (
-            f"\n**Top Performers:**\n"
-            f"🚀 **Best Quest:** {best_trade['coin_symbol']} (`{best_pnl:+.2f}%`)\n"
-            f"💔 **Worst Quest:** {worst_trade['coin_symbol']} (`{worst_pnl:+.2f}%`)\n"
+            f"""
+
+**Top Performers:**
+🚀 **Best Quest:** {best_trade['coin_symbol']} (`{best_pnl:+.2f}%`)
+💔 **Worst Quest:** {worst_trade['coin_symbol']} (`{worst_pnl:+.2f}%`)
+"""
         )
 
     message += "\nKeep honing your skills, seeker. The market's rhythm is complex."
@@ -588,14 +598,22 @@ async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     referral_link = f"https://www.binance.com/en/activity/referral-entry/CPA?ref={config.ADMIN_REFERRAL_CODE}"
 
     message = (
-        f"🤝 **Invite Friends, Earn Together!** 🤝\n\n"
-        f"Refer friends to buy crypto on Binance, and we both get rewarded!\n\n"
-        f"**The Deal:**\n"
-        f"When your friend signs up using the link below and buys over $50 worth of crypto, you both receive a **$100 trading fee rebate voucher**.\n\n"
-        f"**Your Tools to Share:**\n\n"
-        f"🔗 **Referral Link:**\n`{referral_link}`\n\n"
-        f"🏷️ **Referral Code:**\n`{config.ADMIN_REFERRAL_CODE}`\n\n"
-        f"Share the link or code with your friends to start earning. Thank you for supporting the LunessaSignals project!"
+        f"""🤝 **Invite Friends, Earn Together!** 🤝
+
+Refer friends to buy crypto on Binance, and we both get rewarded!
+
+**The Deal:**
+When your friend signs up using the link below and buys over $50 worth of crypto, you both receive a **$100 trading fee rebate voucher**.
+
+**Your Tools to Share:**
+
+🔗 **Referral Link:**
+`{referral_link}`
+
+🏷️ **Referral Code:**
+`{config.ADMIN_REFERRAL_CODE}`
+
+Share the link or code with your friends to start earning. Thank you for supporting the LunessaSignals project!"""
     )
     await update.message.reply_text(message, parse_mode='Markdown', disable_web_page_preview=True)
 
@@ -627,7 +645,7 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays a help message with all available commands."""
-    help_text = ""
+    help_text = """
 <b>LunessaSignals's Guide 🔮</b>
 
 Here are the commands to guide your journey:
@@ -663,7 +681,7 @@ Here are the commands to guide your journey:
 <b>/safety</b> - Read important trading advice
 <b>/resonate</b> - A word of wisdom from LunessaSignals
 <b>/help</b> - Show this help message
-""
+"""
     await update.message.reply_text(help_text, parse_mode=ParseMode.HTML)
 
 async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -676,20 +694,22 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     username = update.effective_user.username or "(not set)"
     autotrade = "Enabled" if db.get_autotrade_status(user_id) else "Disabled"
     message = (
-        f"*Your Profile*\n"
-        f"\n*User ID:* `{user_id}`"
-        f"\n*Username:* @{username}"
-        f"\n*Tier:* {user_tier}"
-        f"\n*Trading Mode:* {trading_mode}"
-        f"\n*Autotrade:* {autotrade}"
+        f"""*Your Profile*
+
+*User ID:* `{user_id}`
+*Username:* @{username}
+*Tier:* {user_tier}
+*Trading Mode:* {trading_mode}
+*Autotrade:* {autotrade}"""
     )
     if trading_mode == "LIVE":
         # Optionally, fetch and show real USDT balance here
         message += f"\n*USDT Balance:* (see /wallet)"
     else:
         message += f"\n*Paper Balance:* `${paper_balance:,.2f}`"
-    message += "\n\n*Custom Settings:*"
-    message += f"\n- RSI Buy: {settings['RSI_BUY_THRESHOLD']}"
+    message += "\n\n*Custom Settings:*
+"
+    message += f"- RSI Buy: {settings['RSI_BUY_THRESHOLD']}"
     message += f"\n- RSI Sell: {settings['RSI_SELL_THRESHOLD']}"
     message += f"\n- Stop Loss: {settings['STOP_LOSS_PERCENTAGE']}%"
     message += f"\n- Trailing Activation: {settings['TRAILING_PROFIT_ACTIVATION_PERCENT']}%"
@@ -703,7 +723,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     def escape_markdown(text):
         import re
-        return re.sub(r'([_\*\-\-\[\]()~`>#+\|= {{}}.!])', r'\\\1', text)
+        return re.sub(r'([_*-[`()~>#+-.=|{{}}!]])', r'\\\1', text)
 
     if user_tier != 'PREMIUM':
         await update.message.reply_text("Upgrade to Premium to use this feature.")
@@ -713,20 +733,30 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if not context.args:
         settings = db.get_user_effective_settings(user_id)
         message = (
-            "⚙️ **Your Custom Trading Settings** ⚙️\n\n"
-            "| Setting              | Value      |\n"
-            "|----------------------|-----------|\n"
-            f"| RSI Buy Threshold    | `{settings['RSI_BUY_THRESHOLD']}`\n"
-            f"| RSI Sell Threshold   | `{settings['RSI_SELL_THRESHOLD']}`\n"
-            f"| Stop Loss (%)        | `{settings['STOP_LOSS_PERCENTAGE']}`\n"
-            f"| Trailing Activation (%) | `{settings['TRAILING_PROFIT_ACTIVATION_PERCENT']}`\n"
-            f"| Trailing Drop (%)    | `{settings['TRAILING_STOP_DROP_PERCENT']}`\n"
-            f"| Trade Size (USDT)    | `{settings.get('TRADE_SIZE_USDT', 5.0)}`\n\n"
-            "---\n"
-            "**Change a setting:**\n  `/settings <name> <value>`\n  Example: `/settings rsi_buy 40`\n\n"
-            "**Set trade size:**\n  `/settings trade_size 10`\n  (Minimum: $5.00)\n\n"
-            "**Reset a setting to default:**\n  `/settings <name> reset`\n\n"
-            "**Available settings:** rsi_buy, rsi_sell, stop_loss, trailing_activation, trailing_drop, trade_size"
+            f"""⚙️ **Your Custom Trading Settings** ⚙️
+
+| Setting              | Value      |
+|----------------------|-----------|
+| RSI Buy Threshold    | `{settings['RSI_BUY_THRESHOLD']}`
+| RSI Sell Threshold   | `{settings['RSI_SELL_THRESHOLD']}`
+| Stop Loss (%)        | `{settings['STOP_LOSS_PERCENTAGE']}`
+| Trailing Activation (%) | `{settings['TRAILING_PROFIT_ACTIVATION_PERCENT']}`
+| Trailing Drop (%)    | `{settings['TRAILING_STOP_DROP_PERCENT']}`
+| Trade Size (USDT)    | `{settings.get('TRADE_SIZE_USDT', 5.0)}`
+
+---
+**Change a setting:**
+  `/settings <name> <value>`
+  Example: `/settings rsi_buy 40`
+
+**Set trade size:**
+  `/settings trade_size 10`
+  (Minimum: $5.00)
+
+**Reset a setting to default:**
+  `/settings <name> reset`
+
+**Available settings:** rsi_buy, rsi_sell, stop_loss, trailing_activation, trailing_drop, trade_size"""
         )
 
         await update.message.reply_text(escape_markdown(message), parse_mode='MarkdownV2')
@@ -785,11 +815,12 @@ async def autotrade_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         coins = getattr(config, "AI_MONITOR_COINS", [])
         coins_str = ", ".join(coins) if coins else "None"
         await update.message.reply_text(
-            f"🤖 **AI Autotrade Status:** `{status}`\n\n"
-            f"<b>Monitored Coins:</b> {coins_str}\n"
-            "<b>What is Autotrade?</b>\n"
-            "When enabled, the bot will automatically scan for strong buy signals and execute trades for you. You will be notified of all actions.\n"
-            "Use <code>/autotrade on</code> to enable, or <code>/autotrade off</code> to disable.",
+            f"""🤖 **AI Autotrade Status:** `{status}`
+
+<b>Monitored Coins:</b> {coins_str}
+<b>What is Autotrade?</b>
+When enabled, the bot will automatically scan for strong buy signals and execute trades for you. You will be notified of all actions.
+Use <code>/autotrade on</code> to enable, or <code>/autotrade off</code> to disable.""",
             parse_mode=ParseMode.HTML
         )
         return
@@ -798,17 +829,21 @@ async def autotrade_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if sub_command == 'on':
         db.set_autotrade_status(user_id, True)
         await update.message.reply_text(
-            "🤖 <b>AI Autotrade has been ENABLED.</b>\n\n"
-            "The bot will now scan for strong buy signals and execute trades for you automatically. You will receive notifications for every action taken.\n\n"
-            "To disable, use <code>/autotrade off</code>.",
+            """🤖 <b>AI Autotrade has been ENABLED.</b>
+
+The bot will now scan for strong buy signals and execute trades for you automatically. You will receive notifications for every action taken.
+
+To disable, use <code>/autotrade off</code>.""",
             parse_mode=ParseMode.HTML
         )
     elif sub_command == 'off':
         db.set_autotrade_status(user_id, False)
         await update.message.reply_text(
-            "🤖 <b>AI Autotrade has been DISABLED.</b>\n\n"
-            "The bot will no longer execute trades automatically. You are now in manual mode.\n\n"
-            "To enable again, use <code>/autotrade on</code>.",
+            """🤖 <b>AI Autotrade has been DISABLED.</b>
+
+The bot will no longer execute trades automatically. You are now in manual mode.
+
+To enable again, use <code>/autotrade on</code>.""",
             parse_mode=ParseMode.HTML
         )
     else:
@@ -879,7 +914,7 @@ async def verifypayment_command(update: Update, context: ContextTypes.DEFAULT_TY
 
     # Validate tier
     if tier_name not in config.SUBSCRIPTION_TIERS:
-        await update.message.reply_text(f"Invalid tier: {tier_name}. Available tiers are: {', '.join(config.SUBSCRIPTION_TIERS.keys())}")
+        await update.message.reply_text(f"Invalid tier: {tier_name}. Available tiers: {', '.join(config.SUBSCRIPTION_TIERS.keys())}")
         return
 
     # Calculate expiry date
@@ -889,8 +924,8 @@ async def verifypayment_command(update: Update, context: ContextTypes.DEFAULT_TY
     db.update_user_subscription(target_telegram_id, tier=tier_name, expires=expiry_date.strftime('%Y-%m-%d %H:%M:%S'))
 
     await update.message.reply_text(
-        f"✅ Payment verified for user `{target_telegram_id}` (Ref: `{payment_reference}`).\n"
-        f"Tier upgraded to **{tier_name}** until `{expiry_date.strftime('%Y-%m-%d %H:%M:%S UTC')}`.",
+        f"""✅ Payment verified for user `{target_telegram_id}` (Ref: `{payment_reference}`).
+Tier upgraded to **{tier_name}** until `{expiry_date.strftime('%Y-%m-%d %H:%M:%S UTC')}`.""",
         parse_mode=ParseMode.MARKDOWN
     )
 
@@ -898,7 +933,9 @@ async def verifypayment_command(update: Update, context: ContextTypes.DEFAULT_TY
     try:
         await context.bot.send_message(
             chat_id=target_telegram_id,
-            text=f"🎉 Your LunessaSignals subscription has been upgraded to **{tier_name}**!\nIt is valid until `{expiry_date.strftime('%Y-%m-%d %H:%M:%S UTC')}`.\nThank you for your support!",
+            text=f"""🎉 Your LunessaSignals subscription has been upgraded to **{tier_name}**!
+It is valid until `{expiry_date.strftime('%Y-%m-%d %H:%M:%S UTC')}`.
+Thank you for your support!""",
             parse_mode=ParseMode.MARKDOWN
         )
     except Exception as e:
