@@ -1,15 +1,15 @@
 # --- Base Stage: A lean Python environment ---
-FROM python:3.11-slim as base
+FROM python:3.11-slim AS base
 
 # Set environment variables for Python
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Set the working directory in the container
 WORKDIR /app
 
 # --- Builder Stage: Install dependencies ---
-FROM base as builder
+FROM base AS builder
 
 # Install system dependencies required for building some Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential
@@ -24,7 +24,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # --- Final Stage: The production image ---
-FROM base as final
+FROM base AS final
 
 # Copy the installed dependencies from the builder stage
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
