@@ -687,7 +687,7 @@ Here are the commands to guide your journey:
 async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays the user's profile information, including tier and settings."""
     user_id = update.effective_user.id
-    user_tier = db.get_user_tier_db(user_id)
+    user_tier = db.get_user_tier(user_id)
     settings = db.get_user_effective_settings(user_id)
     trading_mode, paper_balance = db.get_user_trading_mode_and_balance(user_id)
 
@@ -707,19 +707,20 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         message += f"\n*USDT Balance:* (see /wallet)"
     else:
         message += f"\n*Paper Balance:* `${paper_balance:,.2f}`"
-    message += "\n\n*Custom Settings:*
-"
-    message += f"- RSI Buy: {settings['RSI_BUY_THRESHOLD']}"
+    message += "\n\n*Custom Settings:*"
+    message += f"\n- RSI Buy: {settings['RSI_BUY_THRESHOLD']}"
     message += f"\n- RSI Sell: {settings['RSI_SELL_THRESHOLD']}"
     message += f"\n- Stop Loss: {settings['STOP_LOSS_PERCENTAGE']}%"
     message += f"\n- Trailing Activation: {settings['TRAILING_PROFIT_ACTIVATION_PERCENT']}%"
     message += f"\n- Trailing Drop: {settings['TRAILING_STOP_DROP_PERCENT']}%"
-    await update.message.reply_text(message, parse_mode='Markdown')
+    if user_tier == 'PREMIUM':
+        message += f"\n- Bollinger Band Width: {settings.get('BOLLINGER_BAND_WIDTH', 2.0)}"
+        message += f"\n- MACD Signal Threshold: {settings.get('MACD_SIGNAL_THRESHOLD', 0)}    await update.message.reply_text(message, parse_mode='Markdown')
 
 async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Allows Premium users to view and customize their trading settings."""
     user_id = update.effective_user.id
-    user_tier = db.get_user_tier_db(user_id)
+    user_tier = db.get_user_tier(user_id)
 
     def escape_markdown(text):
         import re
@@ -735,14 +736,16 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         message = (
             f"""⚙️ **Your Custom Trading Settings** ⚙️
 
-| Setting              | Value      |
-|----------------------|-----------|
-| RSI Buy Threshold    | `{settings['RSI_BUY_THRESHOLD']}`
-| RSI Sell Threshold   | `{settings['RSI_SELL_THRESHOLD']}`
-| Stop Loss (%)        | `{settings['STOP_LOSS_PERCENTAGE']}`
-| Trailing Activation (%) | `{settings['TRAILING_PROFIT_ACTIVATION_PERCENT']}`
-| Trailing Drop (%)    | `{settings['TRAILING_STOP_DROP_PERCENT']}`
-| Trade Size (USDT)    | `{settings.get('TRADE_SIZE_USDT', 5.0)}`
+| Setting                   | Value      |
+|---------------------------|------------|
+| RSI Buy Threshold         | `{settings['RSI_BUY_THRESHOLD']}`
+| RSI Sell Threshold        | `{settings['RSI_SELL_THRESHOLD']}`
+| Stop Loss (%)             | `{settings['STOP_LOSS_PERCENTAGE']}`
+| Trailing Activation (%)  | `{settings['TRAILING_PROFIT_ACTIVATION_PERCENT']}`
+| Trailing Drop (%)         | `{settings['TRAILING_STOP_DROP_PERCENT']}`
+| Bollinger Band Width      | `{settings.get('BOLLINGER_BAND_WIDTH', 2.0)}`
+| MACD Signal Threshold     | `{settings.get('MACD_SIGNAL_THRESHOLD', 0)}`
+| Trade Size (USDT)         | `{settings.get('TRADE_SIZE_USDT', 5.0)}`
 
 ---
 **Change a setting:**
@@ -756,7 +759,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 **Reset a setting to default:**
   `/settings <name> reset`
 
-**Available settings:** rsi_buy, rsi_sell, stop_loss, trailing_activation, trailing_drop, trade_size"""
+**Available settings:** rsi_buy, rsi_sell, stop_loss, trailing_activation, trailing_drop, trade_size, bollinger_band_width, macd_signal_threshold"""
         )
 
         await update.message.reply_text(escape_markdown(message), parse_mode='MarkdownV2')
