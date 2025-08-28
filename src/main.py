@@ -715,7 +715,8 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     message += f"\n- Trailing Drop: {settings['TRAILING_STOP_DROP_PERCENT']}%"
     if user_tier == 'PREMIUM':
         message += f"\n- Bollinger Band Width: {settings.get('BOLLINGER_BAND_WIDTH', 2.0)}"
-        message += f"\n- MACD Signal Threshold: {settings.get('MACD_SIGNAL_THRESHOLD', 0)}    await update.message.reply_text(message, parse_mode='Markdown')
+        message += f"\n- MACD Signal Threshold: {settings.get('MACD_SIGNAL_THRESHOLD', 0)}"
+    await update.message.reply_text(message, parse_mode='Markdown')
 
 async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Allows Premium users to view and customize their trading settings."""
@@ -1048,6 +1049,12 @@ async def linkbinance_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def learn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("This is a placeholder for the learn command.")
+
+async def activate_user_command(update, context):
+    logger.warning("activate_user_command is not yet implemented.")
+
+async def setapi_command(update, context):
+    logger.warning("setapi_command is not yet implemented.")
 
 
 async def slip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
