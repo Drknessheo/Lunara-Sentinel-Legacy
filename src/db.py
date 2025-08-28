@@ -166,6 +166,12 @@ def migrate_schema():
         cursor.execute("ALTER TABLE users ADD COLUMN custom_trailing_activation REAL")
         cursor.execute("ALTER TABLE users ADD COLUMN custom_trailing_drop REAL")
         changes_made = True
+        
+    if 'custom_bollinger_band_width' not in user_columns:
+        logger.info("Migrating database: Adding custom bollinger band and macd signal columns to 'users' table.")
+        cursor.execute("ALTER TABLE users ADD COLUMN custom_bollinger_band_width REAL")
+        cursor.execute("ALTER TABLE users ADD COLUMN custom_macd_signal_threshold REAL")
+        changes_made = True
 
     if changes_made:
         conn.commit()
@@ -200,6 +206,8 @@ SETTING_TO_COLUMN_MAP = {
     'stop_loss': 'custom_stop_loss',
     'trailing_activation': 'custom_trailing_activation',
     'trailing_drop': 'custom_trailing_drop',
+    'bollinger_band_width': 'custom_bollinger_band_width',
+    'macd_signal_threshold': 'custom_macd_signal_threshold',
 }
 
 def update_user_setting(user_id: int, setting_key: str, value: float | None):
@@ -241,6 +249,10 @@ def get_user_effective_settings(user_id: int) -> dict:
         settings['TRAILING_PROFIT_ACTIVATION_PERCENT'] = user_data['custom_trailing_activation']
     if 'custom_trailing_drop' in user_keys and user_data['custom_trailing_drop'] is not None:
         settings['TRAILING_STOP_DROP_PERCENT'] = user_data['custom_trailing_drop']
+    if 'custom_bollinger_band_width' in user_keys and user_data['custom_bollinger_band_width'] is not None:
+        settings['BOLLINGER_BAND_WIDTH'] = user_data['custom_bollinger_band_width']
+    if 'custom_macd_signal_threshold' in user_keys and user_data['custom_macd_signal_threshold'] is not None:
+        settings['MACD_SIGNAL_THRESHOLD'] = user_data['custom_macd_signal_threshold']
     return settings
 
 def get_open_trades(user_id: int):
