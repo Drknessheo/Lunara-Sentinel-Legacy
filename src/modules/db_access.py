@@ -1,7 +1,7 @@
 import sqlite3
 import functools
 import logging
-from src import config
+from . import config
 from src.security import decrypt_data
 
 logger = logging.getLogger(__name__)
