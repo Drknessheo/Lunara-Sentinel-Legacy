@@ -4,7 +4,7 @@ import json
 import logging
 import threading
 import httpx
-import config
+from . import config
 
 try:
     import redis

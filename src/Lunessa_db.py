@@ -21,9 +21,9 @@ def set_autotrade_status(user_id: int, enabled: bool):
 
 import logging
 import sqlite3
-import config
-from config import DB_NAME
-from security import encrypt_data, decrypt_data
+from . import config
+from .config import DB_NAME
+from .security import encrypt_data, decrypt_data
 
 logger = logging.getLogger(__name__)
 

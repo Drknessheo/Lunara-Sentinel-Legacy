@@ -53,7 +53,7 @@ from . import slip_manager
 from . import config
 import google.generativeai as genai
 import asyncio
-from src.modules import db_access as autotrade_db
+from .modules import db_access as autotrade_db
 
 logger = logging.getLogger(__name__)
 
