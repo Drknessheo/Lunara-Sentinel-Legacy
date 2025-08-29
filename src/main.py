@@ -18,7 +18,7 @@ from modules import db_access as db
 import logging
 from datetime import datetime, timezone, timedelta
 import autotrade_jobs
-import autotrade_db
+from . import autotrade_db
 
 logger = logging.getLogger(__name__)
 

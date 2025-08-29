@@ -1,4 +1,4 @@
-from src.modules.db_access import get_db_connection
+from .db_access import get_db_connection
 
 def get_or_create_user(user_id: int):
     """Gets a user from the DB or creates a new one with default settings."""

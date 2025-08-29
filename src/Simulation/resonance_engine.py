@@ -13,7 +13,7 @@ from src.Simulation.stochastic_simulation import run_metric_perturbation_simulat
 from src.Simulation.quantum_clock import run_quantum_clock_phase
 from src.Simulation.plot_utilities import plot_metric_perturbation, plot_clock_phase
 ## Do not import trade functions at the top to avoid circular import
-from src.trading_module import get_trade_suggestion, TradeAction
+from ..trading_module import get_trade_suggestion, TradeAction
 
 def run_resonance_simulation(user_id: int, symbol: str | None = None, indicators: dict | None = None):
     """

@@ -1,9 +1,9 @@
 import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
-import config
-import trade
-import db
+from . import config
+from . import trade
+from . import db
 
 # Enable logging
 logging.basicConfig(
