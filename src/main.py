@@ -1,7 +1,7 @@
 import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from slip_parser import parse_slip, SlipParseError
+from .slip_parser import parse_slip, SlipParseError
 import trade_executor
 import redis_validator
 from telegram.constants import ParseMode
