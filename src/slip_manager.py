@@ -2,7 +2,7 @@
 import redis
 from cryptography.fernet import Fernet
 import json
-from src import config
+from . import config
 from datetime import datetime
 import logging
 
