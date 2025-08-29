@@ -16,7 +16,8 @@ ENV LOG_LEVEL=INFO
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+HEALTHCHECK --interval=15m --timeout=5s --start-period=10s \
+  CMD curl -f http://localhost:8080/healthz || exit 1 --timeout=5s --start-period=10s 
   CMD curl -f http://localhost:8080/healthz || exit 1
 
 CMD ["./startup.sh"]
