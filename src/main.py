@@ -1,12 +1,15 @@
 
+
 import os
+import logging
+import redis
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.constants import ParseMode
+import google.generativeai as genai
 from .slip_parser import parse_slip, SlipParseError
 from . import trade_executor
 from . import redis_validator
-from telegram.constants import ParseMode
-import google.generativeai as genai
 from .Simulation import resonance_engine
 from . import config
 import trade
@@ -15,7 +18,6 @@ from .handlers import *
 from .jobs import *
 from .decorators import require_tier
 from .modules import db_access as db
-import logging
 from datetime import datetime, timezone, timedelta
 import autotrade_jobs
 from . import autotrade_db
