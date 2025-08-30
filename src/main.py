@@ -1,14 +1,4 @@
-async def redis_check_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Checks Redis connectivity and basic set/get operation."""
-    try:
-        import redis
-        redis_client = redis.from_url(config.REDIS_URL, decode_responses=True)
-        redis_client.set("healthcheck", "ok")
-        value = redis_client.get("healthcheck")
-        await update.message.reply_text(f"Redis is working: {value}")
-    except Exception as e:
-        logger.error(f"Redis check failed: {e}")
-        await update.message.reply_text("Redis connection failed.")
+
 import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -21,7 +11,6 @@ from .Simulation import resonance_engine
 from . import config
 import trade
 import slip_manager # Import slip_manager
-
 from .handlers import *
 from .jobs import *
 from .decorators import require_tier
@@ -37,6 +26,18 @@ import asyncio
 
 ## Gemini API keys are now managed in autotrade_jobs.py for multi-key support and fallback
 
+async def redis_check_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Checks Redis connectivity and basic set/get operation."""
+    try:
+        import redis
+        redis_client = redis.from_url(config.REDIS_URL, decode_responses=True)
+        redis_client.set("healthcheck", "ok")
+        value = redis_client.get("healthcheck")
+        await update.message.reply_text(f"Redis is working: {value}")
+    except Exception as e:
+        logger.error(f"Redis check failed: {e}")
+        await update.message.reply_text("Redis connection failed.")
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends a welcome message and registers the user if they are new."""
@@ -47,11 +48,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f"User {user.id} ({user.username}) started the bot.")
 
     welcome_message = (
-    f"""🌑 <b>A new trader emerges from the shadows.</b> {user.mention_html()}, you have been summoned by <b>Lunessa Shai'ra Gork</b>, Sorceress of DeFi and guardian of RSI gates.\n\n"""
-    f"""Your journey begins now. I will monitor the markets for you, alert you to opportunities, and manage your trades.\n\n"""
-    f"""<b>Key Commands:</b>\n/quest <code>SYMBOL</code> - Analyze a cryptocurrency.\n/status - View your open trades and watchlist.\n/help - See all available commands.\n\n"""
-    f"""To unlock live trading, please provide your Binance API keys using the <code>/setapi</code> command in a private message with me."""
-)
+        f"🌑 <b>A new trader emerges from the shadows.</b> {user.mention_html()}, you have been summoned by <b>Lunessa Shai'ra Gork</b>, Sorceress of DeFi and guardian of RSI gates.\n\n"
+        f"Your journey begins now. I will monitor the markets for you, alert you to opportunities, and manage your trades.\n\n"
+        f"<b>Key Commands:</b>\n/quest <code>SYMBOL</code> - Analyze a cryptocurrency.\n/status - View your open trades and watchlist.\n/help - See all available commands.\n\n"
+        f"To unlock live trading, please provide your Binance API keys using the <code>/setapi</code> command in a private message with me."
+    )
     
     await update.message.reply_html(welcome_message)
 
