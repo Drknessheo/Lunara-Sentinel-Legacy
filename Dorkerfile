@@ -1,0 +1,22 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+RUN chmod +x startup.sh
+
+ENV PYTHONUNBUFFERED=1
+ENV LOG_LEVEL=INFO
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=15m --timeout=5s --start-period=10s \
+  CMD curl -f http://localhost:8080/healthz || exit 1
+
+CMD ["./startup.sh"]
