@@ -4,7 +4,7 @@ import json
 import logging
 import threading
 import httpx
-from . import config
+import config
 
 try:
     import redis
@@ -15,10 +15,25 @@ logger = logging.getLogger(__name__)
 
 # --- Gemini Cache (Redis optional) ---
 
+# Build a list of available Gemini API keys from config. Support multiple env var names.
+gemini_keys = []
+maybe = getattr(config, 'GEMINI_API_KEY', None)
+if maybe:
+    # Support comma-separated list or single key
+    if isinstance(maybe, str) and ',' in maybe:
+        gemini_keys.extend([k.strip() for k in maybe.split(',') if k.strip()])
+    else:
+        gemini_keys.append(maybe)
+
+# Also accept legacy GEMINI_KEY_1 / GEMINI_KEY_2
+for kname in ('GEMINI_KEY_1', 'GEMINI_KEY_2'):
+    kv = getattr(config, kname, None)
+    if kv:
+        gemini_keys.append(kv)
+
 redis_client = None
-if config.GEMINI_API_KEY and redis:
+if gemini_keys and redis:
     try:
-        # Assuming REDIS_URL is defined in your config.py or .env
         redis_url = getattr(config, 'REDIS_URL', None)
         if redis_url:
             redis_client = redis.from_url(redis_url)
@@ -92,12 +107,12 @@ gemini_key_lock = threading.Lock()
 def get_next_gemini_key():
     global gemini_key_idx
     with gemini_key_lock:
-        if not config.GEMINI_API_KEY:
+        if not gemini_keys:
             return None
-        # This part assumes GEMINI_API_KEY is a list of keys in config.py
-        # If it's a single key, we just return that.
-        # For now, let's assume it's a single key as per the current project structure.
-        return config.GEMINI_API_KEY
+        # Rotate through the list
+        key = gemini_keys[gemini_key_idx % len(gemini_keys)]
+        gemini_key_idx = (gemini_key_idx + 1) % max(1, len(gemini_keys))
+        return key
 
 async def ask_gemini_for_symbol(symbol: str, prompt_extra: str = "") -> dict:
     cache_key = f"gemini:{symbol}"

@@ -1,6 +1,6 @@
 
 import sqlite3
-from .security import encrypt_data, decrypt_data
+from security import encrypt_data, decrypt_data
 
 def get_db_connection():
     conn = sqlite3.connect('lunara_bot.db')

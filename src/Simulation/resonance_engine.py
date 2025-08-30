@@ -1,99 +1,85 @@
 # resonance_engine.py
 
+# resonance_engine.py
+
 import sys
 import os
 import uuid
 import random
 import numpy as np
 
-# Add parent directory to path to allow imports from the root `g:\Lunara Bot` directory
+# Add parent directory to path to allow imports from the root directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from .stochastic_simulation import run_metric_perturbation_simulation
-from .quantum_clock import run_quantum_clock_phase
-from .plot_utilities import plot_metric_perturbation, plot_clock_phase
-## Do not import trade functions at the top to avoid circular import
-from ..trading_module import get_trade_suggestion, TradeAction
+from Simulation.stochastic_simulation import run_metric_perturbation_simulation
+from Simulation.quantum_clock import run_quantum_clock_phase
+from Simulation.plot_utilities import plot_metric_perturbation, plot_clock_phase
+from trading_module import get_trade_suggestion, TradeAction
+
 
 def run_resonance_simulation(user_id: int, symbol: str | None = None, indicators: dict | None = None):
-    """
-    Runs the full resonance simulation, generates plots, and returns a narrative with file paths.
-    If a symbol is provided, the resonance is based on its RSI, Bollinger Bands, and MACD. Otherwise, it's random.
-    """
+    """Runs the resonance simulation and returns narrative and plot filenames."""
     resonance_source = "Random Cosmic Fluctuation"
     if symbol and indicators:
-        rsi, price, upper_band, lower_band, std, macd_hist = (
-            indicators.get('rsi'), indicators.get('price'), indicators.get('upper_band'),
-            indicators.get('lower_band'), indicators.get('std'), indicators.get('macd_hist')
-        )
+        rsi = indicators.get('rsi')
+        price = indicators.get('price')
+        upper_band = indicators.get('upper_band')
+        lower_band = indicators.get('lower_band')
+        std = indicators.get('std')
+        macd_hist = indicators.get('macd_hist')
 
-        if rsi is not None and price is not None and lower_band is not None and upper_band is not None and macd_hist is not None and std is not None:
-            # 1. Calculate RSI Factor (0 to 1, where 1 is a strong buy signal)
-            rsi_factor = 1 - (min(max(rsi, 0), 100) / 100)
+        if None not in (rsi, price, lower_band, upper_band, macd_hist, std):
+            # 1. Calculate RSI Factor (0 to 1). We'll map 50 -> 0.5, extremes -> 0/1 roughly.
+            rsi_factor = 1 - abs((rsi - 50) / 50)
+            rsi_factor = max(0.0, min(1.0, rsi_factor))
 
-            # 2. Calculate Bollinger Band Factor (0 to 1, where 1 is a strong buy signal)
+            # 2. Bollinger Band Factor
             band_range = upper_band - lower_band
             if band_range > 0:
                 price_position = (price - lower_band) / band_range
                 clamped_position = min(max(price_position, 0), 1)
                 bollinger_factor = 1 - clamped_position
             else:
-                bollinger_factor = 0.5 # Neutral if bands are flat
+                bollinger_factor = 0.5
 
-            # 3. Calculate MACD Factor (0 to 1, where 1 is a strong buy signal)
+            # 3. MACD Factor
             if std > 0:
                 scaled_hist = macd_hist / std
-                macd_factor = 1 / (1 + np.exp(-scaled_hist))  # Sigmoid function
+                macd_factor = 1 / (1 + np.exp(-scaled_hist))
             else:
-                macd_factor = 0.5  # Neutral if no volatility
+                macd_factor = 0.5
 
-            # 4. Combine factors (RSI: 40%, Bollinger: 30%, MACD: 30%)
+            # Combine
             combined_factor = (0.4 * rsi_factor) + (0.3 * bollinger_factor) + (0.3 * macd_factor)
-
-            # 5. Map the combined factor (0-1) to the resonance level (0.5-2.5)
             resonance_level = round(0.5 + (combined_factor * 2.0), 2)
             resonance_source = f"{symbol} RSI, BBands & MACD"
         else:
-            # Fallback if any indicator fails
             resonance_level = round(random.uniform(0.5, 2.5), 2)
             resonance_source = f"Could not fully analyze '{symbol}'. Providing a general reading instead."
     else:
-        # --- General Market Resonance (Random) ---
         resonance_level = round(random.uniform(0.5, 2.5), 2)
 
-    # Generate unique filenames for the plots to avoid collisions from concurrent users
     unique_id = uuid.uuid4()
     metric_plot_filename = f"metric_perturbation_{unique_id}.png"
     clock_plot_filename = f"clock_phase_{unique_id}.png"
 
-    # Run the metric perturbation simulation.
     h, t, x = run_metric_perturbation_simulation(elara_resonance_level=resonance_level)
-
-    # Calculate time step for other modules
     dt = t[1] - t[0]
 
-    # Plot the final metric perturbation profile.
     plot_metric_perturbation(x, h[-1, :], t[-1], filename=metric_plot_filename)
-
-    # Compute and plot the quantum clock phase evolution.
     clock_phase = run_quantum_clock_phase(h, dt, x_clock=0.0, x=x)
     plot_clock_phase(t, clock_phase, filename=clock_plot_filename)
 
-    # Get a trading suggestion based on the resonance level
     trade_suggestion = get_trade_suggestion(resonance_level)
-
-
-    # Sanitize the suggestion value for Markdown V1 by replacing underscores.
     trade_suggestion_text = trade_suggestion.value.replace('_', ' ')
 
-    # Build the narrative message
     narrative = (
         f"**LunessaSignals's Resonance Transmission for {symbol or 'the General Market'}**\n\n"
         f"I have attuned my senses to the asset's vibration... The spacetime metric is fluctuating.\n\n"
         f"  - **Resonance Level:** `{resonance_level}` (Attunement: {'Low' if resonance_level < 1.0 else 'Normal' if resonance_level < 1.8 else 'Heightened'})\n"
-        f"  - **Waveform Analysis:** The metric perturbation shows {'minor' if resonance_level < 1.2 else 'significant'} ripples, indicating a period of {'low' if resonance_level < 1.2 else 'high'} potential energy.\n"
+        f"  - **Waveform Analysis:** The metric perturbation shows {'minor' if resonance_level < 1.2 else 'significant'} ripples.\n"
         f"  - **Source of Resonance:** `{resonance_source}`\n"
-        f"  - **Clock Phase:** My internal chronometer is experiencing {'stable' if resonance_level < 1.2 else 'accelerated'} phase shifts, a sign of {'calm' if resonance_level < 1.2 else 'imminent market movement'}.\n\n"
+        f"  - **Clock Phase:** My internal chronometer is experiencing {'stable' if resonance_level < 1.2 else 'accelerated'}.\n\n"
         f"**Oracle's Insight:** My resonance is {'weak' if resonance_level < 0.8 else 'strong'}. The patterns suggest a **{trade_suggestion_text}** stance."
     )
 
@@ -104,14 +90,11 @@ def run_resonance_simulation(user_id: int, symbol: str | None = None, indicators
         "trade_suggestion": trade_suggestion,
     }
 
+
 if __name__ == '__main__':
-    # For direct testing of the simulation engine
-    # Pass dummy indicator data for testing
     dummy_indicators = {'rsi': 30, 'price': 100, 'upper_band': 110, 'lower_band': 90, 'std': 5, 'macd_hist': 0.5}
     results = run_resonance_simulation(user_id=123, symbol="TESTUSDT", indicators=dummy_indicators)
     print(results["narrative"])
     print(f"Metric plot saved to: {results['metric_plot']}")
     print(f"Clock plot saved to: {results['clock_plot']}")
-    # Clean up test files
-    os.remove(results['metric_plot'])
-    os.remove(results['clock_plot'])
+    # Note: don't attempt to remove files in CI

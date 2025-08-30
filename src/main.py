@@ -487,6 +487,94 @@ async def list_sandpaper_command(update: Update, context: ContextTypes.DEFAULT_T
         logger.error(f"list_sandpaper_command failed: {e}")
         await update.message.reply_text("Failed to list sandpaper slips. See logs.")
 
+
+async def audit_recent_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin-only: show recent autosuggest audit entries from Redis."""
+    user_id = update.effective_user.id
+    if user_id != config.ADMIN_USER_ID:
+        await update.message.reply_text("Only the admin can view audit entries.")
+        return
+
+    # How many entries to show (default 5). Cap at 50 for safety.
+    try:
+        n = int(context.args[0]) if context.args else 5
+    except Exception:
+        n = 5
+    n = max(1, min(50, n))
+
+    try:
+        redis_client = redis.from_url(config.REDIS_URL, decode_responses=True)
+        items = redis_client.lrange('autosuggest_audit', 0, n-1) or []
+        if not items:
+            await update.message.reply_text('No audit entries found.')
+            return
+        # Attempt to map admin IDs to usernames via bot API (cached)
+        id_to_name = {}
+        unique_ids = set()
+        parsed = []
+        for raw in items:
+            try:
+                obj = json.loads(raw)
+            except Exception:
+                parsed.append({'raw': raw})
+                continue
+            admin_id = obj.get('admin_id')
+            if admin_id is not None:
+                unique_ids.add(admin_id)
+            parsed.append(obj)
+
+        for aid in list(unique_ids):
+            try:
+                # Try Telegram API first (works if bot can access the user/chat)
+                if context and getattr(context, 'bot', None):
+                    try:
+                        chat = await context.bot.get_chat(aid)
+                        name = f"@{getattr(chat, 'username', None) or getattr(chat, 'first_name', str(aid))}"
+                        id_to_name[aid] = name
+                        continue
+                    except Exception:
+                        pass
+                # Fallback to configured ADMIN_ID if present
+                id_to_name[aid] = getattr(config, 'ADMIN_ID', str(aid)) or str(aid)
+            except Exception:
+                id_to_name[aid] = str(aid)
+
+        # Build message lines
+        msg_lines = [f'Recent {len(items)} autosuggest audit entries:']
+        from datetime import datetime as _dt
+        for obj in parsed:
+            if 'raw' in obj:
+                msg_lines.append(f'- RAW: {obj["raw"]}')
+                continue
+            ts_raw = obj.get('timestamp')
+            try:
+                if ts_raw:
+                    try:
+                        ts = _dt.fromisoformat(ts_raw)
+                        ts_fmt = ts.strftime('%Y-%m-%d %H:%M:%S') + ' UTC'
+                    except Exception:
+                        ts_fmt = ts_raw
+                else:
+                    ts_fmt = 'unknown'
+            except Exception:
+                ts_fmt = str(ts_raw)
+
+            admin = obj.get('admin_id')
+            admin_name = id_to_name.get(admin, str(admin))
+            result = obj.get('result', 'unknown')
+            created = obj.get('created_trades')
+            created_display = ','.join(created) if isinstance(created, list) and created else str(created)
+            msg_lines.append(f'- {ts_fmt} by {admin_name} result={result} created={created_display}')
+
+        # Telegram has message size limits; truncate if necessary
+        out = '\n'.join(msg_lines)
+        if len(out) > 3500:
+            out = out[:3490] + '\n...truncated...'
+        await update.message.reply_text(out)
+    except Exception as e:
+        logger.error(f"audit_recent_command failed: {e}")
+        await update.message.reply_text('Failed to read audit entries. See logs.')
+
 async def safety_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Static handler for the /safety command."""
     await update.message.reply_text(
@@ -1475,6 +1563,7 @@ def main() -> None:
     application.add_handler(CommandHandler("checked", checked_command))
     application.add_handler(CommandHandler("autotrade", autotrade_command))
     application.add_handler(CommandHandler("cleanslips", clean_slips_command))
+    application.add_handler(CommandHandler("audit_recent", audit_recent_command))
 
     # Add the slip handler for text messages starting with 'SLIP:'
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)^SLIP:'), slip_handler))

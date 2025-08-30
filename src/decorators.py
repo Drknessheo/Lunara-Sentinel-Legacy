@@ -1,5 +1,5 @@
 from functools import wraps
-from . import db
+import db
 
 # Decorator to restrict command to users with a required tier (e.g., 'PREMIUM')
 def require_tier(required_tier):

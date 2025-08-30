@@ -1,8 +1,8 @@
 import logging
 import sqlite3
-from . import config
-from .config import DB_NAME
-from .security import encrypt_data, decrypt_data
+import config
+from config import DB_NAME
+from security import encrypt_data, decrypt_data
 
 logger = logging.getLogger(__name__)
 

@@ -8,8 +8,8 @@ from datetime import datetime
 # Ensure the script can find the 'src' modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from . import config
-from . import trade
+import config
+import trade
 
 # --- Logger Setup ---
 logger = logging.getLogger("reimport_monitor")

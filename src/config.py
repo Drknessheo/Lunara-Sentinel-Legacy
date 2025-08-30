@@ -67,7 +67,8 @@ from dotenv import load_dotenv
 load_dotenv() # Load environment variables from .env file
 
 # --- Telegram ---
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+# Support either TELEGRAM_BOT_TOKEN or legacy BOT_TOKEN env var (some deploys set BOT_TOKEN)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("BOT_TOKEN")
 
 # --- Binance ---
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
