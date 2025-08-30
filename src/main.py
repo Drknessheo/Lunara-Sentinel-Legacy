@@ -1291,4 +1291,4 @@ async def clean_slips_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text(f"⚠️ Failed to delete slip `{slip_key_to_delete}`. Error: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
