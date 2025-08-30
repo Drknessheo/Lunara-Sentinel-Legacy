@@ -2,26 +2,36 @@ print("📍 Entered main.py — before imports")
 
 
 import os
+import sys
 import logging
 import redis
+import json
+
+# Ensure the src directory is on sys.path so imports work when running as a script
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ParseMode
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import google.generativeai as genai
-from .slip_parser import parse_slip, SlipParseError
-from . import trade_executor
-from . import redis_validator
-from .Simulation import resonance_engine
-from . import config
+
+# Local modules (imported as top-level names so `python src/main.py` works)
+import slip_parser
+from slip_parser import parse_slip, SlipParseError
+import trade_executor
+import redis_validator
+from Simulation import resonance_engine
+import config
 import trade
-import slip_manager # Import slip_manager
-from .handlers import *
-from .jobs import *
-from .decorators import require_tier
-from .modules import db_access as db
+import slip_manager  # Import slip_manager
+from handlers import *
+from jobs import *
+from decorators import require_tier
+from modules import db_access as db
 from datetime import datetime, timezone, timedelta
 import autotrade_jobs
-from . import autotrade_db
+import autotrade_db
 
 logger = logging.getLogger(__name__)
 
@@ -133,8 +143,24 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     # Get active slips from Redis
     active_slips = slip_manager.list_all_slips()
-    active_slip_symbols = {slip['data']['symbol'] for slip in active_slips if 'data' in slip and 'symbol' in slip['data']}
-    active_slip_keys = {slip['key'] for slip in active_slips}
+
+    # Log and skip malformed slips to avoid runtime crashes (some slips may be floats or strings)
+    valid_slips = []
+    for slip in active_slips:
+        if not isinstance(slip, dict):
+            logger.warning(f"Malformed slip (not dict): {slip}")
+            continue
+        data = slip.get('data')
+        if not isinstance(data, dict):
+            logger.warning(f"Malformed slip data (not dict) for key={slip.get('key')}: {data}")
+            continue
+        if 'symbol' not in data:
+            logger.warning(f"Slip missing 'symbol' field for key={slip.get('key')}: {data}")
+            continue
+        valid_slips.append(slip)
+
+    active_slip_symbols = {slip['data']['symbol'] for slip in valid_slips}
+    active_slip_keys = {slip['key'] for slip in valid_slips}
 
     # Filter open_trades to only include those actively monitored by Redis slips
     monitored_trades = [trade_item for trade_item in open_trades if trade_item['coin_symbol'] in active_slip_symbols]
@@ -253,6 +279,189 @@ async def resonate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             os.remove(metric_plot_path)
         if clock_plot_path and os.path.exists(clock_plot_path):
             os.remove(clock_plot_path)
+
+
+async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Simple /settings handler to set autotrade parameters for the invoking user.
+    Usage: /settings key=value key2=value2
+    Only admin can set global settings via this minimal implementation.
+    """
+    user_id = update.effective_user.id
+    if user_id != config.ADMIN_USER_ID:
+        await update.message.reply_text("Only the admin can change autotrade settings via this command.")
+        return
+
+    # Parse args like key=value
+    settings = {}
+    for token in context.args:
+        if '=' in token:
+            k, v = token.split('=', 1)
+            # coerce numeric values
+            try:
+                if '.' in v:
+                    vv = float(v)
+                else:
+                    vv = int(v)
+            except Exception:
+                vv = v
+            settings[k.strip()] = vv
+
+    if not settings:
+        await update.message.reply_text("Usage: /settings key=value ...\nExample: /settings PROFIT_TARGET_PERCENTAGE=2.5 TRADE_SIZE_USDT=10")
+        return
+
+    try:
+        from autotrade_settings import set_user_settings
+        set_user_settings(user_id, settings)
+        await update.message.reply_text(f"Settings updated: {settings}")
+    except Exception as e:
+        logger.error(f"Failed to save settings: {e}")
+        await update.message.reply_text("Failed to save settings. See logs.")
+
+
+async def mockbuy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin-only command to create a mock autotrade buy for testing the lifecycle.
+    Usage: /mockbuy SYMBOL AMOUNT
+    """
+    user_id = update.effective_user.id
+    if user_id != config.ADMIN_USER_ID:
+        await update.message.reply_text("Only the admin can run this command.")
+        return
+
+    try:
+        symbol = context.args[0].upper()
+        amount = float(context.args[1])
+    except Exception:
+        await update.message.reply_text("Usage: /mockbuy SYMBOL AMOUNT")
+        return
+
+    try:
+        # Call the mock buy helper
+        from autotrade_jobs import mock_autotrade_buy
+        trade_id = await mock_autotrade_buy(user_id, symbol, amount, context)
+        if trade_id:
+            await update.message.reply_text(f"Mock buy created: trade:{trade_id} for {symbol} x{amount}")
+        else:
+            await update.message.reply_text("Failed to create mock buy. See logs.")
+    except Exception as e:
+        logger.error(f"/mockbuy failed: {e}")
+        await update.message.reply_text("Mock buy failed. See logs.")
+
+
+async def autosuggest_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin-only: fetch Gemini suggestions and create mock sandpaper buys for recommended coins."""
+    user_id = update.effective_user.id
+    if user_id != config.ADMIN_USER_ID:
+        await update.message.reply_text("Only the admin can run this command.")
+        return
+
+    # default to dry-run; pass 'commit' argument to actually create slips
+    commit = len(context.args) and context.args[0].lower() == 'commit'
+    if commit:
+        await update.message.reply_text("Fetching suggestions and creating mock buys (commit=true)... This may take a few seconds.")
+    else:
+        await update.message.reply_text("Fetching suggestions (dry-run). Reply with /autosuggest commit to actually create mock buys.")
+
+    try:
+        from autotrade_jobs import autotrade_buy_from_suggestions
+        # Try to get cache age for display
+        cache_age = None
+        try:
+            from gemini_cache import get_cache_age
+            cache_age = get_cache_age(config.AI_MONITOR_COINS[:10])
+        except Exception:
+            cache_age = None
+
+        # If commit requested, ask for confirmation with a max-create preview
+        MAX_CREATE = 5
+        if commit:
+            # Ask for confirmation before creating up to MAX_CREATE slips
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(f"Confirm create up to {MAX_CREATE}", callback_data=f"autosuggest_confirm:{MAX_CREATE}"), InlineKeyboardButton("Cancel", callback_data="autosuggest_cancel")]])
+            await update.message.reply_text(f"You requested commit. This will create up to {MAX_CREATE} mock slips. Confirm?", reply_markup=keyboard)
+            return
+
+        created = await autotrade_buy_from_suggestions(user_id, None, context, dry_run=True, max_create=MAX_CREATE)
+        if not created:
+            if cache_age is not None:
+                await update.message.reply_text(f"No buy suggestions found. Cache age: ~{int(cache_age)}s. Fetching fresh data may help.")
+            else:
+                await update.message.reply_text("No buy suggestions found or creation failed. Check logs.")
+            return
+
+        await update.message.reply_text(f"Dry-run results - top suggested buys (preview max {MAX_CREATE}): {', '.join(created)}")
+    except Exception as e:
+        logger.error(f"/autosuggest failed: {e}")
+        await update.message.reply_text("Autosuggest failed. See logs.")
+
+
+async def autosuggest_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Callback handler for autosuggest confirmation inline buttons."""
+    query = update.callback_query
+    await query.answer()
+    data = query.data or ''
+    if data.startswith('autosuggest_confirm:'):
+        try:
+            _, max_create = data.split(':')
+            max_create = int(max_create)
+        except Exception:
+            max_create = 5
+        # Proceed with actual creation, limited
+        try:
+            # Audit: record who confirmed the autosuggest commit and when
+            try:
+                redis_client = redis.from_url(config.REDIS_URL, decode_responses=True)
+                auditor = {
+                    'admin_id': (query.from_user.id if getattr(query, 'from_user', None) else None),
+                    'action': 'autosuggest_confirm',
+                    'max_create': int(max_create),
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'message_id': getattr(query.message, 'message_id', None)
+                }
+                # push to a list for audit history and set last metadata
+                try:
+                    redis_client.lpush('autosuggest_audit', json.dumps(auditor))
+                    redis_client.set('autosuggest:last', json.dumps(auditor))
+                except Exception as _e:
+                    logger.warning(f"[AUDIT] Failed to write autosuggest audit to Redis: {_e}")
+            except Exception as _e:
+                logger.warning(f"[AUDIT] Redis unavailable for autosuggest audit: {_e}")
+
+            from autotrade_jobs import autotrade_buy_from_suggestions
+            created = await autotrade_buy_from_suggestions(config.ADMIN_USER_ID, None, context, dry_run=False, max_create=max_create)
+            if created:
+                await query.edit_message_text(f"Created mock trades (ids): {', '.join(created)}")
+            else:
+                await query.edit_message_text("No trades created. Check logs.")
+        except Exception as e:
+            logger.error(f"autosuggest confirmation failed: {e}")
+            await query.edit_message_text("Failed to create mock trades. See logs.")
+    else:
+        # Cancel
+        await query.edit_message_text("Autosuggest commit cancelled.")
+
+
+async def list_sandpaper_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin-only: list current sandpaper slips stored in Redis for debugging."""
+    user_id = update.effective_user.id
+    if user_id != config.ADMIN_USER_ID:
+        await update.message.reply_text("Only the admin can run this command.")
+        return
+
+    try:
+        slips = slip_manager.list_all_slips()
+        sandpaper = [s for s in slips if isinstance(s.get('data', {}), dict) and s['data'].get('sandpaper')]
+        if not sandpaper:
+            await update.message.reply_text("No sandpaper slips found.")
+            return
+        msg = "Current sandpaper slips:\n"
+        for s in sandpaper:
+            key = s.get('key')
+            data = s.get('data')
+            msg += f"- {key}: {data}\n"
+        await update.message.reply_text(msg)
+    except Exception as e:
+        logger.error(f"list_sandpaper_command failed: {e}")
+        await update.message.reply_text("Failed to list sandpaper slips. See logs.")
 
 async def safety_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Static handler for the /safety command."""
