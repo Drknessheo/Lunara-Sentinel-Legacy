@@ -48,12 +48,12 @@ async def get_ai_suggestions(prompt):
 
 import logging
 from telegram.ext import ContextTypes
-from . import trade
-from . import slip_manager
-from . import config
+import trade
+import slip_manager
+import config
 import google.generativeai as genai
 import asyncio
-from .modules import db_access as autotrade_db
+from modules import db_access as autotrade_db
 
 logger = logging.getLogger(__name__)
 
@@ -154,35 +154,221 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE):
             except trade.TradeError as e:
                 logger.error(f"Error executing autotrade for {symbol}: {e}")
 
-async def monitor_autotrades(context: ContextTypes.DEFAULT_TYPE):
-    logger.info("Monitoring open autotrades...")
-    # Only process keys that match the expected trade slip pattern (e.g., start with 'trade:')
-    encrypted_slips = [k for k in slip_manager.redis_client.keys('*') if k.startswith(b'trade:')]
 
-    for encrypted_slip in encrypted_slips:
+async def mock_autotrade_buy(user_id: int, symbol: str, amount: float, context: ContextTypes.DEFAULT_TYPE = None):
+    """Creates a mock autotrade buy slip tagged as sandpaper for testing end-to-end lifecycle."""
+    try:
+        # Use slip_manager to create and store the slip
+        trade_id = slip_manager.create_and_store_slip(symbol=symbol, side='buy', amount=amount, price=0.0)
+        logger.info(f"[MOCKBUY] Mock autotrade buy created trade_id={trade_id} symbol={symbol} amount={amount} user_id={user_id}")
+        if context and getattr(context, 'bot', None):
+            await context.bot.send_message(chat_id=user_id, text=f"[MOCKBUY] Created autotrade slip trade:{trade_id} for {symbol} x{amount}")
+        return trade_id
+    except Exception as e:
+        logger.error(f"mock_autotrade_buy failed: {e}")
+        return None
+
+
+async def autotrade_buy_from_suggestions(user_id: int, symbols: list = None, context: ContextTypes.DEFAULT_TYPE = None, dry_run: bool = False, max_create: int | None = None):
+    """Fetch suggestions from Gemini and create mock sandpaper buys for coins recommended as 'buy'.
+    Returns list of created trade_ids.
+    """
+    created = []
+    try:
+        # If symbols not provided, use prioritized list from config
+        if symbols is None:
+            symbols = config.AI_MONITOR_COINS[:10]
+
+        # Try to use cached suggestions if available (gemini_cache) but import lazily
+        suggestions = None
         try:
-                slip = slip_manager.get_and_decrypt_slip(encrypted_slip)
-                logger.info(f"Processing slip from key {encrypted_slip}: {slip}")
-                if slip is not None and all(k in slip for k in ('symbol', 'price', 'amount')):
-                    current_price = trade.get_current_price(slip['symbol'])
-                    if not current_price:
+            try:
+                from gemini_cache import get_suggestions_for, set_suggestions_for
+            except Exception:
+                get_suggestions_for = None
+                set_suggestions_for = None
+
+            if get_suggestions_for:
+                cached = get_suggestions_for(symbols)
+                if cached:
+                    logger.info("Using cached Gemini suggestions")
+                    suggestions = cached
+        except Exception:
+            # If cache lookup fails, continue to live fetch
+            suggestions = None
+
+        if suggestions is None:
+            suggestions = await get_trade_suggestions_from_gemini(symbols)
+            # store in cache if available
+            try:
+                if 'set_suggestions_for' in locals() and set_suggestions_for and suggestions:
+                    set_suggestions_for(symbols, suggestions)
+            except Exception:
+                pass
+        # Use user effective settings for trade size
+        try:
+            from autotrade_settings import get_effective_settings
+            settings = get_effective_settings(user_id)
+            trade_size = float(settings.get('TRADE_SIZE_USDT', 5.0))
+        except Exception:
+            trade_size = 5.0
+
+        # Build ordered list of buy candidates
+        buy_candidates = [s for s, d in (suggestions or {}).items() if d == 'buy']
+
+        # If dry_run, return which symbols would be bought (respect max_create)
+        if dry_run:
+            if max_create is not None:
+                logger.info(f"[AUTOSUGGEST] DRY RUN - would create mock buys for: {buy_candidates[:max_create]}")
+                created.extend(buy_candidates[:max_create])
+            else:
+                logger.info(f"[AUTOSUGGEST] DRY RUN - would create mock buys for: {buy_candidates}")
+                created.extend(buy_candidates)
+            return created
+
+        # Non-dry run: limit creations to max_create if provided
+        if max_create is not None:
+            buy_candidates = buy_candidates[:max_create]
+
+        for symbol in buy_candidates:
+            try:
+                tid = await mock_autotrade_buy(user_id, symbol, trade_size, context)
+                if tid:
+                    created.append(str(tid))
+                    logger.info(f"[MOCKBUY] autotrade_buy_from_suggestions created trade {tid} for {symbol}")
+            except Exception as e:
+                logger.error(f"Failed to create mock buy for {symbol}: {e}")
+    except Exception as e:
+        logger.error(f"autotrade_buy_from_suggestions failed: {e}")
+
+    return created
+
+async def monitor_autotrades(context: ContextTypes.DEFAULT_TYPE = None, dry_run: bool = False) -> None:
+    logger.info("[MONITOR] Monitoring open autotrades...")
+    # Only process keys that match the expected trade slip pattern (e.g., start with 'trade:')
+    # Fetch all keys starting with 'trade:' and group them by trade id.
+    try:
+        raw_keys = list(slip_manager.redis_client.scan_iter("trade:*"))
+    except Exception:
+        # If redis isn't available, fallback to listing from slip_manager
+        raw_keys = [k for k in slip_manager.fallback_cache.keys() if k.startswith('trade:')]
+
+    grouped = {}
+    # Normalize keys to strings and group
+    for raw_key in raw_keys:
+        try:
+            k = raw_key.decode() if isinstance(raw_key, (bytes, bytearray)) else str(raw_key)
+        except Exception:
+            k = str(raw_key)
+        parts = k.split(":")
+        # Expect patterns like 'trade:<id>' (full slip) or 'trade:<id>:<field>' (per-field)
+        if len(parts) >= 2:
+            trade_id = parts[1]
+            grouped.setdefault(trade_id, []).append(k)
+
+    for trade_id, keys in grouped.items():
+        try:
+            # First, attempt to find a full-slip key (exactly 'trade:<id>')
+            full_key = next((kk for kk in keys if kk == f"trade:{trade_id}"), None)
+            slip = None
+            if full_key:
+                # read and expect a dict
+                slip = slip_manager.get_and_decrypt_slip(full_key.encode() if isinstance(raw_keys[0], (bytes, bytearray)) else full_key)
+            else:
+                # Reconstruct slip from per-field keys
+                fields = {}
+                for kk in keys:
+                    # kk looks like 'trade:49:quantity' or similar
+                    val = slip_manager.get_and_decrypt_slip(kk.encode() if isinstance(raw_keys[0], (bytes, bytearray)) else kk)
+                    if val is None:
                         continue
+                    # Extract field name
+                    p = kk.split(":")
+                    if len(p) >= 3:
+                        field_name = p[2]
+                        fields[field_name] = val
+                # if we have symbol, price, amount combine
+                if all(x in fields for x in ("symbol", "price", "quantity")):
+                    slip = {"symbol": fields["symbol"], "price": float(fields["price"]), "amount": float(fields["quantity"])}
+                elif all(x in fields for x in ("symbol", "price", "amount")):
+                    slip = {"symbol": fields["symbol"], "price": float(fields["price"]), "amount": float(fields["amount"])}
 
-                    pnl_percent = ((current_price - slip['price']) / slip['price']) * 100
+            logger.info(f"Processing reconstructed slip for trade_id={trade_id}: {slip}")
+            logger.info(f"[MANUALMONITOR] Processing reconstructed slip for trade_id={trade_id}: {slip}")
+            if slip is None:
+                continue
 
-                    if pnl_percent >= autotrade_db.get_user_effective_settings(config.ADMIN_USER_ID)['PROFIT_TARGET_PERCENTAGE']:
-                        try:
-                            trade.place_sell_order(config.ADMIN_USER_ID, slip['symbol'], slip['amount'])
-                            slip_manager.delete_slip(encrypted_slip)
-                            await context.bot.send_message(
-                                chat_id=config.ADMIN_USER_ID,
-                                text=f"🤖 Autotrade closed: Sold {slip['amount']:.4f} {slip['symbol']} at ${current_price:.8f} for a {pnl_percent:.2f}% gain."
-                            )
-                        except Exception as trade_exc:
-                            logger.error(f"Error placing sell order for {slip['symbol']}: {trade_exc}")
-                else:
-                    # Silently skip invalid or malformed slips
-                    continue
+            # Only process autotrade 'sandpaper' slips here
+            if not isinstance(slip, dict) or not all(k in slip for k in ("symbol", "price", "amount")):
+                continue
+            if not slip.get('sandpaper'):
+                logger.debug(f"[MONITOR] Skipping non-sandpaper slip: {trade_id}")
+                continue
+                logger.debug(f"Skipping non-sandpaper slip: {trade_id}")
+                continue
+
+            # Get per-user effective autotrade settings
+            try:
+                from autotrade_settings import get_effective_settings
+                settings = get_effective_settings(config.ADMIN_USER_ID)
+            except Exception:
+                settings = {'PROFIT_TARGET_PERCENTAGE': 1.0}
+
+            current_price = trade.get_current_price(slip['symbol'])
+            if not current_price:
+                continue
+
+            pnl_percent = ((current_price - float(slip['price'])) / float(slip['price'])) * 100
+            target_pct = float(settings.get('PROFIT_TARGET_PERCENTAGE', 1.0))
+            if pnl_percent >= target_pct:
+                try:
+                    # Dry-run mode: log the intended action but don't execute
+                    if dry_run:
+                        logger.info(f"[MANUALMONITOR] DRY RUN - Would sell {slip['amount']} {slip['symbol']} for trade_id={trade_id} at price={current_price} (pnl={pnl_percent:.2f}%)")
+                    else:
+                        trade.place_sell_order(config.ADMIN_USER_ID, slip['symbol'], slip['amount'])
+
+                    # delete all keys related to this trade (skip deletion in dry_run)
+                    if dry_run:
+                        logger.info(f"[MANUALMONITOR] DRY RUN - Would delete keys for trade_id={trade_id}: {keys}")
+                    else:
+                        for kk in keys:
+                            try:
+                                slip_manager.delete_slip(kk.encode() if isinstance(raw_keys[0], (bytes, bytearray)) else kk)
+                            except Exception:
+                                pass
+
+                    # Send notification via bot if available, otherwise log
+                    msg_text = f"🤖 Autotrade closed: Sold {slip['amount']:.4f} {slip['symbol']} at ${current_price:.8f} for a {pnl_percent:.2f}% gain."
+                    if context and getattr(context, 'bot', None):
+                        await context.bot.send_message(chat_id=config.ADMIN_USER_ID, text=msg_text)
+                    else:
+                        logger.info(f"[MANUALMONITOR] {msg_text}")
+                except Exception as trade_exc:
+                    logger.error(f"[MANUALMONITOR] Error placing sell order for {slip['symbol']}: {trade_exc}")
         except Exception as e:
             import traceback
-            logger.error(f"Error monitoring autotrade: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error monitoring autotrade for trade_id={trade_id}: {e}\n{traceback.format_exc()}")
+
+
+async def force_create_mock_slips(user_id: int, symbols: list, context: ContextTypes.DEFAULT_TYPE = None, max_create: int = 5):
+    """Force-create mock buy slips for a provided list of symbols, bypassing AI suggestions.
+
+    Returns list of created trade ids.
+    """
+    created = []
+    try:
+        if not symbols:
+            return created
+        to_create = symbols[:max_create]
+        for symbol in to_create:
+            try:
+                tid = await mock_autotrade_buy(user_id, symbol, amount=float(autotrade_db.get_user_effective_settings(user_id).get('TRADE_SIZE_USDT', 5.0)), context=context)
+                if tid:
+                    created.append(str(tid))
+                    logger.info(f"[FORCECREATE] Created mock slip {tid} for {symbol}")
+            except Exception as e:
+                logger.error(f"[FORCECREATE] Failed creating mock slip for {symbol}: {e}")
+    except Exception as e:
+        logger.error(f"force_create_mock_slips failed: {e}")
+    return created

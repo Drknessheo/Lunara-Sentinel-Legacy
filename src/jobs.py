@@ -5,6 +5,6 @@ All scheduled and periodic job functions are defined here.
 import logging
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
-from . import config
-from .modules import db_access as db
+import config
+from modules import db_access as db
 # ...existing job functions...

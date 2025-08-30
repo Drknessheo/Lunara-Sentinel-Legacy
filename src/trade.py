@@ -50,13 +50,13 @@ import numpy as np
 import time
 import asyncio
 import math
-from .trade_guard import TradeValidator
+from trade_guard import TradeValidator
 from datetime import datetime, timezone
 import logging
 import numpy as np
-from .indicators import get_volatility_based_ladder, calculate_rsi, calc_atr
-from .risk_management import get_trade_size, get_atr_stop, update_daily_pl, should_pause_trading, is_market_crash_or_big_buyer
-from .modules.adaptive_strategy import adaptive_strategy_job
+from indicators import get_volatility_based_ladder, calculate_rsi, calc_atr
+from risk_management import get_trade_size, get_atr_stop, update_daily_pl, should_pause_trading, is_market_crash_or_big_buyer
+from modules.adaptive_strategy import adaptive_strategy_job
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
 from telegram import Update
@@ -65,13 +65,13 @@ import pandas as pd
 from functools import lru_cache
 import re
 
-from .Simulation import resonance_engine
-from .trading_module import TradeAction
-from . import config
-from .modules import db_access as db
-from .memory import log_trade_outcome
+from Simulation import resonance_engine
+from trading_module import TradeAction
+import config
+from modules import db_access as db
+from memory import log_trade_outcome
 import statistics
-from . import gemini_cacher
+import gemini_cacher
 
 # --- Market Crash/Big Buyer Shield ---
 # Now imported from risk_management.py
@@ -1202,7 +1202,7 @@ def start_scheduler():
 
 from telegram import Update
 from telegram.ext import CommandHandler, ContextTypes
-from .modules import db_access as db
+from modules import db_access as db
 
 async def usercount_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn = db.get_db_connection()
