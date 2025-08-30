@@ -21,8 +21,6 @@ RUN pip install --no-cache-dir \
 
 COPY . .
 
-RUN chmod +x startup.sh
-
 ENV PYTHONUNBUFFERED=1
 ENV LOG_LEVEL=INFO
 
@@ -31,4 +29,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=15m --timeout=5s --start-period=10s \
   CMD curl -f http://localhost:8080/healthz || exit 1
 
-CMD ["./startup.sh"]
+CMD ["sh", "-c", "python -m src.main & python src/health_check_app.py"]
