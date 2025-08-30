@@ -94,6 +94,29 @@ def main():
         except Exception as e:
             note_err('Redis connection failed: ' + repr(e))
 
+    # 4) optional Binance SDK import + ping check (skip with SKIP_BINANCE=1)
+    if os.environ.get('SKIP_BINANCE') == '1':
+        note_ok('SKIP_BINANCE=1 set; skipping Binance checks')
+    else:
+        try:
+            from binance.client import Client
+            # Create a client without credentials for a lightweight ping; if the environment
+            # provides BINANCE_API_KEY/SECRET, Client() will use them; otherwise this still tests
+            # that the module and Client class are importable and ping is callable.
+            try:
+                c = Client()
+                # ping should be callable; wrap in try/except in case network or auth blocks it.
+                try:
+                    resp = c.ping()
+                    note_ok('binance.Client.ping() callable')
+                except Exception as e:
+                    # ping may fail due to network/auth; still treat import as success but report ping error.
+                    note_err('binance ping failed: ' + repr(e))
+            except Exception as e:
+                note_err('failed to instantiate binance.Client: ' + repr(e))
+        except Exception as e:
+            note_err('import binance.client failed: ' + repr(e))
+
     # Summary
     print('\nSummary:')
     for s in OK:

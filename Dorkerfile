@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir \
   python-telegram-bot \
   google-generativeai \
   python-dotenv \
-  python-binance \
+  python-binance==1.0.15 \
   numpy \
   matplotlib \
   cryptography \
