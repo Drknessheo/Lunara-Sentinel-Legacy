@@ -428,6 +428,30 @@ async def autosuggest_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
             from autotrade_jobs import autotrade_buy_from_suggestions
             created = await autotrade_buy_from_suggestions(config.ADMIN_USER_ID, None, context, dry_run=False, max_create=max_create)
+            # Write a final audit entry including created trade ids and result
+            try:
+                try:
+                    redis_client = redis.from_url(config.REDIS_URL, decode_responses=True)
+                    final_auditor = {
+                        'admin_id': (query.from_user.id if getattr(query, 'from_user', None) else None),
+                        'action': 'autosuggest_confirm',
+                        'max_create': int(max_create),
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'message_id': getattr(query.message, 'message_id', None),
+                        'created_trades': created or [],
+                        'result': 'created' if created else 'no_created'
+                    }
+                    try:
+                        redis_client.lpush('autosuggest_audit', json.dumps(final_auditor))
+                        redis_client.set('autosuggest:last', json.dumps(final_auditor))
+                    except Exception as _e:
+                        logger.warning(f"[AUDIT] Failed to write final autosuggest audit to Redis: {_e}")
+                except Exception as _e:
+                    logger.warning(f"[AUDIT] Redis unavailable for final autosuggest audit: {_e}")
+            except Exception:
+                # Don't let audit failures block user feedback
+                pass
+
             if created:
                 await query.edit_message_text(f"Created mock trades (ids): {', '.join(created)}")
             else:
