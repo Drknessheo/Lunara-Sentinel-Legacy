@@ -29,4 +29,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=15m --timeout=5s --start-period=10s \
   CMD curl -f http://localhost:8080/healthz || exit 1
 
-CMD ["sh", "-c", "python src/main.py & python src/health_check_app.py"]
+CMD ["sh", "-c", "python src/health_check_app.py & python src/main.py"]

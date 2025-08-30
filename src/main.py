@@ -37,6 +37,7 @@ import autotrade_db
 logger = logging.getLogger(__name__)
 
 import asyncio
+import time
 
 ## Gemini API keys are now managed in autotrade_jobs.py for multi-key support and fallback
 
@@ -1613,36 +1614,68 @@ def main() -> None:
     logger.info("Starting bot with market monitor and AI trade monitor jobs scheduled...")
 
     # Defensive: remove any webhook left behind (causes telegram.error.Conflict when polling)
-    try:
-        logger.info("Ensuring no webhook is set before starting polling (sync HTTP fallback)...")
+    # Use a small, throttled sync helper so we don't repeatedly hammer the Bot API or touch asyncio loops.
+    webhook_cleanup_state = {'last_attempt': 0.0, 'deleted': False}
+
+    def attempt_delete_webhook(throttle_seconds: int = 30) -> bool:
+        """Try to delete the webhook via a synchronous HTTP call.
+        Returns True if deletion appears successful. Throttles repeated attempts using webhook_cleanup_state.
+        """
+        now = time.time()
+        # If we recently tried (and especially if we succeeded), skip frequent retries.
+        if webhook_cleanup_state['last_attempt'] and (now - webhook_cleanup_state['last_attempt']) < throttle_seconds:
+            logger.debug("Skipping webhook deletion; last attempt was %.1fs ago.", now - webhook_cleanup_state['last_attempt'])
+            return False
+        webhook_cleanup_state['last_attempt'] = now
         try:
-            # Use a simple synchronous HTTP call to the Bot API to avoid touching asyncio loops here.
             import requests
             token = getattr(config, 'TELEGRAM_BOT_TOKEN', None)
-            if token:
-                url = f"https://api.telegram.org/bot{token}/deleteWebhook?drop_pending_updates=true"
-                try:
-                    resp = requests.post(url, timeout=5)
-                    if resp.ok:
-                        logger.info("Deleted webhook via Bot API: %s", resp.text)
-                    else:
-                        logger.warning("Failed to delete webhook (HTTP): %s", resp.text)
-                except Exception as e:
-                    logger.warning(f"HTTP webhook deletion attempt failed: {e}")
+            if not token:
+                logger.debug("No TELEGRAM_BOT_TOKEN available for webhook deletion.")
+                return False
+            url = f"https://api.telegram.org/bot{token}/deleteWebhook?drop_pending_updates=true"
+            try:
+                resp = requests.post(url, timeout=5)
+                if resp.ok:
+                    webhook_cleanup_state['deleted'] = True
+                    logger.info("Deleted webhook via Bot API: %s", resp.text)
+                    return True
+                else:
+                    logger.warning("Failed to delete webhook (HTTP): %s", resp.text)
+            except Exception as e:
+                logger.warning(f"HTTP webhook deletion attempt failed: {e}")
         except Exception as _inner:
             logger.warning(f"Sync webhook deletion skipped: {_inner}")
+        return False
+
+    try:
+        logger.info("Ensuring no webhook is set before starting polling (sync HTTP fallback)...")
+        attempt_delete_webhook(throttle_seconds=5)
     except Exception as _e:
         logger.warning(f"Failed to clean existing webhook before polling: {_e}")
 
     # Global error handler to catch Conflict errors (another getUpdates or webhook active)
+    # Small debounce state to reduce repeated Conflict log spam
+    _conflict_state = {'last_log': 0.0, 'count': 0}
+
     async def _global_error_handler(update, context: ContextTypes.DEFAULT_TYPE):
         err = getattr(context, 'error', None)
         if isinstance(err, TelegramConflict):
-            logger.warning("Telegram Conflict detected: another getUpdates/webhook may be active. Attempting to delete webhook and continue.")
+            now = time.time()
+            # Only log a full warning at most once every 30s; otherwise log debug to avoid noise.
+            if _conflict_state['last_log'] == 0 or (now - _conflict_state['last_log']) > 30:
+                _conflict_state['last_log'] = now
+                _conflict_state['count'] = 1
+                logger.warning("Telegram Conflict detected: another getUpdates/webhook may be active. Attempting to delete webhook and continue.")
+            else:
+                _conflict_state['count'] += 1
+                logger.debug("Telegram Conflict detected (#%d) — throttled.", _conflict_state['count'])
+
             try:
-                await application.bot.delete_webhook(drop_pending_updates=True)
+                # Use the synchronous HTTP fallback to avoid asyncio event loop manipulation here.
+                attempt_delete_webhook()
             except Exception as _ex:
-                logger.warning(f"Failed to delete webhook during Conflict handling: {_ex}")
+                logger.debug(f"Failed to delete webhook during Conflict handling: {_ex}")
             return
         # Default behaviour: log full traceback
         logger.error("Unhandled exception in update handler", exc_info=err)
