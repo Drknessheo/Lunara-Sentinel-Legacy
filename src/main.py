@@ -28,25 +28,30 @@ import asyncio
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Sends a welcome message when the /start command is issued."""
-    user_id = update.effective_user.id
-    db.get_or_create_user_db(user_id) # Ensure user is in the DB
-
+    """Sends a welcome message and registers the user if they are new."""
     user = update.effective_user
-    await update.message.reply_html(
-        rf"""🌑 <b>A new trader emerges from the shadows.</b> {user.mention_html()}, you have been summoned by <b>Lunessa Shai'ra Gork</b> (@Srskat_bot), Sorceress of DeFi and guardian of RSI gates.
+    # Ensure user is in the DB, creating them with default settings if new
+    db.get_or_create_user_db(user.id)
+    
+    logger.info(f"User {user.id} ({user.username}) started the bot.")
 
-🧭 <i>Your journey begins now.</i>
-- Quest 1: Link your API Key (Binance/OKX)
-- Quest 2: Choose your weapon: RSI or Bollinger
-- Quest 3: Survive 3 trades
+    welcome_message = (
+        f"""🌑 <b>A new trader emerges from the shadows.</b> {user.mention_html()}, you have been summoned by <b>Lunessa Shai'ra Gork</b>, Sorceress of DeFi and guardian of RSI gates.
 
-Reply with: /linkbinance or /learn
+"
+        f"""Your journey begins now. I will monitor the markets for you, alert you to opportunities, and manage your trades.
 
-To unlock the arcane powers, send your Binance API keys in a private message with: <code>/setapi YOUR_API_KEY YOUR_SECRET_KEY</code>
+"
+        f"""<b>Key Commands:</b>
+/quest <code>SYMBOL</code> - Analyze a cryptocurrency.
+/status - View your open trades and watchlist.
+/help - See all available commands.
 
-Use /help to see all available commands."""
+"
+        f"""To unlock live trading, please provide your Binance API keys using the <code>/setapi</code> command in a private message with me."""
     )
+    
+    await update.message.reply_html(welcome_message)
 
 # TODO: In /status, alert user about market position, best moves, or when the user might hit a target time. If a position is held too long, alert to sell near stop loss, and suggest trailing stop activation. The bot should help give the user better options.
 async def send_daily_status_summary(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -90,8 +95,31 @@ async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await trade.quest_command(update, context)
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handler for the /status command. Shows open quests and watched symbols."""
+    """Handler for the /status command. Shows subscription status, open quests, and watched symbols."""
     user_id = update.effective_user.id
+    
+    # --- Subscription Status ---
+    tier, expires_str = db.get_user_subscription_db(user_id)
+    autotrade_status = "✅ Enabled" if db.get_autotrade_status(user_id) else "❌ Disabled"
+    
+    subscription_message = f"👤 **Subscription Status**\n- Tier: **{tier.capitalize()}**\n- Auto-trade: {autotrade_status}\n"
+
+    if tier != 'FREE' and expires_str:
+        try:
+            expires_dt = datetime.fromisoformat(expires_str).astimezone(timezone.utc)
+            now_utc = datetime.now(timezone.utc)
+            if expires_dt > now_utc:
+                days_remaining = (expires_dt - now_utc).days
+                expiry_date_formatted = expires_dt.strftime('%d %b %Y')
+                subscription_message += f"- Expires: **{expiry_date_formatted}** ({days_remaining} days left)\n"
+            else:
+                subscription_message += "- Status: **Expired**\n"
+        except (ValueError, TypeError):
+            subscription_message += "- Expiry: *Not set*\n" # Handle parsing errors
+            
+    subscription_message += "\n" + ("-"*20) + "\n\n"
+
+
     open_trades = db.get_open_trades(user_id)
     watched_items = db.get_watched_items_by_user(user_id)
 
@@ -107,7 +135,8 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     orphaned_trades = [trade_item for trade_item in open_trades if trade_item['coin_symbol'] not in active_slip_symbols]
 
     if not monitored_trades and not watched_items and not orphaned_trades:
-        await update.message.reply_text("You have no open quests, watched symbols, or orphaned trades. Use /quest to find an opportunity.")
+        # Prepend subscription status even if there are no trades
+        await update.message.reply_text(subscription_message + "You have no open quests, watched symbols, or orphaned trades. Use /quest to find an opportunity.", parse_mode='Markdown')
         return
 
     message = ""
@@ -174,7 +203,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             message += f"\n🔸 **{item['coin_symbol']}** (*Watching for {int(hours)}h {int(minutes)}m*)"
 
     # The send_premium_message wrapper is overly complex; a direct reply is cleaner.
-    await update.message.reply_text(message, parse_mode='Markdown')
+    await update.message.reply_text(subscription_message + message, parse_mode='Markdown')
 
 async def resonate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Runs LunessaSignals's quantum resonance simulation and sends the results."""
@@ -928,8 +957,7 @@ async def verifypayment_command(update: Update, context: ContextTypes.DEFAULT_TY
     db.update_user_subscription(target_telegram_id, tier=tier_name, expires=expiry_date.strftime('%Y-%m-%d %H:%M:%S'))
 
     await update.message.reply_text(
-        f"""✅ Payment verified for user `{target_telegram_id}` (Ref: `{payment_reference}`).
-Tier upgraded to **{tier_name}** until `{expiry_date.strftime('%Y-%m-%d %H:%M:%S UTC')}`.""",
+        f"""✅ Payment verified for user `{target_telegram_id}` (Ref: `{payment_reference}`).\nTier upgraded to **{tier_name}** until `{expiry_date.strftime('%Y-%m-%d %H:%M:%S UTC')}`.""",
         parse_mode=ParseMode.MARKDOWN
     )
 
@@ -937,49 +965,70 @@ Tier upgraded to **{tier_name}** until `{expiry_date.strftime('%Y-%m-%d %H:%M:%S
     try:
         await context.bot.send_message(
             chat_id=target_telegram_id,
-            text=f"""🎉 Your LunessaSignals subscription has been upgraded to **{tier_name}**!
-It is valid until `{expiry_date.strftime('%Y-%m-%d %H:%M:%S UTC')}`.
-Thank you for your support!""",
+            text=f"""🎉 Your LunessaSignals subscription has been upgraded to **{tier_name}**!\nIt is valid until `{expiry_date.strftime('%Y-%m-%d %H:%M:%S UTC')}`.\nThank you for your support!""",
             parse_mode=ParseMode.MARKDOWN
         )
     except Exception as e:
         logger.warning(f"Could not send notification to user {target_telegram_id} about tier upgrade: {e}")
 
+async def confirm_payment_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin command to confirm payment and activate a standard subscription."""
+    if update.effective_user.id != config.ADMIN_USER_ID:
+        await update.message.reply_text("⛔ You are not authorized to perform this action.")
+        return
+
+    try:
+        target_user_id = int(context.args[0])
+        # Default to 1 month of "GOLD" tier 
+        tier_name = "GOLD" 
+        duration_months = 1
+    except (IndexError, ValueError):
+        await update.message.reply_text("Usage: `/confirm_payment <USER_ID>`")
+        return
+
+    # Calculate expiry date
+    expiry_date = datetime.now(timezone.utc) + timedelta(days=30 * duration_months)
+    expires_str = expiry_date.strftime('%Y-%m-%d %H:%M:%S')
+
+    # Update user in DB
+    db.update_user_subscription(target_user_id, tier=tier_name, expires=expires_str)
+
+    await update.message.reply_text(
+        f"✅ Subscription activated for user `{target_user_id}`.\n"  # Corrected: Removed unnecessary escape for newline
+        f"Tier: **{tier_name}**\n"
+        f"Expires: **{expires_str}**"
+    )
+
+    # Notify the user
+    try:
+        await context.bot.send_message(
+            chat_id=target_user_id,
+            text=(
+                f"🎉 Your subscription has been activated!\n\n"
+                f"You are now a **{tier_name}** member.\n"
+                f"Your access expires on {expiry_date.strftime('%d %b %Y')}."
+            ),
+            parse_mode=ParseMode.MARKDOWN
+        )
+    except Exception as e:
+        logger.warning(f"Could not send subscription activation notification to user {target_user_id}: {e}")
+
+
 async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays payment information and instructions."""
-    payment_info = """
-    💳 **Upgrade to a Premium Tier** 💳
+    bank_info = """
+🏦 *Bank Transfer Instructions*
 
-    To unlock more features, please choose a payment method below.
+*Account Name*: Shamim Reza Saikat  
+*Account Number*: 1534105036454001  
+*Bank Name*: BTAC Bank Ltd.  
+*Branch*: Badda  
+*SWIFT Code*: BRAKBDDH
 
-    --- Payment Methods ---
-
-    📱 **bKash/Nagad (Bangladesh):**
-       - Number: `+8801717948095`
-
-    🏦 **Bank Transfer (BRAC Bank):**
-       - Account: `1534105036454001`
-       - SWIFT Code: `BRAKBDDH`
-
-    💎 **Cryptocurrency (ETH):**
-       - Wallet: `0x2f45bfeb6e499622a774f444c6fe9801e7bd2901`
-
-    --- Tiers ---
-
-    - **Basic:** $5/month
-    - **Pro:** $10/month
-    - **Elite:** $20/month
-
-    --- Instructions ---
-
-    After sending your payment, please use the following command to verify:
-
-    `/verifypayment <TELEGRAM_ID> <PAYMENT_REFERENCE>`
-
-    *Example:*
-    `/verifypayment 123456789 BKASH_TRX12345`
-    """
-    await update.message.reply_text(payment_info, parse_mode=ParseMode.MARKDOWN)
+📸 After sending the payment, please take a screenshot and send it via WhatsApp to *01717948095* for manual confirmation.
+"""
+    await update.message.reply(bank_info, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply("✅ Once verified, your subscription will be activated and you'll receive a confirmation message via Telegram.")
 
 async def usercount_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("User count is a Premium feature.")
@@ -1014,34 +1063,58 @@ async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 # ---
 # Placeholder Command Handlers ---
 async def subscribe_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays subscription tiers and benefits."""
-    subscribe_info = """
-    🌟 **LunessaSignals Subscription Tiers** 🌟
+    """Displays subscription tiers and benefits, or the user's current status."""
+    user_id = update.effective_user.id
+    tier, expires_str = db.get_user_subscription_db(user_id)
 
-    Unlock the full power of LunessaSignals with our premium tiers!
+    if tier != 'FREE' and expires_str:
+        try:
+            # Using fromisoformat for robust parsing
+            expires_dt = datetime.fromisoformat(expires_str).astimezone(timezone.utc)
+            now_utc = datetime.now(timezone.utc)
+            
+            # Check if expired
+            if expires_dt < now_utc:
+                # This is a good place to also downgrade the user in the DB
+                db.update_user_subscription(user_id, tier='FREE', expires=None)
+                message = (
+                    "⚠️ Your subscription has expired. You are now on the FREE tier.\n\n"
+                    "Use the /pay command to renew your subscription and regain access to premium features."
+                )
+                await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+                return
 
-    --- Tiers & Benefits ---
+            days_remaining = (expires_dt - now_utc).days
+            expiry_date_formatted = expires_dt.strftime('%d %b %Y')
+            
+            message = (
+                f"🎉 **You are already a {tier.capitalize()} member!**\n\n"
+                f"Your subscription expires on **{expiry_date_formatted}**.\n"
+                f"Days Remaining: **{days_remaining}**\n\n"
+                "Thank you for your support!"
+            )
+            await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+            return
+        except (ValueError, TypeError):
+            # Fallback if date parsing fails for some reason
+            pass # Will proceed to show generic upgrade message
 
-    **FREE Tier:**
-    - Price: $0
-    - Benefits: Basic `/crypto` and `/status` commands.
+    # For FREE users or if something went wrong with date parsing
+    subscribe_info = '''
+🌟 **LunessaSignals Subscription Tiers** 🌟
 
-    **Basic Tier:**
-    - Price: $5/month
-    - Benefits: 1 signal/day, basic analytics, access to core trading features.
+Unlock the full power of LunessaSignals with our premium tiers!
 
-    **Pro Tier:**
-    - Price: $10/month
-    - Benefits: 5 signals/day, detailed analytics, advanced trading features, priority support.
+| Tier        | Features Included                              | Duration     |
+|-------------|--------------------------------------------------|--------------|
+| Free        | Basic signals, manual trading only              | Unlimited    |
+| Gold        | Premium signals, auto-trade access, priority    | 30 days      |
+| Platinum    | All Gold features + early access to new tools   | 90 days      |
 
-    **Elite Tier:**
-    - Price: $20/month
-    - Benefits: 10 signals/day, custom alerts, priority support, exclusive access to new features.
+---
 
-    --- How to Subscribe ---
-
-    Use the `/pay` command to see payment methods and instructions.
-    """
+To upgrade, use the `/pay` command to see payment methods. After payment, the admin will verify it and activate your new tier.
+    '''
     await update.message.reply_text(subscribe_info, parse_mode=ParseMode.MARKDOWN)
 
 async def linkbinance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1125,6 +1198,7 @@ def main() -> None:
     application.add_handler(CommandHandler("broadcast", broadcast_command))
     application.add_handler(CommandHandler("papertrade", papertrade_command))
     application.add_handler(CommandHandler("verifypayment", verifypayment_command))
+    application.add_handler(CommandHandler("confirm_payment", confirm_payment_command))
     application.add_handler(CommandHandler("pay", pay_command))
     application.add_handler(CommandHandler("safety", safety_command))
     application.add_handler(CommandHandler("hubspeedy", hubspeedy_command))
