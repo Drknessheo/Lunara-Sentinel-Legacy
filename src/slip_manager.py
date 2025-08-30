@@ -104,7 +104,7 @@ def create_and_store_slip(symbol, side, amount, price):
 
 def get_and_decrypt_slip(encrypted_slip_key):
     fernet = get_fernet()
-    logger.info(f"Attempting to decrypt slip: {encrypted_slip_key}")
+    logger.debug(f"Attempting to decrypt slip: {encrypted_slip_key}")
     try:
         encrypted_slip_value = redis_client.get(encrypted_slip_key)
     except Exception:

@@ -155,7 +155,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             logger.warning(f"Malformed slip data (not dict) for key={slip.get('key')}: {data}")
             continue
         if 'symbol' not in data:
-            logger.warning(f"Slip missing 'symbol' field for key={slip.get('key')}: {data}")
+            logger.debug(f"Slip missing 'symbol' field for key={slip.get('key')}: {data}")
             continue
         valid_slips.append(slip)
 
