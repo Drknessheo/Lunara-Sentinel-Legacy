@@ -1,7 +1,7 @@
 import sqlite3
 import functools
 import logging
-from . import config
+from .. import config
 from ..security import decrypt_data
 
 logger = logging.getLogger(__name__)
@@ -97,6 +97,21 @@ def get_user_tier(cursor, user_id: int) -> str:
         return 'PREMIUM'
     user = get_or_create_user(cursor, user_id)
     return user['subscription_tier']
+
+def get_user_subscription(cursor, user_id: int) -> tuple[str, str | None]:
+    """
+    Retrieves a user's subscription tier and expiration date.
+    Treats the admin/creator as 'PREMIUM' with no expiration.
+    """
+    if user_id == getattr(config, 'ADMIN_USER_ID', None):
+        return 'PREMIUM', None
+    user = get_or_create_user(cursor, user_id)
+    return user['subscription_tier'], user['subscription_expires']
+
+@db_connection
+def get_user_subscription_db(cursor, user_id: int) -> tuple[str, str | None]:
+    """Decorator-wrapped version for bot usage."""
+    return get_user_subscription(cursor, user_id)
 
 @db_connection
 def initialize_database(cursor):
