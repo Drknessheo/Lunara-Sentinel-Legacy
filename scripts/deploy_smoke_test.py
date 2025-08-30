@@ -66,7 +66,11 @@ def main():
         REDIS_URL = os.environ.get('REDIS_URL')
 
     if not REDIS_URL:
-        note_err('REDIS_URL not found in config or env; skipping Redis checks')
+        # Allow CI to skip Redis checks by setting SKIP_REDIS=1 in the environment.
+        if os.environ.get('SKIP_REDIS') == '1':
+            note_ok('SKIP_REDIS=1 set; skipping Redis checks')
+        else:
+            note_err('REDIS_URL not found in config or env; skipping Redis checks')
     else:
         try:
             import redis
