@@ -1059,7 +1059,7 @@ Here are the commands to guide your journey:
 async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays the user's profile information, including tier and settings."""
     user_id = update.effective_user.id
-    user_tier = db.get_user_tier(user_id)
+    user_tier = db.get_user_tier_db(user_id)
     settings = db.get_user_effective_settings(user_id)
     trading_mode, paper_balance = db.get_user_trading_mode_and_balance(user_id)
 
@@ -1093,7 +1093,7 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Allows Premium users to view and customize their trading settings."""
     user_id = update.effective_user.id
-    user_tier = db.get_user_tier(user_id)
+    user_tier = db.get_user_tier_db(user_id)
 
     def escape_markdown(text):
         import re

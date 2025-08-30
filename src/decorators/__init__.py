@@ -7,7 +7,7 @@ def require_tier(required_tier):
 		@wraps(func)
 		async def wrapper(update, context, *args, **kwargs):
 			user_id = update.effective_user.id
-			user_tier = db.get_user_tier(user_id)
+			user_tier = db.get_user_tier_db(user_id)
 			if user_tier != required_tier:
 				await update.message.reply_text(
 					f"This command is only available to {required_tier} users. Please upgrade your subscription."
