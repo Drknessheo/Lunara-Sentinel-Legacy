@@ -1,3 +1,4 @@
+print("📍 Entered main.py — before imports")
 
 
 import os
