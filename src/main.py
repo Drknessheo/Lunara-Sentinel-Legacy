@@ -1096,9 +1096,40 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     user_id = update.effective_user.id
     user_tier = db.get_user_tier_db(user_id)
 
-    def escape_markdown(text):
-        import re
-        return re.sub(r'([_*-[`()~>#+-.=|{{}}!]])', r'\\\1', text)
+    def escape_markdown(text: str) -> str:
+        # Use the library helper where available for correct MarkdownV2 escaping.
+        try:
+            from telegram.helpers import escape_markdown as _escape
+            return _escape(text, version=2)
+        except Exception:
+            # Fallback: minimal escaping for common MarkdownV2 metacharacters
+            to_escape = r"_ * [ ] ( ) ~ ` > # + - = | { } . !"
+            # Escape common characters conservatively
+            replacements = {
+                '\\': '\\\\',
+                '_': '\\_',
+                '*': '\\*',
+                '[': '\\[',
+                ']': '\\]',
+                '(': '\\(',
+                ')': '\\)',
+                '~': '\\~',
+                '`': '\\`',
+                '>': '\\>',
+                '#': '\\#',
+                '+': '\\+',
+                '-': '\\-',
+                '=': '\\=',
+                '|': '\\|',
+                '{': '\\{',
+                '}': '\\}',
+                '.': '\\.',
+                '!': '\\!'
+            }
+            out = text
+            for k, v in replacements.items():
+                out = out.replace(k, v)
+            return out
 
     if user_tier != 'PREMIUM':
         await update.message.reply_text("Upgrade to Premium to use this feature.")
