@@ -1191,7 +1191,11 @@ async def slip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 def main() -> None:
 
-    """Start the bot."""
+    print("🚀 Starting Lunara Bot...")
+    # Fail fast if required config is missing
+    assert config.TELEGRAM_BOT_TOKEN, "❌ TELEGRAM_BOT_TOKEN is not set!"
+    assert os.getenv("REDIS_URL"), "❌ REDIS_URL is missing!"
+
     db.initialize_database()
     # Run schema migrations to ensure DB is up to date
     db.migrate_schema()
@@ -1253,6 +1257,7 @@ def main() -> None:
 
     logger.info("Starting bot with market monitor and AI trade monitor jobs scheduled...")
     application.run_polling()
+    print("🛑 application.run_polling() returned unexpectedly.")
 
 async def clean_slips_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Admin command to list and optionally delete Redis trade slips."""
