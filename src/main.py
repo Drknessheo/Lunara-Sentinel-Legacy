@@ -1190,13 +1190,14 @@ async def slip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 def main() -> None:
-    application.add_handler(CommandHandler("redischeck", redis_check_command))
+
     """Start the bot."""
     db.initialize_database()
     # Run schema migrations to ensure DB is up to date
     db.migrate_schema()
 
     application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
+    application.add_handler(CommandHandler("redischeck", redis_check_command))
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
