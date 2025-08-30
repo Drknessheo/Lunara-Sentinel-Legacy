@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.error import Conflict as TelegramConflict
 from telegram.constants import ParseMode
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import google.generativeai as genai
@@ -1579,6 +1580,49 @@ def main() -> None:
     job_queue.run_repeating(autotrade_jobs.monitor_autotrades, interval=60, first=10)
 
     logger.info("Starting bot with market monitor and AI trade monitor jobs scheduled...")
+
+    # Defensive: remove any webhook left behind (causes telegram.error.Conflict when polling)
+    try:
+        logger.info("Ensuring no webhook is set before starting polling...")
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = None
+        if loop and loop.is_running():
+            # schedule deletion if loop already running
+            loop.create_task(application.bot.delete_webhook(drop_pending_updates=True))
+        else:
+            # safe synchronous call
+            try:
+                asyncio.run(application.bot.delete_webhook(drop_pending_updates=True))
+            except RuntimeError:
+                # fallback: try to create a new loop
+                loop2 = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop2)
+                loop2.run_until_complete(application.bot.delete_webhook(drop_pending_updates=True))
+                loop2.close()
+    except Exception as _e:
+        logger.warning(f"Failed to clean existing webhook before polling: {_e}")
+
+    # Global error handler to catch Conflict errors (another getUpdates or webhook active)
+    async def _global_error_handler(update, context: ContextTypes.DEFAULT_TYPE):
+        err = getattr(context, 'error', None)
+        if isinstance(err, TelegramConflict):
+            logger.warning("Telegram Conflict detected: another getUpdates/webhook may be active. Attempting to delete webhook and continue.")
+            try:
+                await application.bot.delete_webhook(drop_pending_updates=True)
+            except Exception as _ex:
+                logger.warning(f"Failed to delete webhook during Conflict handling: {_ex}")
+            return
+        # Default behaviour: log full traceback
+        logger.error("Unhandled exception in update handler", exc_info=err)
+
+    try:
+        application.add_error_handler(_global_error_handler)
+    except Exception:
+        # If add_error_handler not available, ignore — we still attempted webhook cleanup above
+        pass
+
     application.run_polling()
     print("🛑 application.run_polling() returned unexpectedly.")
 
