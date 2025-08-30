@@ -1,20 +1,31 @@
+async def redis_check_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Checks Redis connectivity and basic set/get operation."""
+    try:
+        import redis
+        redis_client = redis.from_url(config.REDIS_URL, decode_responses=True)
+        redis_client.set("healthcheck", "ok")
+        value = redis_client.get("healthcheck")
+        await update.message.reply_text(f"Redis is working: {value}")
+    except Exception as e:
+        logger.error(f"Redis check failed: {e}")
+        await update.message.reply_text("Redis connection failed.")
 import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from .slip_parser import parse_slip, SlipParseError
-import trade_executor
-import redis_validator
+from . import trade_executor
+from . import redis_validator
 from telegram.constants import ParseMode
 import google.generativeai as genai
-from Simulation import resonance_engine
-import config
+from .Simulation import resonance_engine
+from . import config
 import trade
 import slip_manager # Import slip_manager
 
-from handlers import *
-from jobs import *
-from decorators import require_tier
-from modules import db_access as db
+from .handlers import *
+from .jobs import *
+from .decorators import require_tier
+from .modules import db_access as db
 import logging
 from datetime import datetime, timezone, timedelta
 import autotrade_jobs
@@ -36,20 +47,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f"User {user.id} ({user.username}) started the bot.")
 
     welcome_message = (
-        f"""🌑 <b>A new trader emerges from the shadows.</b> {user.mention_html()}, you have been summoned by <b>Lunessa Shai'ra Gork</b>, Sorceress of DeFi and guardian of RSI gates.
-
-"
-        f"""Your journey begins now. I will monitor the markets for you, alert you to opportunities, and manage your trades.
-
-"
-        f"""<b>Key Commands:</b>
-/quest <code>SYMBOL</code> - Analyze a cryptocurrency.
-/status - View your open trades and watchlist.
-/help - See all available commands.
-
-"
-        f"""To unlock live trading, please provide your Binance API keys using the <code>/setapi</code> command in a private message with me."""
-    )
+    f"""🌑 <b>A new trader emerges from the shadows.</b> {user.mention_html()}, you have been summoned by <b>Lunessa Shai'ra Gork</b>, Sorceress of DeFi and guardian of RSI gates.\n\n"""
+    f"""Your journey begins now. I will monitor the markets for you, alert you to opportunities, and manage your trades.\n\n"""
+    f"""<b>Key Commands:</b>\n/quest <code>SYMBOL</code> - Analyze a cryptocurrency.\n/status - View your open trades and watchlist.\n/help - See all available commands.\n\n"""
+    f"""To unlock live trading, please provide your Binance API keys using the <code>/setapi</code> command in a private message with me."""
+)
     
     await update.message.reply_html(welcome_message)
 
@@ -66,7 +68,7 @@ async def send_daily_status_summary(context: ContextTypes.DEFAULT_TYPE) -> None:
             user_count = len(all_user_ids)
             await context.bot.send_message(chat_id=admin_id, text=f"👥 Total users: <b>{user_count}</b>", parse_mode=ParseMode.HTML)
     except Exception as e:
-        logger.warning(f"Failed to send user count to admin: {e}")
+        logger.error(f"Failed to send user count to admin: {e}")
 
     for user_id in all_user_ids:
         open_trades = db.get_open_trades(user_id)
@@ -310,6 +312,24 @@ async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             f"Reason: {close_reason}\n"
             f"Result: {win_loss} ({pnl_percentage:.2f}%)"
         )
+        # Attempt slip cleanup for this trade
+        try:
+            slip_key = None
+            # Try to find the slip key by symbol (as used in slip_manager)
+            active_slips = slip_manager.list_all_slips()
+            for slip in active_slips:
+                data = slip.get('data', {})
+                if data.get('symbol') == symbol:
+                    slip_key = slip['key']
+                    break
+            if slip_key:
+                slip_manager.cleanup_slip(slip_key)
+                await update.message.reply_text(f"Slip data for {symbol} has been cleaned up.")
+            else:
+                await update.message.reply_text(f"No slip data found for {symbol} to clean up.")
+        except Exception as e:
+            logger.error(f"Slip cleanup failed: {e}")
+            await update.message.reply_text("Trade closed, but slip cleanup failed.")
     else:
         await update.message.reply_text("Failed to close the trade.")
 
@@ -442,7 +462,7 @@ async def import_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         summary_message = "✨ **Import Complete!** ✨\n\n"
         if message_lines:
             summary_message += "\n".join(message_lines) + "\n\n"
-        summary_message += f"""*Summary:*\n- New Quests Started: `{imported_count}`\n- Already Tracked: `{skipped_count}`\n\n"""
+        summary_message += f"*Summary:*\n- New Quests Started: `{imported_count}`\n- Already Tracked: `{skipped_count}`\n\n"
         summary_message += "Use /status to see your newly managed quests."
 
         await update.message.reply_text(summary_message, parse_mode='Markdown')
@@ -588,12 +608,10 @@ async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     if best_trade and worst_trade:
         message += (
-            f"""
-
-**Top Performers:**
-🚀 **Best Quest:** {best_trade['coin_symbol']} (`{best_pnl:+.2f}%`)
-💔 **Worst Quest:** {worst_trade['coin_symbol']} (`{worst_pnl:+.2f}%`)
-"""
+            f"\n"
+            f"**Top Performers:**\n"
+            f"🚀 **Best Quest:** {best_trade['coin_symbol']} (`{best_pnl:+.2f}%`)\n"
+            f"💔 **Worst Quest:** {worst_trade['coin_symbol']} (`{worst_pnl:+.2f}%`)\n"
         )
 
     message += "\nKeep honing your skills, seeker. The market's rhythm is complex."
@@ -1123,10 +1141,11 @@ async def linkbinance_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def learn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("This is a placeholder for the learn command.")
 
-async def activate_user_command(update, context):
+
+async def activate_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.warning("activate_user_command is not yet implemented.")
 
-async def setapi_command(update, context):
+async def setapi_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.warning("setapi_command is not yet implemented.")
 
 
@@ -1168,6 +1187,7 @@ async def slip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 def main() -> None:
+    application.add_handler(CommandHandler("redischeck", redis_check_command))
     """Start the bot."""
     db.initialize_database()
     # Run schema migrations to ensure DB is up to date
@@ -1181,8 +1201,8 @@ def main() -> None:
     application.add_handler(CommandHandler("quest", quest_command)) # This now handles the main trading logic
     application.add_handler(CommandHandler("import", import_command))
     application.add_handler(CommandHandler("status", status_command))
-    application.add_handler(CommandHandler("activate", activate_user_command))
-    application.add_handler(CommandHandler("setapi", setapi_command))
+    application.add_handler(CommandHandler("activate", activate_command))
+    application.add_handler(CommandHandler("setapi", set_api_command))
     application.add_handler(CommandHandler("balance", balance_command))
     application.add_handler(CommandHandler("close", close_command))
     application.add_handler(CommandHandler("review", review_command))
@@ -1193,8 +1213,7 @@ def main() -> None:
     application.add_handler(CommandHandler("myprofile", myprofile_command))
     application.add_handler(CommandHandler("settings", settings_command))
     application.add_handler(CommandHandler("subscribe", subscribe_command))
-    application.add_handler(CommandHandler("setapi", set_api_command))
-    application.add_handler(CommandHandler("activate", activate_command))
+    # Removed duplicate handler registrations for 'setapi' and 'activate'.
     application.add_handler(CommandHandler("broadcast", broadcast_command))
     application.add_handler(CommandHandler("papertrade", papertrade_command))
     application.add_handler(CommandHandler("verifypayment", verifypayment_command))

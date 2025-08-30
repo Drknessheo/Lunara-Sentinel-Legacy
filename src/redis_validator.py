@@ -1,6 +1,6 @@
 import logging
 import redis
-from . import config
+import config
 from .modules import db_access as db
 
 logger = logging.getLogger(__name__)

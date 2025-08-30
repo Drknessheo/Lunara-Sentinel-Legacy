@@ -34,6 +34,7 @@ def safe_print_config():
 dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
 print(f"[DEBUG] Loading .env from: {dotenv_path}")
 load_dotenv(dotenv_path=dotenv_path)
+REDIS_URL = os.getenv("REDIS_URL", None) # e.g., "redis://localhost:6379/0"
 
 # Debug: Print sanitized environment variables after loading
 safe_print_config()
@@ -60,18 +61,60 @@ TELEGRAM_SYNC_LOG_ENABLED = True # Set to True to enable trade sync logs via Tel
 AI_TRADE_INTERVAL_MINUTES = 10
 
 # Telegram and Binance API credentials from .env file
-TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
+import os
+from dotenv import load_dotenv
+
+load_dotenv() # Load environment variables from .env file
+
+# --- Telegram ---
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
+# --- Binance ---
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
 BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY")
-CHAT_ID = os.getenv("CHAT_ID") # For global bot alerts
-ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID")) if os.getenv("ADMIN_USER_ID") else None
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-ADMIN_REFERRAL_CODE = os.getenv("ADMIN_REFERRAL_CODE") # For the /referral command
-GDRIVE_REMOTE_NAME = "LunessaSignals" # For database backups
+
+# --- Database ---
+DB_NAME = "lunessa.db"
+
+# --- Security ---
+SLIP_ENCRYPTION_KEY = os.getenv("SLIP_ENCRYPTION_KEY")
+
+# --- User Management ---
+ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", 0))
+
+# --- Subscription Tiers ---
+SUBSCRIPTION_TIERS = {
+    "FREE": {
+        "features": ["basic_signals", "manual_trade"],
+        "settings": {
+            "RSI_BUY_THRESHOLD": 30,
+            "RSI_SELL_THRESHOLD": 70,
+            "STOP_LOSS_PERCENTAGE": 5.0,
+        }
+    },
+    "GOLD": {
+        "features": ["premium_signals", "auto_trade"],
+        "settings": {
+            "RSI_BUY_THRESHOLD": 35,
+            "RSI_SELL_THRESHOLD": 75,
+            "STOP_LOSS_PERCENTAGE": 7.0,
+        },
+        "duration_days": 30
+    },
+    "PLATINUM": {
+        "features": ["all_gold_features", "early_access"],
+        "settings": {
+            "RSI_BUY_THRESHOLD": 40,
+            "RSI_SELL_THRESHOLD": 80,
+            "STOP_LOSS_PERCENTAGE": 10.0,
+        },
+        "duration_days": 90
+    }
+}
 
 # --- AI & Caching Configuration ---
 GEMINI_API_URL = os.getenv("GEMINI_API_URL", "https://api.gemini.example/analysis")
-REDIS_URL = os.getenv("REDIS_URL", None) # e.g., "redis://localhost:6379/0"
+
 
 # --- Database Configuration ---
 DB_NAME = "lunara_bot.db" # Dedicated database file for reliability

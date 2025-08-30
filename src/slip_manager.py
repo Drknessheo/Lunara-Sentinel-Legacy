@@ -1,8 +1,10 @@
+# Fallback cache for slips if Redis is unavailable
+fallback_cache = {}
 
 import redis
 from cryptography.fernet import Fernet
 import json
-from . import config
+import config
 from datetime import datetime
 import logging
 
@@ -61,15 +63,22 @@ def create_and_store_slip(symbol, side, amount, price):
     json_slip = json.dumps(slip)
     encrypted_slip = fernet.encrypt(json_slip.encode())
     # Store with a prefix to easily identify trade slips
-    redis_client.set(f"trade:{encrypted_slip.decode()}", encrypted_slip)
+    try:
+        redis_client.set(f"trade:{encrypted_slip.decode()}", encrypted_slip)
+    except Exception as e:
+        logger.error(f"Redis failed, storing slip in fallback cache: {e}")
+        fallback_cache[f"trade:{encrypted_slip.decode()}"] = encrypted_slip
     return encrypted_slip
 
 def get_and_decrypt_slip(encrypted_slip_key):
     fernet = get_fernet()
     logger.info(f"Attempting to decrypt slip: {encrypted_slip_key}")
-    encrypted_slip_value = redis_client.get(encrypted_slip_key)
+    try:
+        encrypted_slip_value = redis_client.get(encrypted_slip_key)
+    except Exception:
+        encrypted_slip_value = fallback_cache.get(encrypted_slip_key, None)
     if not encrypted_slip_value:
-        logger.warning(f"No value found in Redis for slip key: {encrypted_slip_key}")
+        logger.warning(f"No value found in Redis or fallback cache for slip key: {encrypted_slip_key}")
         return None
     try:
         decrypted_slip = fernet.decrypt(encrypted_slip_value)
@@ -80,16 +89,30 @@ def get_and_decrypt_slip(encrypted_slip_key):
 
 def delete_slip(encrypted_slip_key):
     logger.info(f"Deleting slip: {encrypted_slip_key}")
-    redis_client.delete(encrypted_slip_key)
+    try:
+        redis_client.delete(encrypted_slip_key)
+    except Exception:
+        fallback_cache.pop(encrypted_slip_key, None)
 
 def list_all_slips():
     """Lists all trade slips currently stored in Redis."""
     slips = []
-    # Only retrieve keys that start with 'trade:'
-    for key in redis_client.scan_iter("trade:*"):
-        slip_data = get_and_decrypt_slip(key)
-        if slip_data:
-            slips.append({"key": key.decode(), "data": slip_data})
+    try:
+        # Only retrieve keys that start with 'trade:'
+        for key in redis_client.scan_iter("trade:*"):
+            slip_data = get_and_decrypt_slip(key)
+            if slip_data:
+                slips.append({"key": key.decode(), "data": slip_data})
+    except Exception:
+        # Fallback: list from local cache
+        for key, encrypted_slip in fallback_cache.items():
+            slip_data = None
+            try:
+                slip_data = get_and_decrypt_slip(key)
+            except Exception:
+                pass
+            if slip_data:
+                slips.append({"key": key, "data": slip_data})
     return slips
 
 def cleanup_slip(slip_key):
