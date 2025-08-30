@@ -1583,24 +1583,23 @@ def main() -> None:
 
     # Defensive: remove any webhook left behind (causes telegram.error.Conflict when polling)
     try:
-        logger.info("Ensuring no webhook is set before starting polling...")
+        logger.info("Ensuring no webhook is set before starting polling (sync HTTP fallback)...")
         try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = None
-        if loop and loop.is_running():
-            # schedule deletion if loop already running
-            loop.create_task(application.bot.delete_webhook(drop_pending_updates=True))
-        else:
-            # safe synchronous call
-            try:
-                asyncio.run(application.bot.delete_webhook(drop_pending_updates=True))
-            except RuntimeError:
-                # fallback: try to create a new loop
-                loop2 = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop2)
-                loop2.run_until_complete(application.bot.delete_webhook(drop_pending_updates=True))
-                loop2.close()
+            # Use a simple synchronous HTTP call to the Bot API to avoid touching asyncio loops here.
+            import requests
+            token = getattr(config, 'TELEGRAM_BOT_TOKEN', None)
+            if token:
+                url = f"https://api.telegram.org/bot{token}/deleteWebhook?drop_pending_updates=true"
+                try:
+                    resp = requests.post(url, timeout=5)
+                    if resp.ok:
+                        logger.info("Deleted webhook via Bot API: %s", resp.text)
+                    else:
+                        logger.warning("Failed to delete webhook (HTTP): %s", resp.text)
+                except Exception as e:
+                    logger.warning(f"HTTP webhook deletion attempt failed: {e}")
+        except Exception as _inner:
+            logger.warning(f"Sync webhook deletion skipped: {_inner}")
     except Exception as _e:
         logger.warning(f"Failed to clean existing webhook before polling: {_e}")
 
