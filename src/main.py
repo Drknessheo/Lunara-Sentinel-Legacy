@@ -38,6 +38,27 @@ from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
 logger = logging.getLogger(__name__)
 
+# If ENABLE_AUTOTRADE=true in the environment, force-enable autotrade for the configured admin user.
+try:
+    if os.getenv("ENABLE_AUTOTRADE", "").lower() == "true":
+        ADMIN_ID = getattr(config, "ADMIN_USER_ID", None) or int(os.environ.get("ADMIN_USER_ID", 0) or 0)
+        if ADMIN_ID:
+            try:
+                # prefer db-level helper if available
+                setter = getattr(db, "set_autotrade", None) or getattr(db, "set_autotrade_status", None)
+                if setter:
+                    setter(ADMIN_ID, True)
+                    logger.info("Forced autotrade_enabled via ENABLE_AUTOTRADE env var for %s", ADMIN_ID)
+                else:
+                    logger.warning("ENABLE_AUTOTRADE requested but no setter found on db module")
+            except Exception:
+                logger.exception("Error forcing autotrade on startup")
+        else:
+            logger.warning("ENABLE_AUTOTRADE was set but ADMIN_USER_ID is not configured")
+except Exception:
+    # make sure startup doesn't fail for unexpected reasons
+    logger.exception("Unexpected error evaluating ENABLE_AUTOTRADE")
+
 import asyncio
 import time
 def snip(value, limit=120):
@@ -1601,6 +1622,22 @@ def main() -> None:
     # Run schema migrations to ensure DB is up to date
     db.migrate_schema()
 
+    # Optional: force-enable autotrade via env var (useful for CI/render one-off toggles)
+    try:
+        if os.getenv('ENABLE_AUTOTRADE', '').lower() == 'true':
+            try:
+                admin_id = getattr(config, 'ADMIN_USER_ID', None) or int(os.environ.get('ADMIN_USER_ID') or 0)
+            except Exception:
+                admin_id = None
+            if admin_id:
+                try:
+                    db.set_autotrade_status(admin_id, True)
+                    logger.info('Forced autotrade_enabled via ENABLE_AUTOTRADE env var for admin %s', admin_id)
+                except Exception as _e:
+                    logger.warning('Failed to force-enable autotrade via env var: %s', _e)
+    except Exception:
+        pass
+
     application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
     application.add_handler(CommandHandler("redischeck", redis_check_command))
 
@@ -2353,6 +2390,26 @@ def main() -> None:
         attempt_delete_webhook(throttle_seconds=5)
     except Exception as _e:
         logger.warning(f"Failed to clean existing webhook before polling: {_e}")
+
+    # Extra: Try deleting any webhook using python-telegram-bot's Bot.delete_webhook coroutine
+    # This helps avoid telegram.error.Conflict when polling starts.
+    try:
+        import asyncio
+        logger.info("Attempting to delete webhook via Application.bot.delete_webhook() before polling.")
+        try:
+            # Run the coroutine to delete webhook and drop pending updates
+            asyncio.run(application.bot.delete_webhook(drop_pending_updates=True))
+            logger.info("Deleted webhook via Application.bot.delete_webhook().")
+        except Exception as _ex:
+            logger.debug(f"Application.bot.delete_webhook() attempt failed: {_ex}")
+    except Exception as _ex:
+        logger.debug(f"Async webhook deletion not possible in this environment: {_ex}")
+
+    # Give Telegram a short breather before polling begins
+    try:
+        time.sleep(1)
+    except Exception:
+        pass
 
     # Global error handler to catch Conflict errors (another getUpdates or webhook active)
     # Small debounce state to reduce repeated Conflict log spam
