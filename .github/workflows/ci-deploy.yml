@@ -25,17 +25,23 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+
+      - name: Run linters
+        run: |
+          flake8 src scripts tests || true
 
       - name: Run pytest
         run: |
-          pytest -q
+          pytest --maxfail=1 --disable-warnings -q
 
   build-and-push:
     name: Build, push image and deploy to Render
     runs-on: ubuntu-latest
     needs: test
     env:
-      IMAGE: ${{ secrets.REGISTRY }}/lunessasignels:${{ github.sha }}
+      IMAGE: ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:${{ github.sha }}
+      IMAGE_LATEST: ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:latest
     steps:
       - uses: actions/checkout@v4
 
@@ -45,19 +51,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Log in to container registry
+      - name: Log in to GitHub Container Registry (GHCR)
         uses: docker/login-action@v2
         with:
-          registry: ${{ secrets.REGISTRY }}
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image
+      - name: Build and push Docker image to GHCR
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: ${{ env.IMAGE }}
+          tags: |
+            ${{ env.IMAGE }}
+            ${{ env.IMAGE_LATEST }}
           file: ./Dockerfile
 
       - name: Trigger Render deploy with retries
@@ -93,9 +101,7 @@ jobs:
             fi
           done
 
-# Required repository secrets:
-# - REGISTRY: e.g. ghcr.io/your-org
-# - REGISTRY_USERNAME: registry username (for GHCR use GITHUB_ACTOR)
-# - REGISTRY_TOKEN: registry token (for GHCR use GITHUB_TOKEN or personal access token with packages:write)
-# - RENDER_API_KEY: (optional) Render API key to trigger deploys
-# - RENDER_SERVICE_ID: (optional) Render service ID to deploy
+# Notes:
+# - This workflow pushes images to GHCR (ghcr.io/<owner>/<repo>). It uses the automatic
+#   `GITHUB_TOKEN` and `${{ github.actor }}` for authentication so no registry secrets are required.
+# - Required repository secrets for deploy: RENDER_API_KEY (optional), RENDER_SERVICE_ID (optional)
