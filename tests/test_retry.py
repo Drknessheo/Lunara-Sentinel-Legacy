@@ -23,7 +23,7 @@ class FailHandler(BaseHTTPRequestHandler):
 
 
 @pytest.mark.skipif(not os.getenv('REDIS_URL'), reason='REDIS_URL not set')
-def test_enqueue_on_webhook_failure():
+def test_enqueue_on_webhook_failure(mock_server):
     if not redis:
         pytest.skip('redis python package not installed')
 
