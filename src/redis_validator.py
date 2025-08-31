@@ -1,5 +1,7 @@
 import logging
+
 import redis
+
 import config
 from modules import db_access as db
 
@@ -14,6 +16,7 @@ except Exception as e:
     logger.error(f"Redis validator failed to connect: {e}")
     redis_client = None
 
+
 def validate_trade(slip_data: dict) -> tuple[bool, str]:
     """
     Validates a trade slip against all business rules.
@@ -22,8 +25,8 @@ def validate_trade(slip_data: dict) -> tuple[bool, str]:
     if not redis_client:
         return False, "Validation failed: Redis connection is not available."
 
-    user_id = slip_data['user_id']
-    symbol = slip_data['symbol']
+    user_id = slip_data["user_id"]
+    symbol = slip_data["symbol"]
 
     # 1. Check for duplicates in Redis (Solves #3)
     redis_key = f"trade_status:{symbol}"
@@ -36,14 +39,16 @@ def validate_trade(slip_data: dict) -> tuple[bool, str]:
 
     # 3. Fetch user settings and validate slip rules (Solves #1 and #4)
     settings = db.get_user_effective_settings(user_id)
-    
+
     # Validate risk percentage
     # Using STOP_LOSS_PERCENTAGE as the max risk for now, can be a separate setting later.
-    max_risk = settings.get('STOP_LOSS_PERCENTAGE', 5.0) 
-    slip_risk = slip_data.get('risk_percent')
+    max_risk = settings.get("STOP_LOSS_PERCENTAGE", 5.0)
+    slip_risk = slip_data.get("risk_percent")
 
     if slip_risk > max_risk:
-        reason = f"Slip risk ({slip_risk}%) exceeds your max configured risk ({max_risk}%)."
+        reason = (
+            f"Slip risk ({slip_risk}%) exceeds your max configured risk ({max_risk}%)."
+        )
         logger.warning(f"Trade validation failed for user {user_id}: {reason}")
         return False, reason
 

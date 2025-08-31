@@ -2,31 +2,34 @@
 
 # resonance_engine.py
 
-import sys
 import os
-import uuid
 import random
+import sys
+import uuid
+
 import numpy as np
 
 # Add parent directory to path to allow imports from the root directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from Simulation.stochastic_simulation import run_metric_perturbation_simulation
+from Simulation.plot_utilities import plot_clock_phase, plot_metric_perturbation
 from Simulation.quantum_clock import run_quantum_clock_phase
-from Simulation.plot_utilities import plot_metric_perturbation, plot_clock_phase
-from trading_module import get_trade_suggestion, TradeAction
+from Simulation.stochastic_simulation import run_metric_perturbation_simulation
+from trading_module import get_trade_suggestion
 
 
-def run_resonance_simulation(user_id: int, symbol: str | None = None, indicators: dict | None = None):
+def run_resonance_simulation(
+    user_id: int, symbol: str | None = None, indicators: dict | None = None
+):
     """Runs the resonance simulation and returns narrative and plot filenames."""
     resonance_source = "Random Cosmic Fluctuation"
     if symbol and indicators:
-        rsi = indicators.get('rsi')
-        price = indicators.get('price')
-        upper_band = indicators.get('upper_band')
-        lower_band = indicators.get('lower_band')
-        std = indicators.get('std')
-        macd_hist = indicators.get('macd_hist')
+        rsi = indicators.get("rsi")
+        price = indicators.get("price")
+        upper_band = indicators.get("upper_band")
+        lower_band = indicators.get("lower_band")
+        std = indicators.get("std")
+        macd_hist = indicators.get("macd_hist")
 
         if None not in (rsi, price, lower_band, upper_band, macd_hist, std):
             # 1. Calculate RSI Factor (0 to 1). We'll map 50 -> 0.5, extremes -> 0/1 roughly.
@@ -50,7 +53,9 @@ def run_resonance_simulation(user_id: int, symbol: str | None = None, indicators
                 macd_factor = 0.5
 
             # Combine
-            combined_factor = (0.4 * rsi_factor) + (0.3 * bollinger_factor) + (0.3 * macd_factor)
+            combined_factor = (
+                (0.4 * rsi_factor) + (0.3 * bollinger_factor) + (0.3 * macd_factor)
+            )
             resonance_level = round(0.5 + (combined_factor * 2.0), 2)
             resonance_source = f"{symbol} RSI, BBands & MACD"
         else:
@@ -71,7 +76,7 @@ def run_resonance_simulation(user_id: int, symbol: str | None = None, indicators
     plot_clock_phase(t, clock_phase, filename=clock_plot_filename)
 
     trade_suggestion = get_trade_suggestion(resonance_level)
-    trade_suggestion_text = trade_suggestion.value.replace('_', ' ')
+    trade_suggestion_text = trade_suggestion.value.replace("_", " ")
 
     narrative = (
         f"**LunessaSignals's Resonance Transmission for {symbol or 'the General Market'}**\n\n"
@@ -91,9 +96,18 @@ def run_resonance_simulation(user_id: int, symbol: str | None = None, indicators
     }
 
 
-if __name__ == '__main__':
-    dummy_indicators = {'rsi': 30, 'price': 100, 'upper_band': 110, 'lower_band': 90, 'std': 5, 'macd_hist': 0.5}
-    results = run_resonance_simulation(user_id=123, symbol="TESTUSDT", indicators=dummy_indicators)
+if __name__ == "__main__":
+    dummy_indicators = {
+        "rsi": 30,
+        "price": 100,
+        "upper_band": 110,
+        "lower_band": 90,
+        "std": 5,
+        "macd_hist": 0.5,
+    }
+    results = run_resonance_simulation(
+        user_id=123, symbol="TESTUSDT", indicators=dummy_indicators
+    )
     print(results["narrative"])
     print(f"Metric plot saved to: {results['metric_plot']}")
     print(f"Clock plot saved to: {results['clock_plot']}")

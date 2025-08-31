@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from typing import Optional, List, Tuple
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -21,20 +21,26 @@ logger = logging.getLogger(__name__)
 # Configuration helpers (best-effort import from repo config)
 try:
     import config  # type: ignore
-    DB_NAME = getattr(config, 'DB_NAME', 'lunara_bot.db')
+
+    DB_NAME = getattr(config, "DB_NAME", "lunara_bot.db")
 except Exception:
     config = None  # type: ignore
-    DB_NAME = 'lunara_bot.db'
+    DB_NAME = "lunara_bot.db"
 
 
 try:
-    from security import encrypt_data, decrypt_data  # type: ignore
+    from security import decrypt_data, encrypt_data  # type: ignore
 except Exception:
+
     def encrypt_data(value: str) -> bytes:  # pragma: no cover - placeholder
-        raise NotImplementedError("security.encrypt_data not available in this environment")
+        raise NotImplementedError(
+            "security.encrypt_data not available in this environment"
+        )
 
     def decrypt_data(value: bytes) -> str:  # pragma: no cover - placeholder
-        raise NotImplementedError("security.decrypt_data not available in this environment")
+        raise NotImplementedError(
+            "security.decrypt_data not available in this environment"
+        )
 
 
 def get_db_connection() -> sqlite3.Connection:
@@ -107,18 +113,22 @@ def initialize_database() -> None:
 
 def get_or_create_user(user_id: int) -> sqlite3.Row:
     with get_db_connection() as conn:
-        row = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM users WHERE user_id = ?", (user_id,)
+        ).fetchone()
         if row:
             return row
         conn.execute("INSERT INTO users (user_id) VALUES (?)", (user_id,))
-        return conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
+        return conn.execute(
+            "SELECT * FROM users WHERE user_id = ?", (user_id,)
+        ).fetchone()
 
 
 def get_autotrade_status(user_id: int) -> bool:
     user = get_or_create_user(user_id)
-    if user is not None and user['autotrade_enabled'] is not None:
-        return bool(user['autotrade_enabled'])
-    if config and getattr(config, 'ADMIN_USER_ID', None) == user_id:
+    if user is not None and user["autotrade_enabled"] is not None:
+        return bool(user["autotrade_enabled"])
+    if config and getattr(config, "ADMIN_USER_ID", None) == user_id:
         return True
     return False
 
@@ -126,129 +136,190 @@ def get_autotrade_status(user_id: int) -> bool:
 def set_autotrade_status(user_id: int, enabled: bool) -> None:
     get_or_create_user(user_id)
     with get_db_connection() as conn:
-        conn.execute("UPDATE users SET autotrade_enabled = ? WHERE user_id = ?", (int(enabled), user_id))
+        conn.execute(
+            "UPDATE users SET autotrade_enabled = ? WHERE user_id = ?",
+            (int(enabled), user_id),
+        )
 
 
-def log_trade(user_id: int, coin_symbol: str, buy_price: float, stop_loss: Optional[float], take_profit: Optional[float], mode: str = 'LIVE', trade_size_usdt: Optional[float] = None, quantity: Optional[float] = None) -> None:
+def log_trade(
+    user_id: int,
+    coin_symbol: str,
+    buy_price: float,
+    stop_loss: Optional[float],
+    take_profit: Optional[float],
+    mode: str = "LIVE",
+    trade_size_usdt: Optional[float] = None,
+    quantity: Optional[float] = None,
+) -> None:
     get_or_create_user(user_id)
     with get_db_connection() as conn:
         conn.execute(
             "INSERT INTO trades (user_id, coin_symbol, buy_price, status, stop_loss_price, take_profit_price, mode, trade_size_usdt, quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (user_id, coin_symbol, buy_price, 'open', stop_loss, take_profit, mode, trade_size_usdt, quantity)
+            (
+                user_id,
+                coin_symbol,
+                buy_price,
+                "open",
+                stop_loss,
+                take_profit,
+                mode,
+                trade_size_usdt,
+                quantity,
+            ),
         )
 
 
 def get_open_trades(user_id: int) -> List[sqlite3.Row]:
     with get_db_connection() as conn:
-        return conn.execute("SELECT id, coin_symbol, buy_price, buy_timestamp, stop_loss_price, take_profit_price FROM trades WHERE user_id = ? AND status = 'open'", (user_id,)).fetchall()
+        return conn.execute(
+            "SELECT id, coin_symbol, buy_price, buy_timestamp, stop_loss_price, take_profit_price FROM trades WHERE user_id = ? AND status = 'open'",
+            (user_id,),
+        ).fetchall()
 
 
 def get_all_open_trades() -> List[sqlite3.Row]:
     with get_db_connection() as conn:
-        return conn.execute("SELECT id, user_id, coin_symbol, buy_price, stop_loss_price, take_profit_price, peak_price, mode, trade_size_usdt, quantity, buy_timestamp FROM trades WHERE status = 'open'").fetchall()
+        return conn.execute(
+            "SELECT id, user_id, coin_symbol, buy_price, stop_loss_price, take_profit_price, peak_price, mode, trade_size_usdt, quantity, buy_timestamp FROM trades WHERE status = 'open'"
+        ).fetchall()
 
 
 def get_trade_by_id(trade_id: int, user_id: int) -> Optional[sqlite3.Row]:
     with get_db_connection() as conn:
-        return conn.execute("SELECT id, coin_symbol FROM trades WHERE id = ? AND user_id = ? AND status = 'open'", (trade_id, user_id)).fetchone()
+        return conn.execute(
+            "SELECT id, coin_symbol FROM trades WHERE id = ? AND user_id = ? AND status = 'open'",
+            (trade_id, user_id),
+        ).fetchone()
 
 
-def close_trade(trade_id: int, user_id: int, sell_price: float, close_reason: Optional[str] = None) -> bool:
+def close_trade(
+    trade_id: int, user_id: int, sell_price: float, close_reason: Optional[str] = None
+) -> bool:
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE trades SET status = 'closed', sell_price = ?, close_reason = ? WHERE id = ? AND user_id = ? AND status = 'open'",
-            (sell_price, close_reason, trade_id, user_id)
+            (sell_price, close_reason, trade_id, user_id),
         )
         return cursor.rowcount > 0
 
 
 def activate_trailing_stop(trade_id: int, peak_price: float) -> None:
     with get_db_connection() as conn:
-        conn.execute("UPDATE trades SET peak_price = ? WHERE id = ?", (peak_price, trade_id))
+        conn.execute(
+            "UPDATE trades SET peak_price = ? WHERE id = ?", (peak_price, trade_id)
+        )
 
 
 def get_closed_trades(user_id: int) -> List[sqlite3.Row]:
     with get_db_connection() as conn:
-        return conn.execute("SELECT coin_symbol, buy_price, sell_price FROM trades WHERE user_id = ? AND status = 'closed' AND sell_price IS NOT NULL", (user_id,)).fetchall()
+        return conn.execute(
+            "SELECT coin_symbol, buy_price, sell_price FROM trades WHERE user_id = ? AND status = 'closed' AND sell_price IS NOT NULL",
+            (user_id,),
+        ).fetchall()
 
 
 def get_top_closed_trades(user_id: int, limit: int = 3) -> List[sqlite3.Row]:
     with get_db_connection() as conn:
-        query = '''
+        query = """
             SELECT coin_symbol, buy_price, sell_price, ((sell_price - buy_price) / buy_price) * 100 AS pnl_percent
             FROM trades
             WHERE user_id = ? AND status = 'closed' AND sell_price IS NOT NULL AND ((sell_price - buy_price) / buy_price) > 0
             ORDER BY pnl_percent DESC
             LIMIT ?
-        '''
+        """
         return conn.execute(query, (user_id, limit)).fetchall()
 
 
 def get_global_top_trades(limit: int = 3) -> List[sqlite3.Row]:
     with get_db_connection() as conn:
-        query = '''
+        query = """
             SELECT user_id, coin_symbol, buy_price, sell_price, ((sell_price - buy_price) / buy_price) * 100 AS pnl_percent
             FROM trades
             WHERE status = 'closed' AND sell_price IS NOT NULL AND ((sell_price - buy_price) / buy_price) > 0
             ORDER BY pnl_percent DESC
             LIMIT ?
-        '''
+        """
         return conn.execute(query, (limit,)).fetchall()
 
 
 def set_user_trading_mode(user_id: int, mode: str):
     """Sets the user's trading mode ('LIVE' or 'PAPER')."""
     with get_db_connection() as conn:
-        conn.execute("UPDATE users SET trading_mode = ? WHERE user_id = ?", (mode.upper(), user_id))
+        conn.execute(
+            "UPDATE users SET trading_mode = ? WHERE user_id = ?",
+            (mode.upper(), user_id),
+        )
+
 
 def get_user_trading_mode_and_balance(user_id: int):
     """Gets the user's trading mode and paper balance."""
     user = get_or_create_user(user_id)
-    return user['trading_mode'], user['paper_balance']
+    return user["trading_mode"], user["paper_balance"]
+
 
 def update_paper_balance(user_id: int, amount_change: float):
     """Updates a user's paper balance by adding or subtracting an amount."""
     with get_db_connection() as conn:
-        conn.execute("UPDATE users SET paper_balance = paper_balance + ? WHERE user_id = ?", (amount_change, user_id))
+        conn.execute(
+            "UPDATE users SET paper_balance = paper_balance + ? WHERE user_id = ?",
+            (amount_change, user_id),
+        )
+
 
 def reset_paper_account(user_id: int):
     """Resets a user's paper balance to the default and closes all paper trades."""
     with get_db_connection() as conn:
         # Reset balance
-        conn.execute("UPDATE users SET paper_balance = ? WHERE user_id = ?", (config.PAPER_STARTING_BALANCE, user_id))
+        conn.execute(
+            "UPDATE users SET paper_balance = ? WHERE user_id = ?",
+            (config.PAPER_STARTING_BALANCE, user_id),
+        )
         # Close all open paper trades for that user
-        conn.execute("UPDATE trades SET status = 'closed', sell_price = buy_price, close_reason = 'Reset' WHERE user_id = ? AND mode = 'PAPER' AND status = 'open'", (user_id,))
+        conn.execute(
+            "UPDATE trades SET status = 'closed', sell_price = buy_price, close_reason = 'Reset' WHERE user_id = ? AND mode = 'PAPER' AND status = 'open'",
+            (user_id,),
+        )
+
 
 def get_all_watchlist_items():
     """Retrieves all items from the watchlist for all users."""
     with get_db_connection() as conn:
-        return conn.execute("SELECT id, user_id, coin_symbol, add_timestamp FROM watchlist").fetchall()
+        return conn.execute(
+            "SELECT id, user_id, coin_symbol, add_timestamp FROM watchlist"
+        ).fetchall()
+
 
 def remove_from_watchlist(item_id: int):
     """Removes an item from the watchlist by its ID."""
     with get_db_connection() as conn:
         conn.execute("DELETE FROM watchlist WHERE id = ?", (item_id,))
 
+
 def get_watched_items_by_user(user_id: int):
     """Retrieves all watched symbols for a specific user."""
     with get_db_connection() as conn:
         return conn.execute(
-            "SELECT coin_symbol, add_timestamp FROM watchlist WHERE user_id = ?", (user_id,)
+            "SELECT coin_symbol, add_timestamp FROM watchlist WHERE user_id = ?",
+            (user_id,),
         ).fetchall()
+
 
 # --- User API Key and Subscription Functions ---
 
+
 def store_user_api_keys(user_id: int, api_key: str, secret_key: str):
     """Encrypts and stores a user's Binance API keys."""
-    get_or_create_user(user_id) # Ensure user exists
+    get_or_create_user(user_id)  # Ensure user exists
     encrypted_api_key = encrypt_data(api_key)
     encrypted_secret_key = encrypt_data(secret_key)
     with get_db_connection() as conn:
         conn.execute(
             "UPDATE users SET api_key = ?, secret_key = ? WHERE user_id = ?",
-            (encrypted_api_key, encrypted_secret_key, user_id)
+            (encrypted_api_key, encrypted_secret_key, user_id),
         )
+
 
 def get_user_api_keys(user_id: int) -> tuple[str | None, str | None]:
     """
@@ -260,35 +331,43 @@ def get_user_api_keys(user_id: int) -> tuple[str | None, str | None]:
         return config.BINANCE_API_KEY, config.BINANCE_SECRET_KEY
 
     with get_db_connection() as conn:
-        row = conn.execute("SELECT api_key, secret_key FROM users WHERE user_id = ?", (user_id,)).fetchone()
+        row = conn.execute(
+            "SELECT api_key, secret_key FROM users WHERE user_id = ?", (user_id,)
+        ).fetchone()
 
-    if not row or not row['api_key'] or not row['secret_key']:
+    if not row or not row["api_key"] or not row["secret_key"]:
         return None, None
 
-    api_key = decrypt_data(row['api_key'])
-    secret_key = decrypt_data(row['secret_key'])
+    api_key = decrypt_data(row["api_key"])
+    secret_key = decrypt_data(row["secret_key"])
     return api_key, secret_key
+
 
 def get_user_tier(user_id: int) -> str:
     """Retrieves a user's subscription tier."""
     # As the father of the bot, you are always granted Premium status.
     if user_id == config.ADMIN_USER_ID:
-        return 'PREMIUM'
+        return "PREMIUM"
 
     user = get_or_create_user(user_id)
     # Future logic: check if subscription_expires is in the past and downgrade if so.
-    return user['subscription_tier']
+    return user["subscription_tier"]
+
 
 def update_user_tier(user_id: int, tier: str, expiration_date=None):
     """Updates a user's subscription tier and optional expiration date."""
-    get_or_create_user(user_id) # Ensure user exists
+    get_or_create_user(user_id)  # Ensure user exists
     with get_db_connection() as conn:
         conn.execute(
             "UPDATE users SET subscription_tier = ?, subscription_expires = ? WHERE user_id = ?",
-            (tier.upper(), expiration_date, user_id)
+            (tier.upper(), expiration_date, user_id),
         )
+
 
 def get_all_user_ids() -> list[int]:
     """Retrieves a list of all user IDs from the database."""
     with get_db_connection() as conn:
-        return [row['user_id'] for row in conn.execute("SELECT user_id FROM users").fetchall()]
+        return [
+            row["user_id"]
+            for row in conn.execute("SELECT user_id FROM users").fetchall()
+        ]

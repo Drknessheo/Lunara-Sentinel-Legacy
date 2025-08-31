@@ -1,25 +1,27 @@
 # Fallback cache for slips if Redis is unavailable
 fallback_cache = {}
 
+import json
+import logging
+from datetime import datetime
+
 import redis
 from cryptography.fernet import Fernet
-import json
+
 import config
-from datetime import datetime
-import logging
 
 logger = logging.getLogger("slip_manager")
 logger.setLevel(logging.INFO)
 if not logger.hasHandlers():
     handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
 import os
 
 # Connect to Redis
-redis_url = os.getenv("REDIS_URL", 'redis://localhost:6379/0')
+redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # Sanitize the Redis URL to remove any duplicate schemes
 if redis_url.count("rediss://") > 1:
@@ -36,12 +38,13 @@ if "@" in masked_url:
 
 logger.info(f"Connecting to Redis at {masked_url}")
 try:
-    redis_client = redis.from_url(redis_url, ssl_cert_reqs='none')
+    redis_client = redis.from_url(redis_url, ssl_cert_reqs="none")
 except Exception as e:
     logger.error(f"Failed to connect to Redis at {masked_url}. Error: {e}")
     raise ConnectionError(f"Failed to connect to Redis at {masked_url}.") from e
 
 import functools
+
 
 @functools.lru_cache()
 def get_fernet():
@@ -54,19 +57,22 @@ def get_fernet():
     """
     # Prefer explicit SLIP_ENCRYPTION_KEY, otherwise fall back to BINANCE_ENCRYPTION_KEY
     key = None
-    if getattr(config, 'SLIP_ENCRYPTION_KEY', None):
+    if getattr(config, "SLIP_ENCRYPTION_KEY", None):
         key = config.SLIP_ENCRYPTION_KEY
-    elif getattr(config, 'BINANCE_ENCRYPTION_KEY', None):
+    elif getattr(config, "BINANCE_ENCRYPTION_KEY", None):
         key = config.BINANCE_ENCRYPTION_KEY
 
     if not key:
-        raise ValueError("No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.")
+        raise ValueError(
+            "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+        )
 
     # Ensure the key is bytes
     if isinstance(key, str):
         key = key.encode()
 
     return Fernet(key)
+
 
 def create_and_store_slip(symbol, side, amount, price):
     """
@@ -83,7 +89,7 @@ def create_and_store_slip(symbol, side, amount, price):
         "price": price,
         "status": "open",
         "sandpaper": True,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
     json_slip = json.dumps(slip)
@@ -93,14 +99,19 @@ def create_and_store_slip(symbol, side, amount, price):
     try:
         redis_client.set(f"trade:{trade_id}:data", encrypted_slip)
         redis_client.set(f"trade:{trade_id}:status", fernet.encrypt(b"open"))
-        redis_client.set(f"trade:{trade_id}:quantity", fernet.encrypt(str(amount).encode()))
+        redis_client.set(
+            f"trade:{trade_id}:quantity", fernet.encrypt(str(amount).encode())
+        )
     except Exception as e:
         logger.error(f"Redis failed, storing slip in fallback cache: {e}")
         fallback_cache[f"trade:{trade_id}:data"] = encrypted_slip
         fallback_cache[f"trade:{trade_id}:status"] = fernet.encrypt(b"open")
-        fallback_cache[f"trade:{trade_id}:quantity"] = fernet.encrypt(str(amount).encode())
+        fallback_cache[f"trade:{trade_id}:quantity"] = fernet.encrypt(
+            str(amount).encode()
+        )
 
     return trade_id
+
 
 def get_and_decrypt_slip(encrypted_slip_key):
     fernet = get_fernet()
@@ -110,11 +121,13 @@ def get_and_decrypt_slip(encrypted_slip_key):
     except Exception:
         encrypted_slip_value = fallback_cache.get(encrypted_slip_key, None)
     if not encrypted_slip_value:
-        logger.warning(f"No value found in Redis or fallback cache for slip key: {encrypted_slip_key}")
+        logger.warning(
+            f"No value found in Redis or fallback cache for slip key: {encrypted_slip_key}"
+        )
         return None
     try:
         decrypted_slip = fernet.decrypt(encrypted_slip_value)
-        text = decrypted_slip.decode('utf-8', errors='ignore').strip()
+        text = decrypted_slip.decode("utf-8", errors="ignore").strip()
         if not text:
             return None
         try:
@@ -129,6 +142,7 @@ def get_and_decrypt_slip(encrypted_slip_key):
         logger.error(f"Decryption failed for slip {encrypted_slip_key}: {e}")
         return None
 
+
 def delete_slip(encrypted_slip_key):
     """Delete a slip key or all keys for a trade id.
     If passed a key like 'trade:<id>' or 'trade:<id>:field' or just the id, delete all related keys.
@@ -136,13 +150,17 @@ def delete_slip(encrypted_slip_key):
     logger.info(f"Deleting slip: {encrypted_slip_key}")
     # Normalize to string trade id when possible
     try:
-        k = encrypted_slip_key.decode() if isinstance(encrypted_slip_key, (bytes, bytearray)) else str(encrypted_slip_key)
+        k = (
+            encrypted_slip_key.decode()
+            if isinstance(encrypted_slip_key, (bytes, bytearray))
+            else str(encrypted_slip_key)
+        )
     except Exception:
         k = str(encrypted_slip_key)
 
     # If caller passed 'trade:<id>' or 'trade:<id>:field', extract id
     parts = k.split(":")
-    if len(parts) >= 2 and parts[0] == 'trade':
+    if len(parts) >= 2 and parts[0] == "trade":
         trade_id = parts[1]
         # delete all keys starting with trade:<id>
         try:
@@ -150,7 +168,11 @@ def delete_slip(encrypted_slip_key):
                 redis_client.delete(rk)
         except Exception:
             # fallback cache cleanup
-            keys_to_remove = [kk for kk in list(fallback_cache.keys()) if kk.startswith(f"trade:{trade_id}")]
+            keys_to_remove = [
+                kk
+                for kk in list(fallback_cache.keys())
+                if kk.startswith(f"trade:{trade_id}")
+            ]
             for kk in keys_to_remove:
                 fallback_cache.pop(kk, None)
         return
@@ -160,6 +182,7 @@ def delete_slip(encrypted_slip_key):
         redis_client.delete(k)
     except Exception:
         fallback_cache.pop(k, None)
+
 
 def list_all_slips():
     """Lists all trade slips currently stored in Redis."""
@@ -179,7 +202,7 @@ def list_all_slips():
         except Exception:
             ks = str(k)
         parts = ks.split(":")
-        if len(parts) >= 2 and parts[0] == 'trade':
+        if len(parts) >= 2 and parts[0] == "trade":
             trade_id = parts[1]
             grouped.setdefault(trade_id, []).append(ks)
 
@@ -214,15 +237,17 @@ def list_all_slips():
         if fields:
             # Normalize common field names
             # Some storage uses 'quantity' vs 'amount'
-            if 'quantity' in fields and 'amount' not in fields:
-                fields['amount'] = fields['quantity']
+            if "quantity" in fields and "amount" not in fields:
+                fields["amount"] = fields["quantity"]
             slips.append({"key": full_key, "data": fields})
 
     return slips
 
+
 def cleanup_slip(slip_key):
     """Deletes a specific slip from Redis by its key."""
     delete_slip(slip_key)
+
 
 def clear_all_slips():
     """Delete all trade slip keys from Redis."""

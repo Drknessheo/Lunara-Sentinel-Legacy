@@ -1,15 +1,17 @@
+import json
 import os
 import sys
-import json
+
 import redis
 
 # Ensure project src/ is on sys.path so we can import src.config
-root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-src_path = os.path.join(root, 'src')
+root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+src_path = os.path.join(root, "src")
 if src_path not in sys.path:
     sys.path.insert(0, src_path)
 
 import config
+
 
 def get_redis_url():
     env_url = os.environ.get("REDIS_URL")
@@ -17,6 +19,7 @@ def get_redis_url():
     print(f"[ENV] REDIS_URL: {env_url}")
     print(f"[CONFIG] REDIS_URL: {config_url}")
     return env_url or config_url
+
 
 def classify_value(value):
     try:
@@ -29,10 +32,11 @@ def classify_value(value):
             return "Other JSON"
     except Exception:
         try:
-            float_val = float(value)
+            float(value)
             return "Numeric"
         except Exception:
             return "Raw"
+
 
 def inspect_trades():
     redis_url = get_redis_url()
@@ -67,6 +71,7 @@ def inspect_trades():
         print("\n⚠️ Malformed Entries:")
         for key, err in report["Malformed"]:
             print(f"  {key}: {err}")
+
 
 if __name__ == "__main__":
     inspect_trades()

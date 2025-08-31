@@ -2,13 +2,16 @@
 
 from enum import Enum
 
+
 class TradeAction(Enum):
     """Defines possible trading actions."""
+
     HOLD = "HOLD"
     CONSERVATIVE_BUY = "CONSERVATIVE_BUY"
     AGGRESSIVE_BUY = "AGGRESSIVE_BUY"
     CONSERVATIVE_SELL = "CONSERVATIVE_SELL"
     AGGRESSIVE_SELL = "AGGRESSIVE_SELL"
+
 
 def get_trade_suggestion(resonance_level: float) -> TradeAction:
     """

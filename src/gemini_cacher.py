@@ -1,9 +1,11 @@
-import os
-import time
 import json
 import logging
+import os
 import threading
+import time
+
 import httpx
+
 import config
 
 try:
@@ -17,16 +19,16 @@ logger = logging.getLogger(__name__)
 
 # Build a list of available Gemini API keys from config. Support multiple env var names.
 gemini_keys = []
-maybe = getattr(config, 'GEMINI_API_KEY', None)
+maybe = getattr(config, "GEMINI_API_KEY", None)
 if maybe:
     # Support comma-separated list or single key
-    if isinstance(maybe, str) and ',' in maybe:
-        gemini_keys.extend([k.strip() for k in maybe.split(',') if k.strip()])
+    if isinstance(maybe, str) and "," in maybe:
+        gemini_keys.extend([k.strip() for k in maybe.split(",") if k.strip()])
     else:
         gemini_keys.append(maybe)
 
 # Also accept legacy GEMINI_KEY_1 / GEMINI_KEY_2
-for kname in ('GEMINI_KEY_1', 'GEMINI_KEY_2'):
+for kname in ("GEMINI_KEY_1", "GEMINI_KEY_2"):
     kv = getattr(config, kname, None)
     if kv:
         gemini_keys.append(kv)
@@ -34,7 +36,7 @@ for kname in ('GEMINI_KEY_1', 'GEMINI_KEY_2'):
 redis_client = None
 if gemini_keys and redis:
     try:
-        redis_url = getattr(config, 'REDIS_URL', None)
+        redis_url = getattr(config, "REDIS_URL", None)
         if redis_url:
             redis_client = redis.from_url(redis_url)
             logger.info("Connected to Redis for Gemini cache")
@@ -44,6 +46,7 @@ if gemini_keys and redis:
 
 GEMINI_CACHE_FILE = "gemini_cache.json"
 GEMINI_CACHE_TTL = 300  # 5 minutes, can be moved to config
+
 
 def get_cache(key: str):
     if redis_client:
@@ -57,6 +60,7 @@ def get_cache(key: str):
             return get_file_cache(key)
     return get_file_cache(key)
 
+
 def set_cache(key: str, value: dict):
     if redis_client:
         try:
@@ -67,6 +71,7 @@ def set_cache(key: str, value: dict):
             set_file_cache(key, value)
     else:
         set_file_cache(key, value)
+
 
 def get_file_cache(key: str):
     if not os.path.exists(GEMINI_CACHE_FILE):
@@ -81,6 +86,7 @@ def get_file_cache(key: str):
         logger.error(f"File cache read error: {e}")
     return None
 
+
 def set_file_cache(key: str, value: dict):
     cache = {}
     if os.path.exists(GEMINI_CACHE_FILE):
@@ -89,9 +95,9 @@ def set_file_cache(key: str, value: dict):
                 cache = json.load(f)
         except (IOError, json.JSONDecodeError):
             pass  # Start with a fresh cache if file is corrupt
-    
+
     cache[key] = {"ts": time.time(), "data": value}
-    
+
     try:
         with open(GEMINI_CACHE_FILE, "w", encoding="utf-8") as f:
             json.dump(cache, f, indent=2)
@@ -104,6 +110,7 @@ def set_file_cache(key: str, value: dict):
 gemini_key_idx = 0
 gemini_key_lock = threading.Lock()
 
+
 def get_next_gemini_key():
     global gemini_key_idx
     with gemini_key_lock:
@@ -113,6 +120,7 @@ def get_next_gemini_key():
         key = gemini_keys[gemini_key_idx % len(gemini_keys)]
         gemini_key_idx = (gemini_key_idx + 1) % max(1, len(gemini_keys))
         return key
+
 
 async def ask_gemini_for_symbol(symbol: str, prompt_extra: str = "") -> dict:
     cache_key = f"gemini:{symbol}"
@@ -127,11 +135,13 @@ async def ask_gemini_for_symbol(symbol: str, prompt_extra: str = "") -> dict:
         return {"note": "no_gemini_key"}
 
     # Assuming a generic API endpoint, this should be in config.py
-    gemini_url = getattr(config, 'GEMINI_API_URL', 'https://api.gemini.example/analysis')
+    gemini_url = getattr(
+        config, "GEMINI_API_URL", "https://api.gemini.example/analysis"
+    )
 
     headers = {"Authorization": f"Bearer {api_key}"}
     data = {"symbol": symbol, "context": prompt_extra}
-    
+
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.post(gemini_url, json=data, headers=headers, timeout=20)
@@ -140,7 +150,9 @@ async def ask_gemini_for_symbol(symbol: str, prompt_extra: str = "") -> dict:
             set_cache(cache_key, result)
             return result
         except httpx.HTTPStatusError as e:
-            logger.warning(f"Gemini API call failed for {symbol} with status {e.response.status_code}: {e.response.text}")
+            logger.warning(
+                f"Gemini API call failed for {symbol} with status {e.response.status_code}: {e.response.text}"
+            )
             return {"note": "error", "error": str(e)}
         except httpx.RequestError as e:
             logger.warning(f"Gemini request failed for {symbol}: {e}")

@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, 'release/**' ]
+  pull_request:
+    branches: [ main, 'release/**' ]
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:6
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8 pytest
+
+      - name: Export Redis URL for tests
+        run: echo "REDIS_URL=redis://localhost:6379" >> $GITHUB_ENV
+
+      - name: Run flake8
+        run: |
+          . .venv/bin/activate
+          # prefer setup.cfg if present, fall back to default
+          if [ -f setup.cfg ]; then
+            flake8 --config=setup.cfg .
+          else
+            flake8 .
+          fi
+
+      - name: Run pytest
+        run: |
+          . .venv/bin/activate
+          pytest --maxfail=1 --disable-warnings -q

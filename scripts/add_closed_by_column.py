@@ -1,13 +1,13 @@
-
-import sqlite3
 import os
+import sqlite3
 import sys
 
 # Add project root to the Python path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
 from src.config import DB_NAME
+
 
 def migrate_db():
     """Adds the closed_by column to the trades table."""
@@ -19,10 +19,10 @@ def migrate_db():
         # Check if the column already exists
         cursor.execute("PRAGMA table_info(trades)")
         columns = [column[1] for column in cursor.fetchall()]
-        
-        if 'closed_by' not in columns:
+
+        if "closed_by" not in columns:
             print("Adding 'closed_by' column to 'trades' table...")
-            cursor.execute('ALTER TABLE trades ADD COLUMN closed_by TEXT')
+            cursor.execute("ALTER TABLE trades ADD COLUMN closed_by TEXT")
             conn.commit()
             print("Column 'closed_by' added successfully.")
         else:
@@ -33,6 +33,7 @@ def migrate_db():
     finally:
         if conn:
             conn.close()
+
 
 if __name__ == "__main__":
     migrate_db()

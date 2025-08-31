@@ -2,7 +2,14 @@
 
 import numpy as np
 
-def run_quantum_clock_phase(h: np.ndarray, dt: float, x: np.ndarray, omega: float = 2 * np.pi * 1e9, x_clock: float = 0.0) -> np.ndarray:
+
+def run_quantum_clock_phase(
+    h: np.ndarray,
+    dt: float,
+    x: np.ndarray,
+    omega: float = 2 * np.pi * 1e9,
+    x_clock: float = 0.0,
+) -> np.ndarray:
     """
     Computes the phase evolution of a quantum clock in the simulated metric perturbation.
 
@@ -25,6 +32,6 @@ def run_quantum_clock_phase(h: np.ndarray, dt: float, x: np.ndarray, omega: floa
     # The proper time factor approximates the effect of h on timekeeping.
     for n in range(1, nt):
         proper_time_factor = 1 + h[n, clock_index] / 2.0
-        clock_phase[n] = clock_phase[n-1] + omega * dt * proper_time_factor
+        clock_phase[n] = clock_phase[n - 1] + omega * dt * proper_time_factor
 
     return clock_phase

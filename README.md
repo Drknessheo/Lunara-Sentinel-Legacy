@@ -79,8 +79,8 @@ This project is licensed under the MIT License. See [`LICENSE`](LICENSE) for det
 ---
 
 ## 🙌 Author
-**Shamim Reza Saikat**  
-Telegram: [@Drknessheo](https://t.me/drknessheo)  
+**Shamim Reza Saikat**
+Telegram: [@Drknessheo](https://t.me/drknessheo)
 Email: [s_r_saikat@yahoo.com](mailto:s_r_saikat@yahoo.com)
 ORCID: [0009-0008-3119-166X](https://orcid.org/0009-0008-3119-166X)
 

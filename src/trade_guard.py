@@ -1,10 +1,13 @@
 import logging
 
+
 class TradeValidator:
     MIN_NOTIONAL = 5.0  # Binance minimum in USDT
 
     @staticmethod
-    def is_trade_valid(symbol: str, quantity: float, price: float, user_id=None, slip_id=None) -> bool:
+    def is_trade_valid(
+        symbol: str, quantity: float, price: float, user_id=None, slip_id=None
+    ) -> bool:
         notional = quantity * price
         if notional < TradeValidator.MIN_NOTIONAL:
             tag = f"[symbol={symbol}]"
@@ -12,7 +15,9 @@ class TradeValidator:
                 tag += f"[user_id={user_id}]"
             if slip_id is not None:
                 tag += f"[slip_id={slip_id}]"
-            logging.warning(f"{tag} Trade skipped: Notional value {notional:.2f} < {TradeValidator.MIN_NOTIONAL} USDT")
+            logging.warning(
+                f"{tag} Trade skipped: Notional value {notional:.2f} < {TradeValidator.MIN_NOTIONAL} USDT"
+            )
             return False
         return True
 

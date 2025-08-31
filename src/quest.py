@@ -1,6 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
+
 async def start_quest_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """A placeholder for the RPG quest intro (Lunura's persona)."""
     await update.message.reply_text(

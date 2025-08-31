@@ -9,7 +9,9 @@ import logging
 try:
     from src.modules import db_access
 except ImportError:
-    raise ImportError("Could not import 'db' module. Make sure 'db.py' is present in your project.")
+    raise ImportError(
+        "Could not import 'db' module. Make sure 'db.py' is present in your project."
+    )
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

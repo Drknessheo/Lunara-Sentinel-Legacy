@@ -1,16 +1,21 @@
 import matplotlib
-matplotlib.use('agg')
-import matplotlib.pyplot as plt
+
+matplotlib.use("agg")
 import numpy as np
+
 # -------------------------
 # Part 1: Metric Perturbation Simulation
 # -------------------------
+
 
 def T00(x, t, A, x0, t0, sigma, tau):
     """
     Deterministic stress-energy tensor component: Gaussian pulse.
     """
-    return A * np.exp(-((x - x0) ** 2) / sigma**2) * np.exp(-((t - t0) ** 2) / tau**2)
+    return (
+        A * np.exp(-((x - x0) ** 2) / sigma**2) * np.exp(-((t - t0) ** 2) / tau**2)
+    )
+
 
 def T00_noisy(x, t, A, x0, t0, sigma, tau, noise_std):
     """
@@ -20,14 +25,17 @@ def T00_noisy(x, t, A, x0, t0, sigma, tau, noise_std):
     noise = np.random.normal(0, noise_std, size=x.shape)
     return base + noise
 
-def run_metric_perturbation_simulation(elara_resonance_level=1.0,
-                                        G=6.67430e-11,
-                                        c_eff=3e3,
-                                        L=1e-6,
-                                        nx=101,
-                                        T_total=1e-9,
-                                        A=1e10,
-                                        noise_std=1e9):
+
+def run_metric_perturbation_simulation(
+    elara_resonance_level=1.0,
+    G=6.67430e-11,
+    c_eff=3e3,
+    L=1e-6,
+    nx=101,
+    T_total=1e-9,
+    A=1e10,
+    noise_std=1e9,
+):
     """
     Simulates metric perturbation h₀₀ on a 1D spatial domain.
 
@@ -56,7 +64,9 @@ def run_metric_perturbation_simulation(elara_resonance_level=1.0,
     nt = int(T_total / dt) + 1
     t = np.linspace(0, T_total, nt)
 
-    print(f"[Metric Simulation] c_eff={c_eff} m/s, dt={dt:.2e}s, dx={dx:.2e}m, CFL={(c_eff * dt) / dx:.2f}")
+    print(
+        f"[Metric Simulation] c_eff={c_eff} m/s, dt={dt:.2e}s, dx={dx:.2e}m, CFL={(c_eff * dt) / dx:.2f}"
+    )
 
     # Gaussian pulse parameters
     sigma = L / 10
@@ -66,7 +76,7 @@ def run_metric_perturbation_simulation(elara_resonance_level=1.0,
 
     # Initialize metric perturbation array h (representing h₀₀)
     h = np.zeros((nt, nx))
-    source_coeff = - (16 * np.pi * G) / (c_eff ** 4)
+    source_coeff = -(16 * np.pi * G) / (c_eff**4)
 
     # Finite difference simulation for the wave equation:
     # d²h/dt² = c_eff² d²h/dx² + source term, with h=0 at boundaries.
@@ -77,7 +87,11 @@ def run_metric_perturbation_simulation(elara_resonance_level=1.0,
         d2h_dx2[1:-1] = (h[n, 2:] - 2 * h[n, 1:-1] + h[n, :-2]) / dx**2
 
         # Modulate the source term with elara_resonance_level.
-        S = elara_resonance_level * source_coeff * T00_noisy(x, t[n], A, x0, t0, sigma, tau, noise_std)
+        S = (
+            elara_resonance_level
+            * source_coeff
+            * T00_noisy(x, t[n], A, x0, t0, sigma, tau, noise_std)
+        )
 
         # Monitoring intermediate values for debugging.
         if n > 0 and (np.isnan(h[n, :]).any() or np.isinf(h[n, :]).any()):
@@ -87,8 +101,14 @@ def run_metric_perturbation_simulation(elara_resonance_level=1.0,
         # Update the metric using a finite difference integration scheme.
         if n == 1:
             # Use a forward Euler step for the first time step, assuming h starts at rest.
-            h[n+1, 1:-1] = h[n, 1:-1] + 0.5 * dt**2 * (c_eff**2 * d2h_dx2[1:-1] + S[1:-1])
+            h[n + 1, 1:-1] = h[n, 1:-1] + 0.5 * dt**2 * (
+                c_eff**2 * d2h_dx2[1:-1] + S[1:-1]
+            )
         else:
-            h[n+1, 1:-1] = 2 * h[n, 1:-1] - h[n-1, 1:-1] + dt**2 * (c_eff**2 * d2h_dx2[1:-1] + S[1:-1])
+            h[n + 1, 1:-1] = (
+                2 * h[n, 1:-1]
+                - h[n - 1, 1:-1]
+                + dt**2 * (c_eff**2 * d2h_dx2[1:-1] + S[1:-1])
+            )
 
     return h, t, x

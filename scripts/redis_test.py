@@ -1,9 +1,10 @@
-import redis
 import os
+
+import redis
 from dotenv import load_dotenv
 
 # Load .env file from the project root
-dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+dotenv_path = os.path.join(os.path.dirname(__file__), "..", ".env")
 load_dotenv(dotenv_path=dotenv_path)
 
 redis_url = os.getenv("REDIS_URL")
@@ -16,15 +17,15 @@ else:
     try:
         # Use from_url to connect
         r = redis.Redis.from_url(redis_url, decode_responses=True)
-        
+
         # Test connection and operations
         r.ping()
         print("Connection successful.")
 
-        r.set('lunessasignals:status', 'connected and running')
+        r.set("lunessasignals:status", "connected and running")
         print("Set 'lunessasignals:status' to 'connected and running'")
 
-        status = r.get('lunessasignals:status')
+        status = r.get("lunessasignals:status")
         print(f"Retrieved status: {status}")
 
     except redis.exceptions.ConnectionError as e:

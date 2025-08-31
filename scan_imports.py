@@ -1,6 +1,7 @@
 import os
 import re
 
+
 def scan_for_relative_imports(directory):
     relative_imports_found = {}
     for root, _, files in os.walk(directory):
@@ -12,10 +13,13 @@ def scan_for_relative_imports(directory):
                     # Regex to find relative imports (from . or from ..)
                     # This regex is simplified and might catch some false positives
                     # but should be good enough for a quick scan.
-                    matches = re.findall(r"^from\s+\.\.?\w+\s+import", content, re.MULTILINE)
+                    matches = re.findall(
+                        r"^from\s+\.\.?\w+\s+import", content, re.MULTILINE
+                    )
                     if matches:
                         relative_imports_found[filepath] = matches
     return relative_imports_found
+
 
 if __name__ == "__main__":
     src_directory = "g:\\Lunara Bot\\src"

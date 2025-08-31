@@ -1,5 +1,7 @@
 from functools import wraps
+
 import db
+
 
 # Decorator to restrict command to users with a required tier (e.g., 'PREMIUM')
 def require_tier(required_tier):
@@ -14,5 +16,7 @@ def require_tier(required_tier):
                 )
                 return
             return await func(update, context, *args, **kwargs)
+
         return wrapper
+
     return decorator

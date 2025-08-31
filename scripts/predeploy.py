@@ -1,6 +1,8 @@
-import redis
 import json
 import os
+
+import redis
+
 
 def run_predeploy_tasks():
     """
@@ -9,13 +11,13 @@ def run_predeploy_tasks():
     - Clears specified Redis keys for a clean state.
     - Loads trading pairs from a JSON config file into Redis.
     """
-    redis_url = os.getenv('REDIS_URL')
+    redis_url = os.getenv("REDIS_URL")
     if not redis_url:
         print("Error: REDIS_URL environment variable not set.")
         print("Please set it in your .env file or environment.")
         return
 
-    print(f"Connecting to Redis via URL...")
+    print("Connecting to Redis via URL...")
     try:
         r = redis.Redis.from_url(redis_url, decode_responses=True)
         r.ping()  # Check the connection
@@ -26,20 +28,20 @@ def run_predeploy_tasks():
         return
 
     # 1. Clear outdated Redis keys
-    keys_to_clear = ['slip_queue', 'user_temp_flags']
+    keys_to_clear = ["slip_queue", "user_temp_flags"]
     print(f"Clearing Redis keys: {keys_to_clear}")
     for key in keys_to_clear:
         r.delete(key)
 
     # 2. Load trading pairs configuration into Redis
-    config_path = 'config/trading_pairs.json'
+    config_path = "config/trading_pairs.json"
     print(f"Loading trading pairs from {config_path}...")
     try:
         with open(config_path) as f:
             pairs_data = json.load(f)
-            # Assuming the JSON structure is {"pairs": [...]} 
-            active_pairs = pairs_data.get('pairs', [])
-            r.set('active_pairs', json.dumps(active_pairs))
+            # Assuming the JSON structure is {"pairs": [...]}
+            active_pairs = pairs_data.get("pairs", [])
+            r.set("active_pairs", json.dumps(active_pairs))
             print(f"Loaded {len(active_pairs)} trading pairs into Redis.")
     except FileNotFoundError:
         print(f"Warning: {config_path} not found. Skipping config load.")
@@ -63,5 +65,6 @@ def run_predeploy_tasks():
 
     print("\nPre-deploy tasks completed successfully.")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_predeploy_tasks()

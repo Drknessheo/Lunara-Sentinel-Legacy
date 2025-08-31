@@ -1,8 +1,11 @@
-import redis
 import os
 
+import redis
+
 # Load Redis connection from environment or config
-REDIS_URL = os.getenv("REDIS_URL", "rediss://***:***@measured-whale-51756.upstash.io:6379")
+REDIS_URL = os.getenv(
+    "REDIS_URL", "rediss://***:***@measured-whale-51756.upstash.io:6379"
+)
 r = redis.from_url(REDIS_URL)
 
 # Trade IDs to inspect

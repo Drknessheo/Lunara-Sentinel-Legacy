@@ -178,7 +178,7 @@ def update_user_setting(user_id: int, setting_key: str, value: float | None):
     if setting_key not in SETTING_TO_COLUMN_MAP:
         logger.error(f"Attempted to update invalid setting: {setting_key}")
         return False
-    
+
     column_name = SETTING_TO_COLUMN_MAP[setting_key]
     with get_db_connection() as conn:
         # Using f-string for column name is safe here because we control the input via the map
@@ -194,7 +194,7 @@ def get_user_effective_settings(user_id: int) -> dict:
     """
     tier = get_user_tier(user_id)
     settings = config.get_active_settings(tier).copy() # Start with a copy of tier defaults
-    
+
     with get_db_connection() as conn:
         user_data = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
 
@@ -215,7 +215,7 @@ def get_user_effective_settings(user_id: int) -> dict:
         settings['TRAILING_PROFIT_ACTIVATION_PERCENT'] = user_data['custom_trailing_activation']
     if 'custom_trailing_drop' in user_keys and user_data['custom_trailing_drop'] is not None:
         settings['TRAILING_STOP_DROP_PERCENT'] = user_data['custom_trailing_drop']
-    
+
     return settings
 
 def get_open_trades(user_id: int):
