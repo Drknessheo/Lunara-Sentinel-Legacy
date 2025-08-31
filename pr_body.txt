@@ -60,3 +60,35 @@ Notes for reviewers
 
 Authored-by: Automated patch
 
+
+
+## CI Fixes
+
+- Added `BINANCE_ENCRYPTION_KEY` to the CI environment to prevent import-time crash in `security.py`.
+- Previously failed test:
+  ```
+  ValueError: BINANCE_ENCRYPTION_KEY not found in environment variables.
+  ```
+
+## Next actions / Render deploy checklist
+
+- Push this PR body update to the branch and re-run CI to confirm green.
+- Verify Render environment variables are set for production:
+  - `BINANCE_ENCRYPTION_KEY` (Fernet key used for decrypting stored credentials)
+  - `REDIS_URL` (production Redis)
+  - `WEBHOOK_SECRET` / `SHARED_SECRET` (HMAC secret for webhooks)
+  - `PROMOTION_WEBHOOK_URL` (downstream webhook receiver)
+  - `LOG_LEVEL` (set to `info` or `warning`)
+
+- If Render shows an error on deploy, prioritize:
+  1. Confirm `.env`/env-vars are configured in Render's Environment tab (Render does not read repo `.env`).
+  2. Confirm `BINANCE_ENCRYPTION_KEY` present in Render env.
+  3. Check Dockerfile `WORKDIR` and `ENTRYPOINT` to ensure the app starts from the repository root and the app can read the configured env.
+  4. Re-deploy and tail Render logs; revert env changes or disable retry worker if needed for rollback.
+
+Commit message suggestion:
+
+```
+docs: add CI fixes and Render deploy checklist to PR body
+```
+
