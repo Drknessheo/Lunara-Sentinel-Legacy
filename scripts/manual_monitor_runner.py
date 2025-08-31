@@ -4,7 +4,17 @@ import os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from autotrade_jobs import monitor_autotrades
+try:
+    from src.autotrade_jobs import monitor_autotrades
+except Exception:
+    import importlib
+
+    try:
+        _mod = importlib.import_module('src.autotrade_jobs')
+    except Exception:
+        _mod = importlib.import_module('autotrade_jobs')
+
+    monitor_autotrades = getattr(_mod, 'monitor_autotrades')
 
 
 async def main(dry_run=True):

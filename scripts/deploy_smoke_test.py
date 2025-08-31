@@ -43,11 +43,14 @@ def main():
     print('Lunara deploy smoke-test')
 
     # 1) imports
-    import_check('Lunessa_db')
+    import_check('src.Lunessa_db')
 
     # 2) run initialize_database
     try:
-        import Lunessa_db as LDB
+        try:
+            from src import Lunessa_db as LDB
+        except Exception:
+            import Lunessa_db as LDB
         LDB.initialize_database()
         note_ok('initialize_database() executed')
     except Exception as e:

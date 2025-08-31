@@ -6,7 +6,17 @@ for p in (PROJECT_ROOT, SRC_DIR):
         sys.path.insert(0, p)
 
 import config
-from autotrade_jobs import autotrade_buy_from_suggestions
+try:
+    from src.autotrade_jobs import autotrade_buy_from_suggestions
+except Exception:
+    import importlib
+
+    try:
+        _mod = importlib.import_module('src.autotrade_jobs')
+    except Exception:
+        _mod = importlib.import_module('autotrade_jobs')
+
+    autotrade_buy_from_suggestions = getattr(_mod, 'autotrade_buy_from_suggestions')
 
 async def run_test():
     print(f"Using ADMIN_USER_ID={config.ADMIN_USER_ID}")

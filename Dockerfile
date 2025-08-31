@@ -19,6 +19,9 @@ RUN pip install --no-cache-dir \
   Flask \
   redis
 
+# Install supervisor to run multiple processes reliably
+RUN apt-get update && apt-get install -y supervisor && rm -rf /var/lib/apt/lists/*
+
 COPY . src/
 
 ENV PYTHONUNBUFFERED=1
@@ -29,4 +32,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=15m --timeout=5s --start-period=10s \
   CMD curl -f http://localhost:8080/healthz || exit 1
 
-CMD ["sh", "-c", "python src/health_check_app.py & python src/main.py"]
+# Use supervisord to manage the health server and bot processes
+COPY supervisord.conf /etc/supervisord.conf
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

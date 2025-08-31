@@ -1,0 +1,94 @@
+Title: Add: refactor webhook dispatch, retry stats, and CI Redis integration
+
+Summary
+
+This PR refactors webhook dispatch to be resilient, adds an enqueue-and-retry system with Redis-backed metrics, and consolidates the CI and test-suite mock server (so CI uses the same mock server as local tests).
+
+What changed
+
+- Refactored webhook dispatch into `send_promotion_webhook` and `dispatch_promotion_webhook_sync`.
+- Added enqueue-on-failure (`promotion_webhook_retry`) and background retry worker `promotion_retry_job`.
+- Added Redis metrics hash `promotion_webhook_stats` and admin commands `/retry_queue`, `/retry_dispatch`, `/retry_flush`, `/retry_stats`.
+- Introduced `tests/mock_server.py` (MODE/PORT/DELAY_MS) and made CI run the same server in `MODE=success`.
+- Updated `.github/workflows/smoke_test.yml` to start `tests.mock_server` as a module, wait for `/health`, upload mock logs on failure, and tear down cleanly.
+- Added `tests/__init__.py` and fixed `tests/conftest.py` imports to make tests importable as a package.
+
+Why
+
+- Make webhook delivery deterministic and observable in CI and production.
+- Avoid duplicating mock server logic between local tests and CI (reduces drift).
+- Provide operational tooling and metrics for retry visibility and manual intervention.
+
+Testing performed
+
+- Local syntax checks: `python -m py_compile` on modified files.
+- Local tests: `pytest -q tests/` — tests run; one test skipped locally when `REDIS_URL` is not set (expected). CI runs with Redis service so it will exercise the integration tests.
+- CI workflow updated to run the mock server in `MODE=success` on port 8081 and waits for `/health` before running the smoke test.
+
+CI / Secrets checklist (required before merging)
+
+- Add `SMOKE_WEBHOOK_SECRET` in GitHub Secrets.
+- CI provides Redis via `services.redis` (already configured in workflow).
+- Ensure workflow references are valid in repo settings.
+
+Render / Deploy notes
+
+- Verify Render environment variables:
+  - `REDIS_URL` -> production Redis
+  - `WEBHOOK_SECRET` / `SHARED_SECRET` -> shared HMAC secret
+  - `PROMOTION_WEBHOOK_URL` -> downstream receiver
+  - `LOG_LEVEL` -> set to `info` or `warning`
+- Render typically auto-deploys on `main` push; if not, manually deploy the latest commit.
+
+Rollback / quick mitigation
+
+- Restart the Render service.
+- Revert the merge commit in GitHub to redeploy the previous stable commit.
+- Temporarily disable the retry worker via an env flag if needed.
+
+How to validate after merge
+
+- Check CI runs green (smoke test + pytest).
+- Post-deploy: `curl -fsS https://<your-service>/health` should return 200.
+- Use admin command `/retry_stats` to confirm `pending` is 0 and `failed` stable.
+- Trigger a success and a failure webhook to verify enqueue behavior and metrics update.
+
+Notes for reviewers
+
+- Focus review on `src/main.py` (retry logic and admin commands), `tests/mock_server.py` (MODE/PORT behavior), and `.github/workflows/smoke_test.yml` (CI flow).
+- The PR purpose is operational stability; small refactors are intentionally conservative.
+
+Authored-by: Automated patch
+
+
+
+## CI Fixes
+
+- Added `BINANCE_ENCRYPTION_KEY` to the CI environment to prevent import-time crash in `security.py`.
+- Previously failed test:
+  ```
+  ValueError: BINANCE_ENCRYPTION_KEY not found in environment variables.
+  ```
+
+## Next actions / Render deploy checklist
+
+- Push this PR body update to the branch and re-run CI to confirm green.
+- Verify Render environment variables are set for production:
+  - `BINANCE_ENCRYPTION_KEY` (Fernet key used for decrypting stored credentials)
+  - `REDIS_URL` (production Redis)
+  - `WEBHOOK_SECRET` / `SHARED_SECRET` (HMAC secret for webhooks)
+  - `PROMOTION_WEBHOOK_URL` (downstream webhook receiver)
+  - `LOG_LEVEL` (set to `info` or `warning`)
+
+- If Render shows an error on deploy, prioritize:
+  1. Confirm `.env`/env-vars are configured in Render's Environment tab (Render does not read repo `.env`).
+  2. Confirm `BINANCE_ENCRYPTION_KEY` present in Render env.
+  3. Check Dockerfile `WORKDIR` and `ENTRYPOINT` to ensure the app starts from the repository root and the app can read the configured env.
+  4. Re-deploy and tail Render logs; revert env changes or disable retry worker if needed for rollback.
+
+Commit message suggestion:
+
+```
+docs: add CI fixes and Render deploy checklist to PR body
+```
+
