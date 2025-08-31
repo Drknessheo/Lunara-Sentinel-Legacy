@@ -45,7 +45,7 @@ jobs:
 
       - name: Run linters
         run: |
-          flake8 src scripts tests || true
+          flake8 src scripts tests
 
       - name: Run pytest
         run: |
