@@ -24,6 +24,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Wait for Redis to be ready
+        run: |
+          for i in {1..30}; do
+            nc -z localhost 6379 && echo "Redis is up" && break
+            echo "Waiting for Redis… ($i/30)"
+            sleep 1
+          done
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
