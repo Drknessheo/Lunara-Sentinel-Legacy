@@ -1143,12 +1143,26 @@ async def import_all_command(
             f"⚠️ **Error!**\n\n*Reason:* `{e}`", parse_mode="Markdown"
         )
 
+    async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """
+        Places a live buy order. Premium feature.
+        Usage: /buy <SYMBOL> <USDT_AMOUNT>
+        """
+        # Runtime guard: block live trades if Binance client unavailable
+        try:
+            import trade as _trade
 
-async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Places a live buy order. Premium feature.
-    Usage: /buy <SYMBOL> <USDT_AMOUNT>
-    """
+            if not getattr(_trade, "BINANCE_AVAILABLE", False):
+                await update.message.reply_text(
+                    "Live trading is currently disabled because the Binance client is unavailable. Please check /binance_status or contact the admin."
+                )
+                return
+        except Exception:
+            await update.message.reply_text(
+                "Live trading is currently unavailable. Please try again later."
+            )
+            return
+
     user_id = update.effective_user.id
     mode, _ = db.get_user_trading_mode_and_balance(user_id)
 
@@ -3042,6 +3056,48 @@ def main() -> None:
 
     application.add_handler(CommandHandler("retry_stats", retry_stats_command))
 
+    async def binance_status_command(
+        update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        user_id = update.effective_user.id
+        if user_id != getattr(config, "ADMIN_USER_ID", None):
+            await update.message.reply_text("Unauthorized.")
+            return
+        try:
+            import trade as _trade
+
+            available = getattr(_trade, "BINANCE_AVAILABLE", False)
+            err = getattr(_trade, "BINANCE_INIT_ERROR", None)
+            msg = [f"BINANCE_AVAILABLE={available}"]
+            if err:
+                msg.append(f"INIT_ERROR={_trade.BINANCE_INIT_ERROR}")
+            await update.message.reply_text("\n".join(msg))
+        except Exception as e:
+            await update.message.reply_text(f"Failed to read binance status: {e}")
+
+    application.add_handler(CommandHandler("binance_status", binance_status_command))
+
+    # Runtime guard decorator to block live trade commands when Binance is unavailable
+    def require_binance_available(func):
+        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            try:
+                import trade as _trade
+
+                if not getattr(_trade, "BINANCE_AVAILABLE", False):
+                    await update.message.reply_text(
+                        "Live trading is currently disabled because the Binance client is unavailable. Please check /binance_status or contact the admin."
+                    )
+                    return
+            except Exception:
+                # If we cannot import status, be conservative and block live trades
+                await update.message.reply_text(
+                    "Live trading is currently unavailable. Please try again later."
+                )
+                return
+            return await func(update, context)
+
+        return wrapper
+
     # Add the slip handler for text messages starting with 'SLIP:'
     application.add_handler(
         MessageHandler(
@@ -3211,6 +3267,43 @@ def main() -> None:
         application.add_error_handler(_global_error_handler)
     except Exception:
         # If add_error_handler not available, ignore — we still attempted webhook cleanup above
+        pass
+
+    # Ensure an asyncio event loop exists in the main thread.
+    # Some environments (or Python versions) raise RuntimeError when
+    # asyncio.get_event_loop() is called if no loop has been set yet.
+    try:
+        asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    # Notify admin if Binance is unavailable at startup (best-effort, sync HTTP call)
+    try:
+        from telegram import Bot
+
+        try:
+            import trade as _trade
+
+            if not getattr(_trade, "BINANCE_AVAILABLE", False):
+                admin = getattr(config, "ADMIN_USER_ID", None)
+                token = getattr(config, "TELEGRAM_BOT_TOKEN", None) or getattr(
+                    config, "BOT_TOKEN", None
+                )
+                if admin and token:
+                    try:
+                        b = Bot(token=token)
+                        msg = "Warning: Binance client not available. Trading is disabled."
+                        if getattr(_trade, "BINANCE_INIT_ERROR", None):
+                            msg += f" Init error: {_trade.BINANCE_INIT_ERROR}"
+                        b.send_message(chat_id=admin, text=msg)
+                    except Exception as _ex:
+                        logger.debug(
+                            f"Failed to notify admin about Binance status: {_ex}"
+                        )
+        except Exception:
+            pass
+    except Exception:
         pass
 
     application.run_polling()

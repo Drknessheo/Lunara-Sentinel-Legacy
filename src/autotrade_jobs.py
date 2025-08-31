@@ -4,6 +4,8 @@ import os
 gemini_api_keys = [os.getenv("GEMINI_KEY_1"), os.getenv("GEMINI_KEY_2")]
 mistral_api_key = os.getenv("MISTRAL_KEY")
 
+import time
+
 # Unified AI suggestion function with fallback logic
 import httpx
 
@@ -54,8 +56,10 @@ async def get_ai_suggestions(prompt):
     return None
 
 
+import json
 import logging
 
+import redis
 from telegram.ext import ContextTypes
 
 import config
@@ -130,6 +134,79 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE):
     logger.info("Starting autotrade cycle...")
     user_id = config.ADMIN_USER_ID
 
+    # Skip autotrade if Binance client is not available
+    try:
+        current_available = bool(getattr(trade, "BINANCE_AVAILABLE", False))
+        # Detect flip from unavailable -> available to notify admin
+        try:
+            rc = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
+            prev = rc.get("autotrade:binance_prev_available")
+        except Exception:
+            rc = None
+            prev = None
+
+        if not current_available:
+            logger.info("Skipping autotrade cycle: Binance client unavailable.")
+            # Record that a cycle was skipped for auditing
+            try:
+                rc = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
+                rc.hincrby("autotrade:stats", "skipped_cycles", 1)
+                rc.lpush(
+                    "autotrade:skipped_events",
+                    json.dumps({"ts": time.time(), "reason": "binance_unavailable"}),
+                )
+                rc.ltrim("autotrade:skipped_events", 0, 999)
+            except Exception:
+                pass
+            return
+        else:
+            # If we became available and prev was false, notify admin about skipped events
+            try:
+                if rc and (prev in (None, "0") or prev == "False"):
+                    skipped = []
+                    try:
+                        raw = rc.lrange("autotrade:skipped_events", 0, 9)
+                        for item in raw:
+                            try:
+                                skipped.append(json.loads(item))
+                            except Exception:
+                                skipped.append({"raw": item})
+                    except Exception:
+                        skipped = []
+
+                    if skipped:
+                        # Build a summary message
+                        text = "Autotrade resumed. Skipped events while Binance was down:\n"
+                        for s in skipped:
+                            t = s.get("ts")
+                            sym = s.get("symbol") or s.get("reason")
+                            text += f"- {sym} at {t}\n"
+                        try:
+                            # best-effort notify admin
+                            if context and getattr(context, "bot", None):
+                                await context.bot.send_message(
+                                    chat_id=config.ADMIN_USER_ID, text=text
+                                )
+                        except Exception:
+                            logger.info(
+                                "Failed to notify admin about skipped autotrade events"
+                            )
+            except Exception:
+                pass
+
+        # Persist current availability for next cycle
+        try:
+            if rc:
+                rc.set("autotrade:binance_prev_available", str(current_available))
+        except Exception:
+            pass
+    except Exception:
+        # If we cannot determine status, be conservative and skip
+        logger.info(
+            "Skipping autotrade cycle: could not determine Binance client availability."
+        )
+        return
+
     if not autotrade_db.get_autotrade_status(user_id):
         logger.info("Autotrade is disabled. Skipping cycle.")
         return
@@ -182,6 +259,20 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE):
                 )
             except trade.TradeError as e:
                 logger.error(f"Error executing autotrade for {symbol}: {e}")
+                # Record skipped autotrade event for later audit/notification
+                try:
+                    rc = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
+                    ev = {
+                        "ts": time.time(),
+                        "symbol": symbol,
+                        "reason": str(e),
+                        "type": "autotrade_buy_failed",
+                    }
+                    rc.lpush("autotrade:skipped_events", json.dumps(ev))
+                    rc.hincrby("autotrade:stats", "skipped_events", 1)
+                    rc.ltrim("autotrade:skipped_events", 0, 999)
+                except Exception:
+                    pass
 
 
 async def mock_autotrade_buy(

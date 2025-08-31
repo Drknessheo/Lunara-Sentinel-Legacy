@@ -71,6 +71,7 @@ import asyncio
 import json
 import logging
 import math
+import os
 import re
 import statistics
 import time
@@ -118,9 +119,32 @@ def get_symbol_info(symbol: str):
         return None
 
 
-# Initialize Binance client
+# Initialize Binance client with defensive handling.
+# BINANCE_AVAILABLE will be True if the client was successfully created.
+BINANCE_AVAILABLE = False
+BINANCE_INIT_ERROR = None
+client = None
 if config.BINANCE_API_KEY and config.BINANCE_SECRET_KEY:
-    client = Client(config.BINANCE_API_KEY, config.BINANCE_SECRET_KEY)
+    try:
+        client = Client(config.BINANCE_API_KEY, config.BINANCE_SECRET_KEY)
+        BINANCE_AVAILABLE = True
+        logger.info("Binance client initialized successfully.")
+    except BinanceAPIException as e:
+        BINANCE_INIT_ERROR = repr(e)
+        # Common case in CI or restricted runners: HTTP 451 restricted location.
+        if "451" in repr(e) or "restricted location" in str(e).lower():
+            logger.warning(
+                "Binance API unavailable due to restricted location (451). Trading disabled."
+            )
+        else:
+            logger.exception("Failed to initialize Binance client; trading disabled.")
+        client = None
+    except Exception as e:
+        BINANCE_INIT_ERROR = repr(e)
+        logger.exception(
+            "Unexpected error initializing Binance client; trading disabled."
+        )
+        client = None
 else:
     logger.warning("Binance API keys not found. Trading functions will be disabled.")
     client = None
@@ -671,6 +695,48 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif mode == "PAPER":
         message += f"💰 **Paper Balance:** ${paper_balance:,.2f} USDT\n"
 
+    # --- Autotrade skipped events summary (if Redis available) ---
+    try:
+        rc = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
+        skipped_count = rc.hget("autotrade:stats", "skipped_events") or rc.hget(
+            "autotrade:stats", "skipped_cycles"
+        )
+        if skipped_count:
+            message += f"\n⚠️ Autotrade skipped events: {skipped_count}\n"
+            # show a short sample of recent skipped events
+            try:
+                raw = rc.lrange("autotrade:skipped_events", 0, 4)
+                if raw:
+                    message += "Recent skipped events:\n"
+                    for it in raw:
+                        try:
+                            ev = json.loads(it)
+                            ts = ev.get("ts")
+                            sym = ev.get("symbol") or ev.get("reason")
+                            message += f" - {sym} at {ts}\n"
+                        except Exception:
+                            message += f" - {it}\n"
+            except Exception:
+                pass
+    except Exception:
+        # Ignore if Redis not configured
+        pass
+
+    # --- Cached Gemini suggestions (if gemini_cache available) ---
+    try:
+        try:
+            from gemini_cache import get_suggestions_for
+
+            cached = get_suggestions_for(config.AI_MONITOR_COINS[:5])
+            if cached:
+                message += "\n🤖 Cached AI suggestions:\n"
+                for s, d in (cached or {}).items():
+                    message += f" - {s}: {d}\n"
+        except Exception:
+            pass
+    except Exception:
+        pass
+
     await update.message.reply_text(message, parse_mode="Markdown")
 
 
@@ -678,6 +744,19 @@ async def import_last_trade_command(update: Update, context: ContextTypes.DEFAUL
     """Handles the /import command to manually add a trade or import from Binance."""
     user_id = update.effective_user.id
     mode, _ = db.get_user_trading_mode_and_balance(user_id)
+
+    # Runtime guard: block import if Binance client unavailable
+    try:
+        if not BINANCE_AVAILABLE:
+            await update.message.reply_text(
+                "Live trading/import is currently disabled because the Binance client is unavailable. Please check /binance_status."
+            )
+            return
+    except Exception:
+        await update.message.reply_text(
+            "Live trading/import is currently unavailable. Please try again later."
+        )
+        return
 
     if mode == "PAPER":
         await update.message.reply_text(
@@ -804,6 +883,19 @@ async def import_last_trade_command(update: Update, context: ContextTypes.DEFAUL
 async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Manually closes an open trade by its ID."""
     user_id = update.effective_user.id
+
+    # Runtime guard: block close if Binance client unavailable for LIVE trades
+    try:
+        if not BINANCE_AVAILABLE:
+            await update.message.reply_text(
+                "Live trading/close is currently disabled because the Binance client is unavailable. Please check /binance_status."
+            )
+            return
+    except Exception:
+        await update.message.reply_text(
+            "Live trading is currently unavailable. Please try again later."
+        )
+        return
 
     if not context.args or not context.args[0].isdigit():
         await update.message.reply_text(
