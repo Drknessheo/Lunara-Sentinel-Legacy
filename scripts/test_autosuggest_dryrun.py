@@ -5,7 +5,19 @@ for p in (PROJECT_ROOT, SRC_DIR):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from autotrade_jobs import autotrade_buy_from_suggestions
+try:
+    # Prefer package import when running as part of the project
+    from src.autotrade_jobs import autotrade_buy_from_suggestions
+except Exception:
+    # Fallback for ad-hoc script execution
+    import importlib
+
+    try:
+        _mod = importlib.import_module('src.autotrade_jobs')
+    except Exception:
+        _mod = importlib.import_module('autotrade_jobs')
+
+    autotrade_buy_from_suggestions = getattr(_mod, 'autotrade_buy_from_suggestions')
 
 async def run_test():
     res = await autotrade_buy_from_suggestions(user_id=12345, symbols=['BTCUSDT','ETHUSDT'], context=None, dry_run=True)

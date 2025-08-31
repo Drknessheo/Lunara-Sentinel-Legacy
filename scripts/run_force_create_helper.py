@@ -5,7 +5,17 @@ for p in (PROJECT_ROOT, SRC_DIR):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from autotrade_jobs import force_create_mock_slips
+try:
+    from src.autotrade_jobs import force_create_mock_slips
+except Exception:
+    import importlib
+
+    try:
+        _mod = importlib.import_module('src.autotrade_jobs')
+    except Exception:
+        _mod = importlib.import_module('autotrade_jobs')
+
+    force_create_mock_slips = getattr(_mod, 'force_create_mock_slips')
 import config
 
 async def run():

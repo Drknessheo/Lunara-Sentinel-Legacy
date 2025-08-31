@@ -18,14 +18,31 @@ SRC = os.path.join(ROOT, 'src')
 sys.path.insert(0, SRC)
 sys.path.insert(0, ROOT)
 
-import slip_manager
+try:
+    import importlib
+
+    try:
+        _mod = importlib.import_module('src.slip_manager')
+    except Exception:
+        _mod = importlib.import_module('slip_manager')
+
+    list_all_slips = getattr(_mod, 'list_all_slips')
+    delete_slip = getattr(_mod, 'delete_slip')
+except Exception:
+    # As a final fallback, try to import by plain module name via importlib
+    try:
+        _mod = importlib.import_module('slip_manager')
+        list_all_slips = getattr(_mod, 'list_all_slips')
+        delete_slip = getattr(_mod, 'delete_slip')
+    except Exception:
+        raise
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--force', action='store_true', help='Delete invalid slips')
 args = parser.parse_args()
 
 invalid = []
-all_slips = slip_manager.list_all_slips()
+all_slips = list_all_slips()
 for s in all_slips:
     data = s.get('data')
     if not isinstance(data, dict) or 'symbol' not in data:
@@ -44,7 +61,7 @@ if args.force:
     if confirm == 'YES':
         for s in invalid:
             print('Deleting', s['key'])
-            slip_manager.delete_slip(s['key'])
+            delete_slip(s['key'])
         print('Deletion complete.')
     else:
         print('Aborted by user.')

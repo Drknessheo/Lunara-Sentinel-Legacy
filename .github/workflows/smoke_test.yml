@@ -9,6 +9,10 @@ on:
 jobs:
   smoke-test:
     runs-on: ubuntu-latest
+    env:
+      BINANCE_ENCRYPTION_KEY: ${{ secrets.BINANCE_ENCRYPTION_KEY }}
+      SMOKE_WEBHOOK_SECRET: ${{ secrets.SMOKE_WEBHOOK_SECRET }}
+      REDIS_URL: redis://localhost:6379/0
     services:
       redis:
         image: redis:7-alpine
@@ -19,6 +23,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -52,14 +57,13 @@ jobs:
         env:
           MODE: success
           PORT: 8081
-          SECRET: ${{ secrets.SMOKE_WEBHOOK_SECRET }}
         run: |
           nohup python -m tests.mock_server > /tmp/mock_server.log 2>&1 &
           echo $! > /tmp/mock_server.pid
 
       - name: Wait for mock server health
         run: |
-          for i in {1..30}; do
+          for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8081/health > /dev/null; then
               echo "Mock server is up"; exit 0
             fi
@@ -70,7 +74,7 @@ jobs:
       - name: Run smoke test
         run: |
           # Run the smoke test against the mock server
-          python scripts/smoke_test.py --base-url http://127.0.0.1:8081 --webhook-url http://127.0.0.1:8081/webhook --webhook-secret "${{ secrets.SMOKE_WEBHOOK_SECRET }}"
+          python scripts/smoke_test.py --base-url http://127.0.0.1:8081 --webhook-url http://127.0.0.1:8081/webhook --webhook-secret "$SMOKE_WEBHOOK_SECRET"
 
       - name: Run retry integration test
         env:

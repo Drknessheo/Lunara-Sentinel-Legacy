@@ -7,7 +7,14 @@ if src not in sys.path:
     sys.path.insert(0, src)
 
 import config, redis
-from autotrade_jobs import force_create_mock_slips
+import importlib
+
+try:
+    _mod = importlib.import_module('src.autotrade_jobs')
+except Exception:
+    _mod = importlib.import_module('autotrade_jobs')
+
+force_create_mock_slips = getattr(_mod, 'force_create_mock_slips')
 
 async def main():
     user_id = getattr(config, 'ADMIN_USER_ID', None)

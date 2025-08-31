@@ -5,7 +5,14 @@ for p in (PROJECT_ROOT, SRC_DIR):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from autotrade_jobs import autotrade_buy_from_suggestions
+import importlib
+
+try:
+    _mod = importlib.import_module('src.autotrade_jobs')
+except Exception:
+    _mod = importlib.import_module('autotrade_jobs')
+
+autotrade_buy_from_suggestions = getattr(_mod, 'autotrade_buy_from_suggestions')
 import config
 
 async def run():

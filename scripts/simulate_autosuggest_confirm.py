@@ -12,7 +12,14 @@ if src_path not in sys.path:
 
 import config
 import redis
-from autotrade_jobs import autotrade_buy_from_suggestions
+import importlib
+
+try:
+    _mod = importlib.import_module('src.autotrade_jobs')
+except Exception:
+    _mod = importlib.import_module('autotrade_jobs')
+
+autotrade_buy_from_suggestions = getattr(_mod, 'autotrade_buy_from_suggestions')
 
 async def main():
     user_id = getattr(config, 'ADMIN_USER_ID', None)
