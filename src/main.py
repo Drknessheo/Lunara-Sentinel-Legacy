@@ -16,6 +16,7 @@ from telegram.error import Conflict as TelegramConflict
 from telegram.constants import ParseMode
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import google.generativeai as genai
+import requests
 
 # Local modules (imported as top-level names so `python src/main.py` works)
 import slip_parser
@@ -33,11 +34,24 @@ from modules import db_access as db
 from datetime import datetime, timezone, timedelta
 import autotrade_jobs
 import autotrade_db
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
 logger = logging.getLogger(__name__)
 
 import asyncio
 import time
+def snip(value, limit=120):
+    """Return a single-line, truncated representation of value (max `limit` chars)."""
+    try:
+        if value is None:
+            return ''
+        s = str(value)
+        s = s.replace('\n', ' ').replace('\r', ' ')
+        if len(s) <= limit:
+            return s
+        return s[:limit-3] + '...'
+    except Exception:
+        return ''
 
 ## Gemini API keys are now managed in autotrade_jobs.py for multi-key support and fallback
 
@@ -1062,7 +1076,39 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     """Displays the user's profile information, including tier and settings."""
     user_id = update.effective_user.id
     user_tier = db.get_user_tier_db(user_id)
+    # Prefer live Redis settings when available (allows remote changes without DB migration)
     settings = db.get_user_effective_settings(user_id)
+    try:
+        if os.getenv('REDIS_URL'):
+            rc = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True)
+            redis_key = f"user:{user_id}:settings"
+            if rc.exists(redis_key):
+                try:
+                    stored = rc.get(redis_key)
+                    # stored may be JSON or a simple key-value mapping; try JSON first
+                    parsed = json.loads(stored) if stored else {}
+                    # Merge parsed values into settings (keys as lower-case snake or exact names)
+                    for k, v in parsed.items():
+                        try:
+                            # Convert numeric strings to numbers when appropriate
+                            if isinstance(v, str) and v.replace('.', '', 1).isdigit():
+                                if '.' in v:
+                                    parsed[k] = float(v)
+                                else:
+                                    parsed[k] = int(v)
+                        except Exception:
+                            pass
+                    # Map lower-case Redis keys to config keys if possible
+                    for k, val in parsed.items():
+                        upper_mapped = k.upper()
+                        if upper_mapped in settings:
+                            settings[upper_mapped] = val
+                        else:
+                            settings[k] = val
+                except Exception:
+                    logger.debug(f"Could not parse Redis settings for user {user_id}")
+    except Exception as e:
+        logger.debug(f"Redis unavailable when loading profile for {user_id}: {e}")
     trading_mode, paper_balance = db.get_user_trading_mode_and_balance(user_id)
 
     username = update.effective_user.username or "(not set)"
@@ -1558,6 +1604,171 @@ def main() -> None:
     application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
     application.add_handler(CommandHandler("redischeck", redis_check_command))
 
+    # --- Promotion webhook retry helpers ---
+    def update_retry_metrics(field: str, delta: int = 1):
+        """Update simple retry metrics in Redis hash `promotion_webhook_stats`.
+
+        Fields used:
+        - pending: number of items currently pending in the retry queue
+        - failed: number of permanently failed items
+        - total_sent: number of successful sends from retry worker/admin
+        - last_failed_ts: ISO timestamp of last permanent failure
+        """
+        try:
+            rc = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True)
+            # Use hincrby for numeric counters
+            if field in ('pending', 'failed', 'total_sent'):
+                rc.hincrby('promotion_webhook_stats', field, delta)
+                # record last failed timestamp when failed increments
+                if field == 'failed' and delta > 0:
+                    rc.hset('promotion_webhook_stats', 'last_failed_ts', datetime.now(timezone.utc).isoformat())
+            else:
+                # set arbitrary value
+                rc.hset('promotion_webhook_stats', field, delta)
+        except Exception as e:
+            logger.debug(f'Failed to update retry metrics: {e}')
+
+    def enqueue_promotion_retry(payload: dict, error: str = None, attempts: int = 0, next_try: float = None) -> None:
+        try:
+            rc = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True)
+            item = {
+                'payload': payload,
+                'attempts': int(attempts or 0),
+                'last_error': str(error) if error else None,
+                'next_try': float(next_try) if next_try else time.time()
+            }
+            rc.rpush('promotion_webhook_retry', json.dumps(item))
+            # Keep queue bounded to avoid OOM
+            rc.ltrim('promotion_webhook_retry', 0, 4999)
+            logger.info('Enqueued promotion webhook retry (attempts=%d) for audit=%s', item['attempts'], payload.get('audit_id'))
+            # update metrics: one more pending item
+            try:
+                update_retry_metrics('pending', 1)
+            except Exception:
+                pass
+        except Exception as e:
+            logger.debug(f'Failed to enqueue promotion retry: {e}')
+
+    def dispatch_promotion_webhook_sync(payload: dict, webhook_url: str | None = None, timeout: int = 3) -> tuple:
+        """Synchronous dispatch used by worker/admin; returns (success, status, body_or_error)"""
+        try:
+            headers = {}
+            secret = getattr(config, 'PROMOTION_WEBHOOK_SECRET', None)
+            if secret:
+                try:
+                    import hmac, hashlib
+                    sig = hmac.new(secret.encode() if isinstance(secret, str) else secret, msg=json.dumps(payload).encode('utf-8'), digestmod=hashlib.sha256).hexdigest()
+                    headers['X-Signature'] = sig
+                except Exception as ex:
+                    logger.debug(f'Failed to compute HMAC signature: {ex}')
+            url = webhook_url or getattr(config, 'PROMOTION_WEBHOOK_URL', None)
+            if not url:
+                return False, None, 'no webhook url configured'
+            resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+            try:
+                body = resp.text
+            except Exception:
+                body = ''
+            return resp.ok, resp.status_code, body
+        except Exception as ex:
+            return False, None, str(ex)
+
+    def send_promotion_webhook(payload: dict, webhook_url: str | None = None, timeout: int = 3) -> tuple:
+        """High-level helper: send webhook, enqueue on failure and return (success, status, body)."""
+        success, status, body = dispatch_promotion_webhook_sync(payload, webhook_url=webhook_url, timeout=timeout)
+        if not success:
+            try:
+                enqueue_promotion_retry(payload, error=body or (f'http:{status}' if status else 'error'), attempts=0)
+            except Exception:
+                logger.debug('Failed to enqueue failed webhook from send_promotion_webhook')
+        return success, status, body
+
+    async def promotion_retry_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Background job that processes `promotion_webhook_retry` queue (runs under job_queue)."""
+        try:
+            rc = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True)
+        except Exception:
+            return
+
+        MAX_PER_RUN = 10
+        MAX_ATTEMPTS = getattr(config, 'PROMOTION_WEBHOOK_MAX_ATTEMPTS', 5)
+
+        for _ in range(MAX_PER_RUN):
+            raw = None
+            try:
+                raw = rc.lpop('promotion_webhook_retry')
+            except Exception:
+                break
+            if not raw:
+                break
+
+            try:
+                item = json.loads(raw)
+            except Exception:
+                # malformed item, skip
+                continue
+
+            payload = item.get('payload') or {}
+            attempts = int(item.get('attempts', 0) or 0)
+            next_try = float(item.get('next_try', 0) or 0)
+            now = time.time()
+            if next_try and next_try > now:
+                # Not ready yet; requeue at tail
+                try:
+                    rc.rpush('promotion_webhook_retry', raw)
+                except Exception:
+                    logger.debug('Failed to requeue item not ready yet')
+                # stop processing to avoid spinning
+                break
+
+            # attempt send
+            success, status, body = dispatch_promotion_webhook_sync(payload)
+            if success:
+                # record success for auditing
+                try:
+                    log_entry = json.dumps({'event': 'promotion_retry_success', 'audit_id': payload.get('audit_id'), 'trade_id': payload.get('trade_id'), 'timestamp': datetime.now(timezone.utc).isoformat()})
+                    rc.lpush('promotion_log', log_entry)
+                    rc.ltrim('promotion_log', 0, 499)
+                except Exception:
+                    pass
+                # update metrics: one less pending, one more total_sent
+                try:
+                    update_retry_metrics('pending', -1)
+                    update_retry_metrics('total_sent', 1)
+                except Exception:
+                    pass
+                continue
+            else:
+                attempts += 1
+                err = body or 'no response'
+                if attempts < MAX_ATTEMPTS:
+                    backoff = min(2 ** attempts, 300)
+                    item['attempts'] = attempts
+                    item['last_error'] = err
+                    item['next_try'] = now + backoff
+                    try:
+                        rc.rpush('promotion_webhook_retry', json.dumps(item))
+                    except Exception:
+                        logger.debug('Failed to requeue failed webhook')
+                else:
+                    # give up; move to failed list for manual inspection
+                    try:
+                        item['attempts'] = attempts
+                        item['last_error'] = err
+                        item['failed_at'] = datetime.now(timezone.utc).isoformat()
+                        rc.lpush('promotion_webhook_failed', json.dumps(item))
+                        rc.ltrim('promotion_webhook_failed', 0, 9999)
+                        # update metrics: pending decreased, failed increased
+                        try:
+                            update_retry_metrics('pending', -1)
+                            update_retry_metrics('failed', 1)
+                        except Exception:
+                            pass
+                    except Exception:
+                        logger.debug('Failed to move item to failed list')
+        return
+
+
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("about", trade.about_command))
@@ -1575,6 +1786,380 @@ def main() -> None:
     application.add_handler(CommandHandler("leaderboard", leaderboard_command))
     application.add_handler(CommandHandler("myprofile", myprofile_command))
     application.add_handler(CommandHandler("settings", settings_command))
+    # Admin-only: preview and promote estimated quantities from audit table
+    async def estimated_quantities_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user_id = update.effective_user.id
+        if user_id != getattr(config, 'ADMIN_USER_ID', None):
+            await update.message.reply_text("Unauthorized.")
+            return
+
+        args = context.args if context and context.args else []
+        page = 0
+        per_page = 5
+        if args:
+            try:
+                page = max(0, int(args[0]) - 1)
+            except Exception:
+                page = 0
+
+        start = page * per_page
+        # Use DB helper to fetch audit rows
+        try:
+            conn = db.get_db_connection()
+            cursor = conn.execute('SELECT id, trade_id, estimated_quantity, source_price, source_trade_size_usdt, confidence, created_at, promoted FROM estimated_quantities_audit ORDER BY created_at DESC LIMIT ? OFFSET ?', (per_page, start))
+            rows = cursor.fetchall()
+        except Exception as e:
+            await update.message.reply_text('Failed to read estimated quantities audit table.')
+            return
+
+        if not rows:
+            await update.message.reply_text('No estimated quantities found.')
+            return
+
+        messages = []
+        keyboard = []
+        for r in rows:
+            promoted = r['promoted'] if 'promoted' in r.keys() else 0
+            messages.append(f"ID:{r['id']} trade:{r['trade_id']} est_qty:{r['estimated_quantity']} conf:{r.get('confidence', 0)} promoted:{promoted} ts:{r['created_at']}")
+            if not promoted:
+                keyboard.append([InlineKeyboardButton(f"Promote {r['id']}", callback_data=f"promote_est:{r['id']}")])
+
+        # Navigation
+        nav = [
+            InlineKeyboardButton("Prev", callback_data=f"est_page:{max(0, page-1)}"),
+            InlineKeyboardButton("Next", callback_data=f"est_page:{page+1}")
+        ]
+
+        reply_markup = InlineKeyboardMarkup(keyboard + [nav]) if keyboard else InlineKeyboardMarkup([nav])
+        await update.message.reply_text('\n'.join(messages), reply_markup=reply_markup)
+
+    async def estimated_quantities_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        query = update.callback_query
+        await query.answer()
+        data = query.data or ''
+        if data.startswith('promote_est:'):
+            try:
+                audit_id = int(data.split(':', 1)[1])
+            except Exception:
+                await query.edit_message_text('Invalid promote id')
+                return
+            # Ask for confirmation
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('Confirm Promote', callback_data=f'confirm_promote:{audit_id}'), InlineKeyboardButton('Cancel', callback_data='cancel')]])
+            await query.edit_message_text(f'Promote estimate id={audit_id}?', reply_markup=keyboard)
+            return
+
+        if data.startswith('confirm_promote:'):
+            try:
+                audit_id = int(data.split(':', 1)[1])
+            except Exception:
+                await query.edit_message_text('Invalid confirmation id')
+                return
+            # Perform promotion: fetch row, check trades.quantity, then write
+            try:
+                conn = db.get_db_connection()
+                cur = conn.cursor()
+                audit_row = cur.execute('SELECT trade_id, estimated_quantity, promoted FROM estimated_quantities_audit WHERE id = ?', (audit_id,)).fetchone()
+                if not audit_row:
+                    await query.edit_message_text('Audit entry not found')
+                    return
+                if audit_row['promoted']:
+                    await query.edit_message_text('Already promoted')
+                    return
+                trade_id = audit_row['trade_id']
+                est_qty = audit_row['estimated_quantity']
+                # Check current quantity
+                trade_row = cur.execute('SELECT quantity FROM trades WHERE id = ?', (trade_id,)).fetchone()
+                if not trade_row:
+                    await query.edit_message_text('Trade not found')
+                    return
+                if trade_row['quantity'] is not None and trade_row['quantity'] > 0:
+                    await query.edit_message_text('Trade already has a quantity, skipping')
+                    return
+                # Perform update
+                cur.execute('UPDATE trades SET quantity = ? WHERE id = ?', (est_qty, trade_id))
+                cur.execute('UPDATE estimated_quantities_audit SET promoted = 1 WHERE id = ?', (audit_id,))
+                conn.commit()
+                # Log promotion to Redis for cross-service auditing
+                try:
+                    rc = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True)
+                    log_entry = json.dumps({
+                        'audit_id': audit_id,
+                        'trade_id': trade_id,
+                        'estimated_quantity': est_qty,
+                        'promoted_by': update.effective_user.username or str(update.effective_user.id),
+                        'confidence': float(audit_row.get('confidence', 0.0)) if isinstance(audit_row.get('confidence', None), (int, float, str)) else 0.0,
+                        'timestamp': datetime.now(timezone.utc).isoformat()
+                    })
+                    rc.lpush('promotion_log', log_entry)
+                    rc.ltrim('promotion_log', 0, 499)
+                except Exception as e:
+                    logger.debug(f'Failed to write promotion log to Redis: {e}')
+
+                # Dispatch webhook asynchronously if enabled
+                try:
+                    webhook_url = getattr(config, 'PROMOTION_WEBHOOK_URL', None)
+                    enable_webhook = getattr(config, 'ENABLE_PROMOTION_WEBHOOK', False)
+                    if enable_webhook and webhook_url:
+                        payload = {
+                            'event': 'promotion',
+                            'audit_id': audit_id,
+                            'trade_id': trade_id,
+                            'estimated_quantity': est_qty,
+                            'confidence': float(audit_row.get('confidence', 0.0)) if isinstance(audit_row.get('confidence', None), (int, float, str)) else 0.0,
+                            'promoted_by': update.effective_user.username or str(update.effective_user.id),
+                            'timestamp': datetime.now(timezone.utc).isoformat()
+                        }
+
+                        async def _dispatch_webhook(p):
+                            try:
+                                loop = asyncio.get_running_loop()
+                                def _post():
+                                    try:
+                                        # Use shared helper to send and enqueue on failure
+                                        return send_promotion_webhook(p, webhook_url=webhook_url, timeout=3)
+                                    except Exception as ex:
+                                        logger.debug(f"Promotion webhook error: {ex}")
+                                        try:
+                                            enqueue_promotion_retry(p, error=str(ex), attempts=0)
+                                        except Exception:
+                                            logger.debug('Failed to enqueue failed webhook after exception')
+                                        return None, str(ex)
+                                await loop.run_in_executor(None, _post)
+                            except Exception as ex:
+                                logger.debug(f"Failed to dispatch promotion webhook: {ex}")
+
+                        # schedule background dispatch without awaiting
+                        try:
+                            asyncio.create_task(_dispatch_webhook(payload))
+                        except Exception:
+                            # Fallback: run without await in a thread — ensure failures are enqueued
+                            try:
+                                import threading
+                                def _thread_post():
+                                    try:
+                                        send_promotion_webhook(payload, webhook_url=webhook_url, timeout=3)
+                                    except Exception as ex:
+                                        try:
+                                            enqueue_promotion_retry(payload, error=str(ex), attempts=0)
+                                        except Exception:
+                                            logger.debug('Failed to enqueue failed webhook from thread after exception')
+                                threading.Thread(target=_thread_post, daemon=True).start()
+                            except Exception as ex:
+                                logger.debug(f"Failed to spawn webhook thread: {ex}")
+                except Exception as e:
+                    logger.debug(f'Webhook dispatch preparation failed: {e}')
+
+                await query.edit_message_text(f'Promoted estimate {audit_id} -> trade {trade_id} (qty={est_qty})')
+            except Exception as e:
+                conn.rollback()
+                await query.edit_message_text(f'Failed to promote: {e}')
+            finally:
+                conn.close()
+            return
+
+        if data == 'cancel':
+            await query.edit_message_text('Cancelled')
+            return
+
+    from telegram.ext import CallbackQueryHandler
+    application.add_handler(CommandHandler('estimated_quantities', estimated_quantities_command))
+    application.add_handler(CallbackQueryHandler(estimated_quantities_callback))
+
+    async def promotion_log_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user_id = update.effective_user.id
+        if user_id != getattr(config, 'ADMIN_USER_ID', None):
+            await update.message.reply_text('Unauthorized.')
+            return
+
+        args = context.args if context and context.args else []
+        page = 0
+        per_page = 10
+        if args:
+            try:
+                page = max(0, int(args[0]) - 1)
+            except Exception:
+                page = 0
+
+        start = page * per_page
+        end = start + per_page - 1
+        try:
+            rc = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True)
+            items = rc.lrange('promotion_log', start, end) or []
+        except Exception:
+            await update.message.reply_text('Redis unavailable or promotion_log missing.')
+            return
+
+        if not items:
+            await update.message.reply_text('No promotions found.')
+            return
+
+        messages = []
+        for it in items:
+            try:
+                e = json.loads(it)
+                messages.append(f"audit:{e.get('audit_id')} trade:{e.get('trade_id')} qty:{e.get('estimated_quantity')} by:{e.get('promoted_by')} ts:{e.get('timestamp')}")
+            except Exception:
+                messages.append(str(it))
+
+        keyboard = []
+        if page > 0:
+            keyboard.append(InlineKeyboardButton('Prev', callback_data=f'promotion_log_page:{page-1}'))
+        keyboard.append(InlineKeyboardButton('Next', callback_data=f'promotion_log_page:{page+1}'))
+
+        await update.message.reply_text('\n'.join(messages), reply_markup=InlineKeyboardMarkup([keyboard]))
+
+    # Register promotion log command
+    application.add_handler(CommandHandler('promotion_log', promotion_log_command))
+
+    async def status_command_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user_id = update.effective_user.id
+        if user_id != getattr(config, 'ADMIN_USER_ID', None):
+            await update.message.reply_text('Unauthorized.')
+            return
+
+        parts = []
+
+        # Redis checks
+        rc = None
+        try:
+            rc = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True)
+            rc.ping()
+            trade_issues_count = rc.llen('trade_issues')
+            promotion_log_count = rc.llen('promotion_log')
+            parts.append(f"Redis: OK — trade_issues={trade_issues_count}, promotion_log={promotion_log_count}")
+        except Exception as e:
+            parts.append(f"Redis: FAILED — {e}")
+
+        # DB checks
+        try:
+            conn = db.get_db_connection()
+            cur = conn.cursor()
+            cur.execute('SELECT COUNT(1) as c FROM trades')
+            trades_count = cur.fetchone()[0]
+            cur.execute('SELECT COUNT(1) as c FROM estimated_quantities_audit')
+            try:
+                audit_count = cur.fetchone()[0]
+            except Exception:
+                audit_count = 0
+            parts.append(f"DB: OK — trades={trades_count}, estimated_audit={audit_count}")
+        except Exception as e:
+            parts.append(f"DB: FAILED — {e}")
+
+        # Webhook config
+        webhook_url = getattr(config, 'PROMOTION_WEBHOOK_URL', None)
+        webhook_enabled = getattr(config, 'ENABLE_PROMOTION_WEBHOOK', False)
+        parts.append(f"Webhook: {'ENABLED' if webhook_enabled and webhook_url else 'DISABLED'}")
+
+        # Recent activity brief: include small snippets for quick glance
+        try:
+            if rc:
+                recent_trade_issues = rc.lrange('trade_issues', 0, 4) or []
+                recent_promotions = rc.lrange('promotion_log', 0, 4) or []
+            else:
+                recent_trade_issues = []
+                recent_promotions = []
+
+            parts.append(f"Recent trade_issues: {len(recent_trade_issues)} (showing up to 5)")
+            for it in recent_trade_issues[:5]:
+                try:
+                    e = json.loads(it)
+                    when = e.get('ts') or e.get('timestamp') or e.get('ts')
+                    parts.append(f" - TID:{snip(e.get('trade_id'))} user:{snip(e.get('user_id'))} sym:{snip(e.get('symbol'))} qty:{snip(e.get('quantity'))} ts:{snip(when)}")
+                except Exception:
+                    parts.append(f" - {snip(str(it))}")
+
+            parts.append(f"Recent promotions: {len(recent_promotions)} (showing up to 5)")
+            for it in recent_promotions[:5]:
+                try:
+                    e = json.loads(it)
+                    parts.append(f" - audit:{snip(e.get('audit_id'))} trade:{snip(e.get('trade_id'))} qty:{snip(e.get('estimated_quantity'))} by:{snip(e.get('promoted_by'))} ts:{snip(e.get('timestamp'))}")
+                except Exception:
+                    parts.append(f" - {snip(str(it))}")
+        except Exception:
+            parts.append("Recent activity: n/a")
+
+        message = "\n".join(parts)
+        await update.message.reply_text(f"Lunessa Status:\n{message}")
+
+    application.add_handler(CommandHandler('status', status_command_bot))
+    # Admin-only: view recent trade issues recorded in Redis by the monitoring job
+    async def trade_issues_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user_id = update.effective_user.id
+        if user_id != getattr(config, 'ADMIN_USER_ID', None):
+            await update.message.reply_text("Unauthorized.")
+            return
+
+        try:
+            rc = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True)
+        except Exception as e:
+            await update.message.reply_text("Redis unavailable.")
+            return
+
+        # Pagination: support ?page=N or /trade_issues N
+        args = context.args if context and context.args else []
+        page = 0
+        per_page = 10
+        if args:
+            try:
+                page = int(args[0]) - 1 if int(args[0]) > 0 else 0
+            except Exception:
+                page = 0
+
+        start = page * per_page
+        end = start + per_page - 1
+        try:
+            items = rc.lrange('trade_issues', start, end) or []
+        except Exception:
+            await update.message.reply_text("Failed to read trade_issues from Redis.")
+            return
+
+        if not items:
+            await update.message.reply_text("No trade issues found.")
+            return
+
+        messages = []
+        for it in items:
+            try:
+                entry = json.loads(it)
+            except Exception:
+                entry = {'raw': it}
+            ts = entry.get('ts') or entry.get('timestamp') or None
+            when = datetime.fromtimestamp(ts).isoformat() if ts else 'unknown'
+            messages.append(f"- trade_id={entry.get('trade_id')} user={entry.get('user_id')} symbol={entry.get('symbol')} qty={entry.get('quantity')} ts={when}")
+
+        text = "\n".join(messages)
+
+        # Inline navigation
+        keyboard = []
+        if page > 0:
+            keyboard.append(InlineKeyboardButton("Prev", callback_data=f"trade_issues:page:{page-1}"))
+        keyboard.append(InlineKeyboardButton("Next", callback_data=f"trade_issues:page:{page+1}"))
+        reply_markup = InlineKeyboardMarkup([keyboard])
+
+        await update.message.reply_text(f"Trade issues (page {page+1}):\n{text}", reply_markup=reply_markup)
+
+    async def trade_issues_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        # Handle inline button callbacks
+        query = update.callback_query
+        await query.answer()
+        data = query.data or ''
+        parts = data.split(":")
+        if len(parts) >= 3 and parts[0] == 'trade_issues' and parts[1] == 'page':
+            try:
+                page = int(parts[2])
+            except Exception:
+                page = 0
+            # Simulate calling the command with page+1
+            mock_update = update
+            mock_context = context
+            # Reuse the command handler logic by calling it with adjusted args
+            mock_context.args = [str(page+1)]
+            await trade_issues_command(mock_update, mock_context)
+
+    application.add_handler(CommandHandler("trade_issues", trade_issues_command))
+    application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^trade_issues:\d+$"), trade_issues_command))
+    from telegram.ext import CallbackQueryHandler
+    application.add_handler(CallbackQueryHandler(trade_issues_callback))
     application.add_handler(CommandHandler("subscribe", subscribe_command))
     # Removed duplicate handler registrations for 'setapi' and 'activate'.
     application.add_handler(CommandHandler("broadcast", broadcast_command))
@@ -1597,6 +2182,121 @@ def main() -> None:
     application.add_handler(CommandHandler("autotrade", autotrade_command))
     application.add_handler(CommandHandler("cleanslips", clean_slips_command))
     application.add_handler(CommandHandler("audit_recent", audit_recent_command))
+
+    # Register background retry job: run every 15 seconds
+    try:
+        job_queue.run_repeating(promotion_retry_job, interval=15, first=15)
+    except Exception:
+        logger.debug('Failed to schedule promotion_retry_job via job_queue')
+
+    # Admin commands for retry queue
+    async def retry_queue_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user_id = update.effective_user.id
+        if user_id != getattr(config, 'ADMIN_USER_ID', None):
+            await update.message.reply_text('Unauthorized.')
+            return
+        try:
+            rc = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True)
+            total = rc.llen('promotion_webhook_retry')
+            sample = rc.lrange('promotion_webhook_retry', 0, 9) or []
+        except Exception:
+            await update.message.reply_text('Redis unavailable.')
+            return
+
+        msgs = [f'Pending: {total} (showing up to 10)']
+        for i, it in enumerate(sample):
+            try:
+                j = json.loads(it)
+                msgs.append(f'{i}: audit={j.get("payload",{}).get("audit_id")} attempts={j.get("attempts")} next_try={j.get("next_try")}')
+            except Exception:
+                msgs.append(f'{i}: {it}')
+        await update.message.reply_text('\n'.join(msgs))
+
+    async def retry_dispatch_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user_id = update.effective_user.id
+        if user_id != getattr(config, 'ADMIN_USER_ID', None):
+            await update.message.reply_text('Unauthorized.')
+            return
+        if not context.args:
+            await update.message.reply_text('Usage: /retry_dispatch <index>')
+            return
+        try:
+            idx = int(context.args[0])
+        except Exception:
+            await update.message.reply_text('Index must be an integer.')
+            return
+        try:
+            rc = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True)
+            item = rc.lindex('promotion_webhook_retry', idx)
+            if not item:
+                await update.message.reply_text('No item at that index.')
+                return
+            obj = json.loads(item)
+            payload = obj.get('payload') or {}
+            success, status, body = dispatch_promotion_webhook_sync(payload)
+            await update.message.reply_text(f'Retry result: success={success} status={status} info={str(body)[:300]}')
+            if success:
+                # remove the item at idx by using a Lua script (atomic) or LSET+LREM trick
+                try:
+                    marker = '__TO_DELETE__' + str(time.time())
+                    rc.lset('promotion_webhook_retry', idx, marker)
+                    rc.lrem('promotion_webhook_retry', 1, marker)
+                except Exception:
+                    logger.debug('Failed to remove retried item from queue')
+        except Exception as e:
+            await update.message.reply_text(f'Error: {e}')
+
+    async def retry_flush_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user_id = update.effective_user.id
+        if user_id != getattr(config, 'ADMIN_USER_ID', None):
+            await update.message.reply_text('Unauthorized.')
+            return
+        # confirm with a second argument 'confirm'
+        if not context.args or context.args[0] != 'confirm':
+            await update.message.reply_text('This will clear the retry queue. To confirm, run: /retry_flush confirm')
+            return
+        try:
+            rc = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True)
+            rc.delete('promotion_webhook_retry')
+            await update.message.reply_text('Retry queue cleared.')
+        except Exception as e:
+            await update.message.reply_text(f'Failed to clear queue: {e}')
+
+    application.add_handler(CommandHandler('retry_queue', retry_queue_command))
+    application.add_handler(CommandHandler('retry_dispatch', retry_dispatch_command))
+    application.add_handler(CommandHandler('retry_flush', retry_flush_command))
+
+    async def retry_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        user_id = update.effective_user.id
+        if user_id != getattr(config, 'ADMIN_USER_ID', None):
+            await update.message.reply_text('Unauthorized.')
+            return
+        try:
+            rc = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True)
+        except Exception:
+            await update.message.reply_text('Redis unavailable.')
+            return
+
+        try:
+            pending = rc.llen('promotion_webhook_retry')
+            failed = rc.llen('promotion_webhook_failed')
+            promotion_log = rc.llen('promotion_log')
+            last_failed = rc.lindex('promotion_webhook_failed', 0)
+            last_failed_ts = None
+            if last_failed:
+                try:
+                    j = json.loads(last_failed)
+                    last_failed_ts = j.get('failed_at') or j.get('payload', {}).get('timestamp')
+                except Exception:
+                    last_failed_ts = str(last_failed)[:120]
+            msg = [f'pending={pending}', f'failed={failed}', f'promotions_logged={promotion_log}']
+            if last_failed_ts:
+                msg.append(f'last_failed={last_failed_ts}')
+            await update.message.reply_text('\n'.join(msg))
+        except Exception as e:
+            await update.message.reply_text(f'Failed to collect stats: {e}')
+
+    application.add_handler(CommandHandler('retry_stats', retry_stats_command))
 
     # Add the slip handler for text messages starting with 'SLIP:'
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)^SLIP:'), slip_handler))

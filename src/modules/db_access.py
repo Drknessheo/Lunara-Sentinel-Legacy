@@ -239,6 +239,45 @@ def get_all_user_ids(cursor):
     rows = cursor.execute("SELECT user_id FROM users").fetchall()
     return [row['user_id'] for row in rows]
 
+
+@db_connection
+def get_estimated_audit_rows(cursor, limit: int = 10, offset: int = 0):
+    """Return rows from estimated_quantities_audit for preview in the bot."""
+    # Ensure table exists
+    cursor.execute('''CREATE TABLE IF NOT EXISTS estimated_quantities_audit (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        trade_id INTEGER NOT NULL,
+        estimated_quantity REAL NOT NULL,
+        source_price REAL,
+        source_trade_size_usdt REAL,
+        confidence REAL,
+        promoted INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+    rows = cursor.execute('SELECT * FROM estimated_quantities_audit ORDER BY created_at DESC LIMIT ? OFFSET ?', (limit, offset)).fetchall()
+    return rows
+
+
+@db_connection
+def promote_estimate_to_trade(cursor, audit_id: int) -> tuple[bool, str]:
+    """Atomically promote an estimate into trades.quantity and mark audit row as promoted.
+    Returns (success, message)."""
+    audit_row = cursor.execute('SELECT * FROM estimated_quantities_audit WHERE id = ?', (audit_id,)).fetchone()
+    if not audit_row:
+        return False, 'Audit row not found'
+    if audit_row['promoted']:
+        return False, 'Already promoted'
+    trade_id = audit_row['trade_id']
+    est_qty = audit_row['estimated_quantity']
+    trade_row = cursor.execute('SELECT quantity FROM trades WHERE id = ?', (trade_id,)).fetchone()
+    if not trade_row:
+        return False, 'Trade not found'
+    if trade_row['quantity'] is not None and trade_row['quantity'] > 0:
+        return False, 'Trade already has quantity'
+    cursor.execute('UPDATE trades SET quantity = ? WHERE id = ?', (est_qty, trade_id))
+    cursor.execute('UPDATE estimated_quantities_audit SET promoted = 1 WHERE id = ?', (audit_id,))
+    return True, f'Promoted estimate {audit_id} -> trade {trade_id}'
+
 @db_connection
 def get_trade_by_id(cursor, trade_id: int, user_id: int):
     """Fetches a trade by its ID and user ID."""

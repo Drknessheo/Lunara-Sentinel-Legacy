@@ -88,3 +88,39 @@ ORCID: [0009-0008-3119-166X](https://orcid.org/0009-0008-3119-166X)
 
 ## 🌠 Vision
 Lunara is your AI-powered crypto trading companion, harmonizing intention, signal, and market flow for disciplined, secure, and scalable trading.
+
+---
+
+## Webhook Retry System
+
+Failed promotion webhooks are automatically enqueued and retried with exponential backoff. This helps ensure promotions are delivered reliably even when receivers are temporarily unavailable.
+
+Admin commands:
+- `/retry_queue` — list pending retries
+- `/retry_dispatch <index>` — manually retry one
+- `/retry_flush confirm` — clear the queue
+- `/retry_stats` — show retry metrics
+
+Redis keys used:
+- `promotion_webhook_retry` — pending items
+- `promotion_webhook_failed` — permanently failed
+- `promotion_log` — successful dispatches
+
+Usage:
+Send `/retry_stats` in any admin-approved thread or DM to get a quick pulse on retry health.
+
+### Redis Metrics (promotion_webhook_stats)
+
+Stored in Redis hash `promotion_webhook_stats`:
+
+- `pending`: Number of items currently in the retry queue
+- `failed`: Total number of failed dispatches moved to failed list
+- `total_sent`: Total successful dispatches (via retry)
+- `last_failed_ts`: ISO timestamp of the most recent failure
+
+View manually:
+```bash
+redis-cli HGETALL promotion_webhook_stats
+```
+
+Or use `/retry_stats` to view in bot output.
