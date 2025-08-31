@@ -112,20 +112,34 @@ def main():
         try:
             from binance.client import Client
 
-            # Create a client without credentials for a lightweight ping; if the environment
-            # provides BINANCE_API_KEY/SECRET, Client() will use them; otherwise this still tests
-            # that the module and Client class are importable and ping is callable.
+            # Create a client without credentials for a lightweight ping.
+            # If the environment provides BINANCE_API_KEY/SECRET, Client() will
+            # use them; otherwise this still tests that the module and Client
+            # class are importable and ping is callable.
             try:
                 c = Client()
-                # ping should be callable; wrap in try/except in case network or auth blocks it.
+                # ping should be callable. Wrap in try/except in case network
+                # or auth blocks it.
                 try:
                     c.ping()
                     note_ok("binance.Client.ping() callable")
                 except Exception as e:
-                    # ping may fail due to network/auth; still treat import as success but report ping error.
+                    # ping may fail due to network/auth. Treat import as
+                    # successful but report ping error.
                     note_err("binance ping failed: " + repr(e))
             except Exception as e:
-                note_err("failed to instantiate binance.Client: " + repr(e))
+                # binance.Client may raise BinanceAPIException with HTTP status 451
+                # when the runner's IP is geo-restricted. Treat this case as a
+                # non-fatal warning so CI runners in restricted locations don't
+                # fail the smoke-test.
+                se = repr(e)
+                if "451" in se or "restricted location" in se.lower():
+                    note_ok(
+                        "binance.Client unavailable due to restricted location"
+                        " (451); skipping Binance checks"
+                    )
+                else:
+                    note_err("failed to instantiate binance.Client: " + se)
         except Exception as e:
             note_err("import binance.client failed: " + repr(e))
 
