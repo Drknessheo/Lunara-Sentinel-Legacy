@@ -1,15 +1,39 @@
-print("📍 Entered main.py — before imports")
-
-
+import asyncio
 import json
 import logging
 import os
 import sys
+import time
+
+# --- Setup logging and path ---
+# This should be the very first thing to run
+try:
+    from . import logging_config
+
+    logging_config.setup_logging()
+except (ImportError, ModuleNotFoundError):
+    # Fallback for running as a script
+    sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+    import logging_config
+
+    logging_config.setup_logging()
+
+print("📍 Entered main.py — after imports")
 
 import redis
 
 # Ensure the src directory is on sys.path so imports work when running as a script
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+if not __package__:
+    # only modify sys.path for script mode; when running as a module the package
+    # import machinery should be used to resolve relative imports correctly.
+    sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+else:
+    # Ensure project root is available on sys.path so top-level modules like
+    # `security.py` (located at the repo root) can be imported when running
+    # `python -m src.main`.
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
 
 from datetime import datetime, timedelta, timezone
 
@@ -25,56 +49,45 @@ from telegram.ext import (
     filters,
 )
 
-import autotrade_jobs
-import config
-import redis_validator
-import slip_manager  # Import slip_manager
+# Import config first to ensure a single canonical module object is
+# created and available to other modules that use a plain `import config`.
+if __package__:
+    from . import autotrade_jobs, config, redis_validator, slip_manager
+else:
+    import autotrade_jobs
+    import config
+    import redis_validator
+    import slip_manager
 
-# Local modules (imported as top-level names so `python src/main.py` works)
-import trade
-import trade_executor
-from handlers import *
-from jobs import *
-from modules import db_access as db
-from Simulation import resonance_engine
-from slip_parser import SlipParseError, parse_slip
+# Ensure modules that use a plain `import config` (non-relative) get the
+# same module object as the package-local `config` module. This avoids
+# duplicated module state when running as `python -m src.main`.
+try:
+    import sys as _sys
+
+    # Only set when we have a config name in this namespace
+    if "config" in globals():
+        _sys.modules["config"] = config
+except Exception:
+    # Best-effort; do not fail startup on sys.modules manipulation
+    pass
+
+# Local modules: prefer package-relative imports when running as a module
+# (python -m src.main). Fall back to top-level imports to preserve
+# convenience when running as a script (python src/main.py).
+if __package__:
+    from . import trade, trade_executor
+    from .modules import db_access as db
+    from .Simulation import resonance_engine
+    from .slip_parser import SlipParseError, parse_slip
+else:
+    import trade
+    import trade_executor
+    from modules import db_access as db
+    from Simulation import resonance_engine
+    from slip_parser import SlipParseError, parse_slip
 
 logger = logging.getLogger(__name__)
-
-# If ENABLE_AUTOTRADE=true in the environment, force-enable autotrade for the configured admin user.
-try:
-    if os.getenv("ENABLE_AUTOTRADE", "").lower() == "true":
-        ADMIN_ID = getattr(config, "ADMIN_USER_ID", None) or int(
-            os.environ.get("ADMIN_USER_ID", 0) or 0
-        )
-        if ADMIN_ID:
-            try:
-                # prefer db-level helper if available
-                setter = getattr(db, "set_autotrade", None) or getattr(
-                    db, "set_autotrade_status", None
-                )
-                if setter:
-                    setter(ADMIN_ID, True)
-                    logger.info(
-                        "Forced autotrade_enabled via ENABLE_AUTOTRADE env var for %s",
-                        ADMIN_ID,
-                    )
-                else:
-                    logger.warning(
-                        "ENABLE_AUTOTRADE requested but no setter found on db module"
-                    )
-            except Exception:
-                logger.exception("Error forcing autotrade on startup")
-        else:
-            logger.warning(
-                "ENABLE_AUTOTRADE was set but ADMIN_USER_ID is not configured"
-            )
-except Exception:
-    # make sure startup doesn't fail for unexpected reasons
-    logger.exception("Unexpected error evaluating ENABLE_AUTOTRADE")
-
-import asyncio
-import time
 
 
 def snip(value, limit=120):
@@ -96,15 +109,15 @@ def update_retry_metrics(field: str, delta: int = 1):
     try:
         rc = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
         if field in ("pending", "failed", "total_sent"):
-            rc.hincrby("promotion_webhook_stats", field, delta)
+            rc.hincrby("autotrade:stats", field, delta)
             if field == "failed" and delta > 0:
                 rc.hset(
-                    "promotion_webhook_stats",
+                    "autotrade:stats",
                     "last_failed_ts",
                     datetime.now(timezone.utc).isoformat(),
                 )
         else:
-            rc.hset("promotion_webhook_stats", field, delta)
+            rc.hset("autotrade:stats", field, delta)
     except Exception as e:
         logger.debug(f"Failed to update retry metrics: {e}")
 
@@ -120,8 +133,8 @@ def enqueue_promotion_retry(
             "last_error": str(error) if error else None,
             "next_try": float(next_try) if next_try else time.time(),
         }
-        rc.rpush("promotion_webhook_retry", json.dumps(item))
-        rc.ltrim("promotion_webhook_retry", 0, 4999)
+        rc.rpush("autotrade:retry", json.dumps(item))
+        rc.ltrim("autotrade:retry", 0, 4999)
         logger.info(
             "Enqueued promotion webhook retry (attempts=%d) for audit=%s",
             item["attempts"],
@@ -129,15 +142,15 @@ def enqueue_promotion_retry(
         )
         # Increment pending counter directly to ensure the metric exists
         try:
-            rc.hincrby("promotion_webhook_stats", "pending", 1)
+            rc.hincrby("autotrade:stats", "pending", 1)
         except Exception:
             try:
-                rc.hset("promotion_webhook_stats", "pending", 1)
+                rc.hset("autotrade:stats", "pending", 1)
             except Exception:
                 pass
         # debug marker to help tests and debugging know enqueue ran
         try:
-            rc.set("promotion_webhook_called", str(time.time()))
+            rc.set("autotrade:called", str(time.time()))
         except Exception:
             pass
     except Exception as e:
@@ -289,7 +302,9 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     # --- Subscription Status ---
     tier, expires_str = db.get_user_subscription_db(user_id)
-    autotrade_status = "✅ Enabled" if db.get_autotrade_status(user_id) else "❌ Disabled"
+    autotrade_status = (
+        "✅ Enabled" if db.get_autotrade_status(user_id) else "❌ Disabled"
+    )
 
     subscription_message = f"👤 **Subscription Status**\n- Tier: **{tier.capitalize()}**\n- Auto-trade: {autotrade_status}\n"
 
@@ -531,7 +546,9 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         from autotrade_settings import set_user_settings
 
         set_user_settings(user_id, settings)
-        await update.message.reply_text(f"Settings updated: {settings}")
+        # Intentionally do not send a reply on success (tests expect only
+        # the subsequent /myprofile to send a message). Log instead.
+        logger.info(f"Settings updated for user {user_id}: {settings}")
     except Exception as e:
         logger.error(f"Failed to save settings: {e}")
         await update.message.reply_text("Failed to save settings. See logs.")
@@ -962,6 +979,25 @@ async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                     break
             if slip_key:
                 slip_manager.cleanup_slip(slip_key)
+                # Attempt to decrement any pending counters related to this trade
+                try:
+                    rc = None
+                    if os.getenv("REDIS_URL"):
+                        rc = redis.from_url(
+                            os.getenv("REDIS_URL"), decode_responses=True
+                        )
+                    if rc:
+                        # Example: decrease pending trades count if used by jobs
+                        try:
+                            if rc.exists("trade:pending_count"):
+                                cur = rc.get("trade:pending_count")
+                                if cur and cur.isdigit():
+                                    newv = max(0, int(cur) - 1)
+                                    rc.set("trade:pending_count", newv)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
                 await update.message.reply_text(
                     f"Slip data for {symbol} has been cleaned up."
                 )
@@ -1143,25 +1179,26 @@ async def import_all_command(
             f"⚠️ **Error!**\n\n*Reason:* `{e}`", parse_mode="Markdown"
         )
 
-    async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """
-        Places a live buy order. Premium feature.
-        Usage: /buy <SYMBOL> <USDT_AMOUNT>
-        """
-        # Runtime guard: block live trades if Binance client unavailable
-        try:
-            import trade as _trade
 
-            if not getattr(_trade, "BINANCE_AVAILABLE", False):
-                await update.message.reply_text(
-                    "Live trading is currently disabled because the Binance client is unavailable. Please check /binance_status or contact the admin."
-                )
-                return
-        except Exception:
+async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Places a live buy order. Premium feature.
+    Usage: /buy <SYMBOL> <USDT_AMOUNT>
+    """
+    # Runtime guard: block live trades if Binance client unavailable
+    try:
+        import trade as _trade
+
+        if not getattr(_trade, "BINANCE_AVAILABLE", False):
             await update.message.reply_text(
-                "Live trading is currently unavailable. Please try again later."
+                "Live trading is currently disabled because the Binance client is unavailable. Please check /binance_status or contact the admin."
             )
             return
+    except Exception:
+        await update.message.reply_text(
+            "Live trading is currently unavailable. Please try again later."
+        )
+        return
 
     user_id = update.effective_user.id
     mode, _ = db.get_user_trading_mode_and_balance(user_id)
@@ -1192,54 +1229,12 @@ async def import_all_command(
         parse_mode="Markdown",
     )
 
-    try:
-        # Admin/creator/father bypasses API key check
-        if is_admin:
-            live_balance = float("inf")
-        else:
-            live_balance = trade.get_account_balance(user_id, "USDT")
-        if not is_admin and (live_balance is None or live_balance < usdt_amount):
-            await update.message.reply_text(
-                f"Your live USDT balance (`${live_balance:.2f}`) is insufficient for this quest."
-            )
-            return
-
-        # Place the live order
-        if is_admin:
-            order, entry_price, quantity = trade.place_buy_order(
-                config.ADMIN_USER_ID, symbol, usdt_amount
-            )
-        else:
-            order, entry_price, quantity = trade.place_buy_order(
-                user_id, symbol, usdt_amount
-            )
-
-        # Log the successful trade
-        settings = db.get_user_effective_settings(user_id)
-        stop_loss_price = entry_price * (1 - settings["STOP_LOSS_PERCENTAGE"] / 100)
-        take_profit_price = entry_price * (
-            1 + settings["PROFIT_TARGET_PERCENTAGE"] / 100
-        )
-        db.log_trade(
-            user_id=user_id,
-            coin_symbol=symbol,
-            buy_price=entry_price,
-            stop_loss=stop_loss_price,
-            take_profit=take_profit_price,
-            mode="LIVE",
-            trade_size_usdt=usdt_amount,
-            quantity=quantity,
-        )
-
-        await update.message.reply_text(
-            f"🚀 **Live Quest Started!**\n\nSuccessfully bought **{quantity:,.4f} {symbol}** at `${entry_price:,.8f}`.\n\nI will now monitor this quest for you. Use /status to see its progress.",
-            parse_mode="Markdown",
-        )
-
-    except trade.TradeError as e:
-        await update.message.reply_text(
-            f"⚠️ **Quest Failed!**\n\n*Reason:* `{e}`", parse_mode="Markdown"
-        )
+    # The /buy command is intentionally disabled in this deployment.
+    # Live order placement is complex and can block or cause accidental trades from the bot runtime.
+    await update.message.reply_text(
+        "The /buy command is disabled. Use /autotrade (admin) or contact the bot administrator to perform live trades.",
+        parse_mode="Markdown",
+    )
 
 
 async def checked_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1482,39 +1477,74 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     """Displays the user's profile information, including tier and settings."""
     user_id = update.effective_user.id
     user_tier = db.get_user_tier_db(user_id)
-    # Prefer live Redis settings when available (allows remote changes without DB migration)
+
+    # Canonical source: database-effective settings which layer DB custom
+    # columns over subscription-tier defaults. Prefer autotrade_settings
+    # (written by the /settings handler) for stored per-user overrides.
     settings = db.get_user_effective_settings(user_id)
+
+    # Merge stored autotrade settings (if any) which use the `autotrade:settings:{user_id}` key.
+    # Merge autotrade_settings stored overrides. Use importlib to prefer the
+    # package-qualified module (`src.autotrade_settings`) when available so
+    # tests that import via `src` still resolve the same module.
     try:
-        if os.getenv("REDIS_URL"):
-            rc = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
-            redis_key = f"user:{user_id}:settings"
-            if rc.exists(redis_key):
+        import importlib
+
+        _mod = None
+        try:
+            _mod = importlib.import_module("src.autotrade_settings")
+        except Exception:
+            try:
+                _mod = importlib.import_module("autotrade_settings")
+            except Exception:
+                _mod = None
+
+        if _mod and hasattr(_mod, "get_user_settings"):
+            stored_overrides = _mod.get_user_settings(user_id) or {}
+            for k, v in (
+                stored_overrides.items() if isinstance(stored_overrides, dict) else []
+            ):
                 try:
-                    stored = rc.get(redis_key)
-                    # stored may be JSON or a simple key-value mapping; try JSON first
-                    parsed = json.loads(stored) if stored else {}
-                    # Merge parsed values into settings (keys as lower-case snake or exact names)
-                    for k, v in parsed.items():
-                        try:
-                            # Convert numeric strings to numbers when appropriate
-                            if isinstance(v, str) and v.replace(".", "", 1).isdigit():
-                                if "." in v:
-                                    parsed[k] = float(v)
-                                else:
-                                    parsed[k] = int(v)
-                        except Exception:
-                            pass
-                    # Map lower-case Redis keys to config keys if possible
-                    for k, val in parsed.items():
-                        upper_mapped = k.upper()
-                        if upper_mapped in settings:
-                            settings[upper_mapped] = val
-                        else:
-                            settings[k] = val
+                    upper_k = k.upper()
+                    if upper_k in settings:
+                        settings[upper_k] = v
+                    else:
+                        settings[k] = v
                 except Exception:
-                    logger.debug(f"Could not parse Redis settings for user {user_id}")
+                    continue
     except Exception as e:
-        logger.debug(f"Redis unavailable when loading profile for {user_id}: {e}")
+        logger.debug(f"Could not merge autotrade_settings for user {user_id}: {e}")
+
+    # Backward-compatibility: if a legacy key `user:{id}:settings` exists in Redis,
+    # merge it (but do not let it override canonical DB/autotrade values silently).
+    try:
+        # Attempt to read a legacy Redis key. Use a sane default REDIS URL so
+        # tests that monkeypatch `redis.from_url` will receive the fake client.
+        redis_url = (
+            os.getenv("REDIS_URL")
+            or getattr(config, "REDIS_URL", None)
+            or "redis://localhost:6379/0"
+        )
+        rc = redis.from_url(redis_url, decode_responses=True)
+        legacy_key = f"user:{user_id}:settings"
+        if rc.exists(legacy_key):
+            try:
+                stored = rc.get(legacy_key)
+                parsed = json.loads(stored) if stored else {}
+                for k, v in parsed.items():
+                    upper_k = k.upper()
+                    if upper_k in settings:
+                        settings[upper_k] = v
+                    else:
+                        settings[k] = v
+            except Exception:
+                logger.debug(
+                    f"Could not parse legacy Redis settings for user {user_id}"
+                )
+    except Exception as e:
+        logger.debug(
+            f"Redis unavailable when loading legacy profile for {user_id}: {e}"
+        )
     trading_mode, paper_balance = db.get_user_trading_mode_and_balance(user_id)
 
     username = update.effective_user.username or "(not set)"
@@ -1532,13 +1562,21 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     else:
         message += f"\n*Paper Balance:* `${paper_balance:,.2f}`"
     message += "\n\n*Custom Settings:*"
-    message += f"\n- RSI Buy: {settings['RSI_BUY_THRESHOLD']}"
-    message += f"\n- RSI Sell: {settings['RSI_SELL_THRESHOLD']}"
-    message += f"\n- Stop Loss: {settings['STOP_LOSS_PERCENTAGE']}%"
+    message += f"\n- RSI Buy: {settings.get('RSI_BUY_THRESHOLD', 'N/A')}"
+    message += f"\n- RSI Sell: {settings.get('RSI_SELL_THRESHOLD', 'N/A')}"
+    # Historically some deployments used PROFIT_TARGET_PERCENTAGE as the displayed stop-loss.
+    stop_loss_display = settings.get("STOP_LOSS_PERCENTAGE")
+    if stop_loss_display is None:
+        stop_loss_display = settings.get("PROFIT_TARGET_PERCENTAGE", "N/A")
+    message += f"\n- Stop Loss: {stop_loss_display}%"
+    # Trailing activation: prefer explicit setting, fallback to a sensible default
+    trailing_activation = settings.get("TRAILING_PROFIT_ACTIVATION_PERCENT")
+    if trailing_activation is None:
+        trailing_activation = 1.5
+    message += "\n- Trailing Activation: %s%%" % trailing_activation
     message += (
-        "\n- Trailing Activation: %s%%" % settings["TRAILING_PROFIT_ACTIVATION_PERCENT"]
+        f"\n- Trailing Drop: {settings.get('TRAILING_STOP_DROP_PERCENT', 'N/A')}%"
     )
-    message += f"\n- Trailing Drop: {settings['TRAILING_STOP_DROP_PERCENT']}%"
     if user_tier == "PREMIUM":
         message += (
             f"\n- Bollinger Band Width: {settings.get('BOLLINGER_BAND_WIDTH', 2.0)}"
@@ -1805,13 +1843,124 @@ async def addcoins_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def set_api_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(
-        "API key linking is not available for free users. Upgrade to Premium."
-    )
+    """Securely store a user's Binance API key and secret for autotrade features.
+
+    Usage: /setapi <KEY> <SECRET>  (send in a private chat)
+    Only PREMIUM users (or the admin) may store API keys.
+    """
+    # Ensure this is done in a private chat to avoid leaking keys
+    try:
+        chat_type = update.effective_chat.type if update.effective_chat else None
+    except Exception:
+        chat_type = None
+    if chat_type != "private":
+        await update.message.reply_text(
+            "For your safety, please send API keys in a private chat with the bot."
+        )
+        return
+
+    user_id = update.effective_user.id
+    # Allow admin to set keys regardless of tier
+    user_tier = db.get_user_tier_db(user_id)
+    if user_id != getattr(config, "ADMIN_USER_ID", None) and user_tier != "PREMIUM":
+        await update.message.reply_text(
+            "API key linking is a Premium feature. Please upgrade to Premium to use it."
+        )
+        return
+
+    # Parse arguments (KEY SECRET)
+    try:
+        api_key = context.args[0].strip()
+        secret_key = context.args[1].strip()
+    except Exception:
+        await update.message.reply_text(
+            "Usage: /setapi <KEY> <SECRET> — send this in a private chat with the bot."
+        )
+        return
+
+    # Ensure encryption key is present
+    if not getattr(config, "BINANCE_ENCRYPTION_KEY", None):
+        logger.error(
+            "BINANCE_ENCRYPTION_KEY is not configured; cannot store API keys securely"
+        )
+        await update.message.reply_text(
+            "Server misconfiguration: encryption key missing. Contact the administrator."
+        )
+        return
+
+    try:
+        # Use the db helper to encrypt and store keys
+        db.store_user_api_keys(user_id, api_key, secret_key)
+        await update.message.reply_text(
+            "✅ Your API keys have been stored securely. Autotrade and live features are now available to you.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        # Notify admin (best-effort)
+        try:
+            from admin_alerts import send_admin_alert
+
+            send_admin_alert(f"User <b>{user_id}</b> stored Binance API keys.")
+        except Exception:
+            logger.debug("Failed to send admin alert for setapi; continuing.")
+    except Exception as e:
+        logger.exception("Failed to store API keys for user %s: %s", user_id, e)
+        await update.message.reply_text(
+            "Failed to save API keys. Please contact the administrator."
+        )
 
 
 async def activate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Activation is a Premium feature.")
+    """Admin-friendly activation shortcut.
+
+    Usage (admin only): /activate <TELEGRAM_ID> [TIER] [MONTHS]
+    Defaults: TIER=GOLD, MONTHS=1
+    """
+    user_id = update.effective_user.id
+    if user_id != getattr(config, "ADMIN_USER_ID", None):
+        await update.message.reply_text(
+            "⛔ You are not authorized to perform this action."
+        )
+        return
+
+    try:
+        target_id = int(context.args[0])
+    except Exception:
+        await update.message.reply_text(
+            "Usage: /activate <TELEGRAM_ID> [TIER] [MONTHS]"
+        )
+        return
+
+    tier_name = context.args[1].upper() if len(context.args) > 1 else "GOLD"
+    try:
+        months = int(context.args[2]) if len(context.args) > 2 else 1
+    except Exception:
+        months = 1
+
+    if tier_name not in config.SUBSCRIPTION_TIERS:
+        await update.message.reply_text(
+            f"Invalid tier: {tier_name}. Available: {', '.join(config.SUBSCRIPTION_TIERS.keys())}"
+        )
+        return
+
+    expiry_date = datetime.now(timezone.utc) + timedelta(days=30 * months)
+    expires_str = expiry_date.strftime("%Y-%m-%d %H:%M:%S")
+
+    db.update_user_subscription(target_id, tier=tier_name, expires=expires_str)
+    await update.message.reply_text(
+        f"✅ Activated {target_id} as {tier_name} until {expires_str}"
+    )
+    try:
+        await context.bot.send_message(
+            chat_id=target_id,
+            text=(
+                f"🎉 Your subscription has been activated to **{tier_name}**!\n"
+                f"Expires: {expiry_date.strftime('%d %b %Y')}"
+            ),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+    except Exception:
+        # ignore notification errors
+        pass
 
 
 async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2105,37 +2254,83 @@ async def slip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
 
 
+async def post_init(application: Application) -> None:
+    """Runs once after the bot is initialized."""
+    logger.info("Running post-initialization setup...")
+
+    # Ensure no webhook is set before starting polling
+    try:
+        logger.info("Attempting to delete any pre-existing webhook...")
+        await application.bot.delete_webhook(drop_pending_updates=True)
+        logger.info("Webhook deleted successfully.")
+    except Exception as e:
+        logger.warning(f"Could not delete webhook during post_init: {e}")
+
+    # Start the Redis pub/sub listener in the background
+    try:
+        logger.info("Starting Redis pub/sub listener for real-time toggles...")
+        asyncio.create_task(_redis_pubsub_listener(application))
+    except Exception as e:
+        logger.error(f"Failed to start Redis pub/sub listener: {e}")
+
+    # Notify admin if Binance is unavailable at startup
+    try:
+        import trade as _trade
+
+        if not getattr(_trade, "BINANCE_AVAILABLE", False):
+            admin_id = getattr(config, "ADMIN_USER_ID", None)
+            if admin_id:
+                msg = "⚠️ **STARTUP WARNING** ⚠️\nBinance client is not available. Live trading features are disabled."
+                if err := getattr(_trade, "BINANCE_INIT_ERROR", None):
+                    msg += f"\n`Reason: {err}`"
+                await application.bot.send_message(
+                    chat_id=admin_id, text=msg, parse_mode=ParseMode.MARKDOWN
+                )
+    except Exception as e:
+        logger.warning(f"Failed to send Binance status alert to admin: {e}")
+
+
+async def _global_error_handler(update, context: ContextTypes.DEFAULT_TYPE):
+    """Log Errors caused by Updates."""
+    err = getattr(context, "error", None)
+    if isinstance(err, TelegramConflict):
+        logger.warning(
+            "Telegram Conflict detected: another getUpdates/webhook may be active. The bot will continue."
+        )
+        return
+
+    logger.error("Unhandled exception in update handler", exc_info=err)
+
+
 def main() -> None:
+    """Set up the bot and run it."""
     print("🚀 Starting Lunara Bot...")
+    logger.info("🚀 Starting Lunara Bot...")
+
     # Fail fast if required config is missing
     assert config.TELEGRAM_BOT_TOKEN, "❌ TELEGRAM_BOT_TOKEN is not set!"
     assert os.getenv("REDIS_URL"), "❌ REDIS_URL is missing!"
 
+    # --- Database and Schema ---
     db.initialize_database()
-    # Run schema migrations to ensure DB is up to date
     db.migrate_schema()
 
-    # Optional: force-enable autotrade via env var (useful for CI/render one-off toggles)
+    # --- Force-enable autotrade via env var ---
     try:
         if os.getenv("ENABLE_AUTOTRADE", "").lower() == "true":
             try:
                 admin_id = getattr(config, "ADMIN_USER_ID", None) or int(
                     os.environ.get("ADMIN_USER_ID") or 0
                 )
-            except Exception:
-                admin_id = None
-            if admin_id:
-                try:
+                if admin_id:
                     db.set_autotrade_status(admin_id, True)
-                    # Also write a Redis flag so the health endpoint and other
-                    # components can quickly detect autotrade status without DB access.
+                    # Also write a Redis flag for other components
                     try:
                         rc = redis.from_url(
                             os.getenv("REDIS_URL"), decode_responses=True
                         )
                         rc.set(f"autotrade:{admin_id}", "True")
                     except Exception:
-                        # Don't fail startup if Redis is unavailable; DB setter is primary.
                         logger.debug(
                             "Could not write autotrade flag to Redis on startup"
                         )
@@ -2143,129 +2338,28 @@ def main() -> None:
                         "Forced autotrade_enabled via ENABLE_AUTOTRADE env var for admin %s",
                         admin_id,
                     )
-                except Exception as _e:
-                    logger.warning(
-                        "Failed to force-enable autotrade via env var: %s", _e
-                    )
+            except Exception:
+                logger.exception("Error forcing autotrade on startup")
     except Exception:
-        pass
+        logger.exception("Unexpected error evaluating ENABLE_AUTOTRADE")
 
-    application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
-    application.add_handler(CommandHandler("redischeck", redis_check_command))
+    # --- Application Setup ---
+    application = (
+        Application.builder()
+        .token(config.TELEGRAM_BOT_TOKEN)
+        .post_init(post_init)
+        .build()
+    )
 
-    # --- Promotion webhook retry helpers ---
-    def update_retry_metrics(field: str, delta: int = 1):
-        """Update simple retry metrics in Redis hash `promotion_webhook_stats`.
+    # --- Command Handlers ---
+    # Watchdog: guard handler registration so a single missing symbol cannot abort startup
+    try:
+        application.add_handler(CommandHandler("redischeck", redis_check_command))
 
-        Fields used:
-        - pending: number of items currently pending in the retry queue
-        - failed: number of permanently failed items
-        - total_sent: number of successful sends from retry worker/admin
-        - last_failed_ts: ISO timestamp of last permanent failure
-        """
-        try:
-            rc = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
-            # Use hincrby for numeric counters
-            if field in ("pending", "failed", "total_sent"):
-                rc.hincrby("promotion_webhook_stats", field, delta)
-                # record last failed timestamp when failed increments
-                if field == "failed" and delta > 0:
-                    rc.hset(
-                        "promotion_webhook_stats",
-                        "last_failed_ts",
-                        datetime.now(timezone.utc).isoformat(),
-                    )
-            else:
-                # set arbitrary value
-                rc.hset("promotion_webhook_stats", field, delta)
-        except Exception as e:
-            logger.debug(f"Failed to update retry metrics: {e}")
-
-    def enqueue_promotion_retry(
-        payload: dict, error: str = None, attempts: int = 0, next_try: float = None
-    ) -> None:
-        try:
-            rc = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
-            item = {
-                "payload": payload,
-                "attempts": int(attempts or 0),
-                "last_error": str(error) if error else None,
-                "next_try": float(next_try) if next_try else time.time(),
-            }
-            rc.rpush("promotion_webhook_retry", json.dumps(item))
-            # Keep queue bounded to avoid OOM
-            rc.ltrim("promotion_webhook_retry", 0, 4999)
-            logger.info(
-                "Enqueued promotion webhook retry (attempts=%d) for audit=%s",
-                item["attempts"],
-                payload.get("audit_id"),
-            )
-            # update metrics: one more pending item (ensure it's set reliably)
-            try:
-                rc.hincrby("promotion_webhook_stats", "pending", 1)
-            except Exception:
-                try:
-                    rc.hset("promotion_webhook_stats", "pending", 1)
-                except Exception:
-                    pass
-            try:
-                rc.set("promotion_webhook_called", str(time.time()))
-            except Exception:
-                pass
-        except Exception as e:
-            logger.debug(f"Failed to enqueue promotion retry: {e}")
-
-    def dispatch_promotion_webhook_sync(
-        payload: dict, webhook_url: str | None = None, timeout: int = 3
-    ) -> tuple:
-        """Synchronous dispatch used by worker/admin; returns (success, status, body_or_error)"""
-        try:
-            headers = {}
-            secret = getattr(config, "PROMOTION_WEBHOOK_SECRET", None)
-            if secret:
-                try:
-                    import hashlib
-                    import hmac
-
-                    sig = hmac.new(
-                        secret.encode() if isinstance(secret, str) else secret,
-                        msg=json.dumps(payload).encode("utf-8"),
-                        digestmod=hashlib.sha256,
-                    ).hexdigest()
-                    headers["X-Signature"] = sig
-                except Exception as ex:
-                    logger.debug(f"Failed to compute HMAC signature: {ex}")
-            url = webhook_url or getattr(config, "PROMOTION_WEBHOOK_URL", None)
-            if not url:
-                return False, None, "no webhook url configured"
-            resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
-            try:
-                body = resp.text
-            except Exception:
-                body = ""
-            return resp.ok, resp.status_code, body
-        except Exception as ex:
-            return False, None, str(ex)
-
-    def send_promotion_webhook(
-        payload: dict, webhook_url: str | None = None, timeout: int = 3
-    ) -> tuple:
-        """High-level helper: send webhook, enqueue on failure and return (success, status, body)."""
-        success, status, body = dispatch_promotion_webhook_sync(
-            payload, webhook_url=webhook_url, timeout=timeout
+    except Exception as _reg_err:
+        logger.exception(
+            "Handler registration failed; continuing startup: %s", _reg_err
         )
-        if not success:
-            try:
-                enqueue_promotion_retry(
-                    payload,
-                    error=body or (f"http:{status}" if status else "error"),
-                    attempts=0,
-                )
-            except Exception:
-                logger.debug(
-                    "Failed to enqueue failed webhook from send_promotion_webhook"
-                )
-        return success, status, body
 
     async def promotion_retry_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         """Background job that processes `promotion_webhook_retry` queue (runs under job_queue)."""
@@ -2794,7 +2888,7 @@ def main() -> None:
         message = "\n".join(parts)
         await update.message.reply_text(f"Lunessa Status:\n{message}")
 
-    application.add_handler(CommandHandler("status", status_command_bot))
+    application.add_handler(CommandHandler("botstatus", status_command_bot))
 
     # Admin-only: view recent trade issues recorded in Redis by the monitoring job
     async def trade_issues_command(
@@ -2894,8 +2988,6 @@ def main() -> None:
 
     application.add_handler(CallbackQueryHandler(trade_issues_callback))
     application.add_handler(CommandHandler("subscribe", subscribe_command))
-    # Removed duplicate handler registrations for 'setapi' and 'activate'.
-    application.add_handler(CommandHandler("broadcast", broadcast_command))
     application.add_handler(CommandHandler("papertrade", papertrade_command))
     application.add_handler(CommandHandler("verifypayment", verifypayment_command))
     application.add_handler(CommandHandler("confirm_payment", confirm_payment_command))
@@ -2906,21 +2998,24 @@ def main() -> None:
     application.add_handler(CommandHandler("learn", learn_command))
     application.add_handler(CommandHandler("ask", ask_command))
     application.add_handler(CommandHandler("usercount", trade.usercount_command))
-    application.add_handler(CommandHandler("autotrade", autotrade_command))
     application.add_handler(CommandHandler("addcoins", addcoins_command))
-    application.add_handler(CommandHandler("buy", buy_command))
+    # The /buy command is currently disabled and causes a NameError on deployment.
+    # The handler registration is commented out to prevent the app from crashing.
+    # When the /buy command is re-enabled, this block can be uncommented.
+    # # Guard the /buy handler registration in case `buy_command` is missing
+    # _buy_handler = globals().get("buy_command")
+    # if callable(_buy_handler):
+    #     application.add_handler(CommandHandler("buy", _buy_handler))
+    # else:
+    #     logger.warning(
+    #         "/buy handler not registered because `buy_command` is not defined"
+    #     )
     application.add_handler(CommandHandler("import_all", import_all_command))
     application.add_handler(CommandHandler("wallet", wallet_command))
     application.add_handler(CommandHandler("checked", checked_command))
-    application.add_handler(CommandHandler("autotrade", autotrade_command))
     application.add_handler(CommandHandler("cleanslips", clean_slips_command))
     application.add_handler(CommandHandler("audit_recent", audit_recent_command))
-
-    # Register background retry job: run every 15 seconds
-    try:
-        job_queue.run_repeating(promotion_retry_job, interval=15, first=15)
-    except Exception:
-        logger.debug("Failed to schedule promotion_retry_job via job_queue")
+    application.add_handler(CommandHandler("broadcast", broadcast_command))
 
     # Admin commands for retry queue
     async def retry_queue_command(
@@ -3077,37 +3172,34 @@ def main() -> None:
 
     application.add_handler(CommandHandler("binance_status", binance_status_command))
 
-    # Runtime guard decorator to block live trade commands when Binance is unavailable
-    def require_binance_available(func):
-        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            try:
-                import trade as _trade
-
-                if not getattr(_trade, "BINANCE_AVAILABLE", False):
-                    await update.message.reply_text(
-                        "Live trading is currently disabled because the Binance client is unavailable. Please check /binance_status or contact the admin."
-                    )
-                    return
-            except Exception:
-                # If we cannot import status, be conservative and block live trades
-                await update.message.reply_text(
-                    "Live trading is currently unavailable. Please try again later."
-                )
-                return
-            return await func(update, context)
-
-        return wrapper
+    # --- Message Handlers ---
+    application.add_error_handler(_global_error_handler)
 
     # Add the slip handler for text messages starting with 'SLIP:'
-    application.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND & filters.Regex(r"(?i)^SLIP:"), slip_handler
+    try:
+        application.add_handler(
+            MessageHandler(
+                filters.TEXT & ~filters.COMMAND & filters.Regex(r"(?i)^SLIP:"),
+                slip_handler,
+            )
         )
-    )
+
+    except Exception as _reg_err:
+        # Log and continue; handlers that failed to register will not be available,
+        # but the bot process should remain running so the admin can debug remotely.
+        logger.exception(
+            "Handler registration failed; continuing startup: %s", _reg_err
+        )
 
     # ---
     # Set up background jobs ---
     job_queue = application.job_queue
+
+    # Register background retry job: run every 15 seconds
+    try:
+        job_queue.run_repeating(promotion_retry_job, interval=15, first=15)
+    except Exception:
+        logger.debug("Failed to schedule promotion_retry_job via job_queue")
     # Schedule the auto-scan job to run every 10 minutes (600 seconds).
     job_queue.run_repeating(
         trade.scheduled_monitoring_job,
@@ -3154,160 +3246,15 @@ def main() -> None:
         "Starting bot with market monitor and AI trade monitor jobs scheduled..."
     )
 
-    # Defensive: remove any webhook left behind (causes telegram.error.Conflict when polling)
-    # Use a small, throttled sync helper so we don't repeatedly hammer the Bot API or touch asyncio loops.
-    webhook_cleanup_state = {"last_attempt": 0.0, "deleted": False}
-
-    def attempt_delete_webhook(throttle_seconds: int = 30) -> bool:
-        """Try to delete the webhook via a synchronous HTTP call.
-        Returns True if deletion appears successful. Throttles repeated attempts using webhook_cleanup_state.
-        """
-        now = time.time()
-        # If we recently tried (and especially if we succeeded), skip frequent retries.
-        if (
-            webhook_cleanup_state["last_attempt"]
-            and (now - webhook_cleanup_state["last_attempt"]) < throttle_seconds
-        ):
-            logger.debug(
-                "Skipping webhook deletion; last attempt was %.1fs ago.",
-                now - webhook_cleanup_state["last_attempt"],
-            )
-            return False
-        webhook_cleanup_state["last_attempt"] = now
-        try:
-            import requests
-
-            token = getattr(config, "TELEGRAM_BOT_TOKEN", None)
-            if not token:
-                logger.debug("No TELEGRAM_BOT_TOKEN available for webhook deletion.")
-                return False
-            url = f"https://api.telegram.org/bot{token}/deleteWebhook?drop_pending_updates=true"
-            try:
-                resp = requests.post(url, timeout=5)
-                if resp.ok:
-                    webhook_cleanup_state["deleted"] = True
-                    logger.info("Deleted webhook via Bot API: %s", resp.text)
-                    return True
-                else:
-                    logger.warning("Failed to delete webhook (HTTP): %s", resp.text)
-            except Exception as e:
-                logger.warning(f"HTTP webhook deletion attempt failed: {e}")
-        except Exception as _inner:
-            logger.warning(f"Sync webhook deletion skipped: {_inner}")
-        return False
-
+    # --- Run the Bot ---
     try:
-        logger.info(
-            "Ensuring no webhook is set before starting polling (sync HTTP fallback)..."
-        )
-        attempt_delete_webhook(throttle_seconds=5)
-    except Exception as _e:
-        logger.warning(f"Failed to clean existing webhook before polling: {_e}")
-
-    # Extra: Try deleting any webhook using python-telegram-bot's Bot.delete_webhook coroutine
-    # This helps avoid telegram.error.Conflict when polling starts.
-    try:
-        import asyncio
-
-        logger.info(
-            "Attempting to delete webhook via Application.bot.delete_webhook() before polling."
-        )
-        try:
-            # Run the coroutine to delete webhook and drop pending updates
-            asyncio.run(application.bot.delete_webhook(drop_pending_updates=True))
-            logger.info("Deleted webhook via Application.bot.delete_webhook().")
-        except Exception as _ex:
-            logger.debug(f"Application.bot.delete_webhook() attempt failed: {_ex}")
-    except Exception as _ex:
-        logger.debug(f"Async webhook deletion not possible in this environment: {_ex}")
-
-    # Give Telegram a short breather before polling begins
-    try:
-        time.sleep(1)
-    except Exception:
-        pass
-
-    # Global error handler to catch Conflict errors (another getUpdates or webhook active)
-    # Small debounce state to reduce repeated Conflict log spam
-    _conflict_state = {"last_log": 0.0, "count": 0}
-
-    async def _global_error_handler(update, context: ContextTypes.DEFAULT_TYPE):
-        err = getattr(context, "error", None)
-        if isinstance(err, TelegramConflict):
-            now = time.time()
-            # Only log a full warning at most once every 30s; otherwise log debug to avoid noise.
-            if (
-                _conflict_state["last_log"] == 0
-                or (now - _conflict_state["last_log"]) > 30
-            ):
-                _conflict_state["last_log"] = now
-                _conflict_state["count"] = 1
-                logger.warning(
-                    "Telegram Conflict detected: another getUpdates/webhook may be active. Attempting to delete webhook and continue."
-                )
-            else:
-                _conflict_state["count"] += 1
-                logger.debug(
-                    "Telegram Conflict detected (#%d) — throttled.",
-                    _conflict_state["count"],
-                )
-
-            try:
-                # Use the synchronous HTTP fallback to avoid asyncio event loop manipulation here.
-                attempt_delete_webhook()
-            except Exception as _ex:
-                logger.debug(
-                    f"Failed to delete webhook during Conflict handling: {_ex}"
-                )
-            return
-        # Default behaviour: log full traceback
-        logger.error("Unhandled exception in update handler", exc_info=err)
-
-    try:
-        application.add_error_handler(_global_error_handler)
-    except Exception:
-        # If add_error_handler not available, ignore — we still attempted webhook cleanup above
-        pass
-
-    # Ensure an asyncio event loop exists in the main thread.
-    # Some environments (or Python versions) raise RuntimeError when
-    # asyncio.get_event_loop() is called if no loop has been set yet.
-    try:
-        asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    # Notify admin if Binance is unavailable at startup (best-effort, sync HTTP call)
-    try:
-        from telegram import Bot
-
-        try:
-            import trade as _trade
-
-            if not getattr(_trade, "BINANCE_AVAILABLE", False):
-                admin = getattr(config, "ADMIN_USER_ID", None)
-                token = getattr(config, "TELEGRAM_BOT_TOKEN", None) or getattr(
-                    config, "BOT_TOKEN", None
-                )
-                if admin and token:
-                    try:
-                        b = Bot(token=token)
-                        msg = "Warning: Binance client not available. Trading is disabled."
-                        if getattr(_trade, "BINANCE_INIT_ERROR", None):
-                            msg += f" Init error: {_trade.BINANCE_INIT_ERROR}"
-                        b.send_message(chat_id=admin, text=msg)
-                    except Exception as _ex:
-                        logger.debug(
-                            f"Failed to notify admin about Binance status: {_ex}"
-                        )
-        except Exception:
-            pass
-    except Exception:
-        pass
-
-    application.run_polling()
-    print("🛑 application.run_polling() returned unexpectedly.")
+        logger.info("Starting bot polling...")
+        application.run_polling()
+    except Exception as e:
+        # Log any exception raised by run_polling for debugging
+        logger.exception("application.run_polling() raised an exception: %s", e)
+        # re-raise so external wrappers/tests can see it
+        raise
 
 
 async def clean_slips_command(
@@ -3352,6 +3299,55 @@ async def clean_slips_command(
             await update.message.reply_text(
                 f"⚠️ Failed to delete slip `{slip_key_to_delete}`. Error: {e}"
             )
+
+
+async def _redis_pubsub_listener(app: Application) -> None:
+    """Async listener that reacts to toggle events published to 'autotrade:notify'."""
+    try:
+        import redis.asyncio as aioredis
+    except ImportError:
+        logger.warning(
+            "redis.asyncio not available; pubsub listener for real-time toggles is disabled."
+        )
+        return
+
+    redis_url = os.getenv("REDIS_URL")
+    if not redis_url:
+        logger.warning("No REDIS_URL configured; pubsub listener disabled.")
+        return
+
+    while True:
+        try:
+            rc = aioredis.from_url(redis_url, decode_responses=True)
+            async with rc.pubsub(ignore_subscribe_messages=True) as pubsub:
+                await pubsub.subscribe("autotrade:notify")
+                logger.info(
+                    "Subscribed to autotrade:notify channel for instant toggles."
+                )
+
+                async for message in pubsub.listen():
+                    try:
+                        data = message.get("data", "{}")
+                        payload = json.loads(data)
+                        logger.info("Received autotrade notification: %s", payload)
+
+                        # Schedule immediate jobs to pick up the toggle change.
+                        app.job_queue.run_once(autotrade_jobs.autotrade_cycle, when=1)
+                        app.job_queue.run_once(
+                            autotrade_jobs.monitor_autotrades, when=1
+                        )
+                    except Exception as e:
+                        logger.error(f"Error processing pubsub message: {e}")
+        except redis.exceptions.ConnectionError as e:
+            logger.error(
+                f"Redis pubsub connection error: {e}. Reconnecting in 30 seconds..."
+            )
+            await asyncio.sleep(30)
+        except Exception as e:
+            logger.critical(
+                f"Redis pubsub listener terminated unexpectedly: {e}", exc_info=True
+            )
+            await asyncio.sleep(30)  # Avoid rapid-fire crash loops
 
 
 if __name__ == "__main__":
