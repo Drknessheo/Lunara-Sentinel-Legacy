@@ -8,15 +8,11 @@ import time
 # --- Setup logging and path ---
 # This should be the very first thing to run
 try:
-    from . import logging_config
-
-    logging_config.setup_logging()
-except (ImportError, ModuleNotFoundError):
-    # Fallback for running as a script
-    sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+    # Works if running with "python -m src.main"
+    from src import logging_config
+except ImportError:
+    # Works if running "python main.py"
     import logging_config
-
-    logging_config.setup_logging()
 
 print("📍 Entered main.py — after imports")
 
@@ -302,9 +298,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     # --- Subscription Status ---
     tier, expires_str = db.get_user_subscription_db(user_id)
-    autotrade_status = (
-        "✅ Enabled" if db.get_autotrade_status(user_id) else "❌ Disabled"
-    )
+    autotrade_status = "✅ Enabled" if db.get_autotrade_status(user_id) else "❌ Disabled"
 
     subscription_message = f"👤 **Subscription Status**\n- Tier: **{tier.capitalize()}**\n- Auto-trade: {autotrade_status}\n"
 

@@ -9,6 +9,8 @@ services:
     plan: free
     # Health check to ensure the service is alive
     healthCheckPath: /healthz
+    buildCommand: ""
+    startCommand: python -m src.main
     envVars:
       - key: PYTHON_VERSION
         value: 3.11
@@ -16,9 +18,6 @@ services:
         value: false # Ensures debug mode is off in production
       # Link to a secret group in Render to store your API keys and tokens
       - fromGroup: lunara-secrets
-
-    # Command to run before every deployment
-    preDeployCommand: "python scripts/predeploy.py"
 
   # The Redis instance for caching and job queues
   - type: redis
