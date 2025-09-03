@@ -7,12 +7,19 @@ import time
 
 # --- Setup logging and path ---
 # This should be the very first thing to run
-try:
-    # Works if running with "python -m src.main"
-    from src import logging_config
-except ImportError:
-    # Works if running "python main.py"
-    import logging_config
+# --- Setup logging and path ---
+# This should be the very first thing to run
+import os
+import sys
+
+# Add the project root to the python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# Now that the path is set up, we can import our modules
+from src import logging_config
+logging_config.setup_logging()
 
 print("📍 Entered main.py — after imports")
 
