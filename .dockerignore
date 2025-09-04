@@ -3,8 +3,7 @@
 .gitignore
 
 # Docker
-.dockerignore
-Dockerfile
+# (Do not ignore the Dockerfile; some CI/build systems expect it in the context)
 render.yaml
 
 # Python virtual environments

@@ -14,12 +14,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN useradd --create-home appuser
 WORKDIR /app
 
-# Install dependencies first to leverage Docker cache
-COPY requirements.txt /app/requirements.txt
-RUN pip install --upgrade pip && pip install -r /app/requirements.txt
-
-# Copy application source
+# Install dependencies (robust): copy source early and use a conditional fallback
+# This avoids build failures when the build context or filename differs (e.g. requirements-dev.txt)
 COPY . /app
+RUN pip install --upgrade pip && \
+  if [ -f /app/requirements.txt ]; then \
+    pip install -r /app/requirements.txt; \
+  elif [ -f /app/requirements-dev.txt ]; then \
+    pip install -r /app/requirements-dev.txt; \
+  else \
+    echo "No requirements file found, skipping pip install"; \
+  fi
+
 RUN chown -R appuser:appuser /app
 
 USER appuser

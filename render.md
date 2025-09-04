@@ -8,9 +8,9 @@ Required environment variables (set in the Render service):
 - SLIP_ENCRYPTION_KEY: base64 Fernet key for slip encryption
 - WEBHOOK_HMAC_SECRET: secret for incoming webhook verification
 
-Service setup recommendations:
+ Service setup recommendations:
 
-- Create a Web Service for the bot with the build command `pip install -r requirements.txt` and start command `python -m src.main`.
+ - Create a Web Service for the bot with the start command `python -m src.main`. The Render build will use the repo `Dockerfile` if present; ensure `WEBHOOK_HMAC_SECRET` and `SLIP_ENCRYPTION_KEY` are set in the service environment.
 - If you need Redis, use Render's managed Redis addon and point `REDIS_URL` to it.
 - Configure health checks to hit `/health` on the app (if you add an HTTP health endpoint).
 
