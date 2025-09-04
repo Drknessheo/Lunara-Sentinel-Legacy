@@ -1,29 +1,15 @@
-import os
-import sys
-
-# --- Setup logging and path ---
-# This should be the very first thing to run
-# Ensure the src directory is on sys.path so imports work when running as a script
-if not __package__:
-    # only modify sys.path for script mode; when running as a module the package
-    # import machinery should be used to resolve relative imports correctly.
-    sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
-else:
-    # Ensure project root is available on sys.path so top-level modules like
-    # `security.py` (located at the repo root) can be imported when running
-    # `python -m src.main`.
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
-
-import logging_config
-
-logging_config.setup_logging()
-
 import asyncio
 import json
 import logging
+import os
+import sys
 import time
+
+# --- Setup logging and path ---
+# This should be the very first thing to run
+import logging_config
+
+logging_config.setup_logging()
 
 print("📍 Entered main.py — after imports")
 
@@ -912,6 +898,9 @@ async def hubspeedy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler for the /balance command. Calls the trade module."""
     await trade.balance_command(update, context)
+
+
+
 
 
 async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2220,6 +2209,21 @@ async def activate_user_command(update: Update, context: ContextTypes.DEFAULT_TY
     logger.warning("activate_user_command is not yet implemented.")
 
 
+async def set_api_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Securely store a user's Binance API key and secret for autotrade features.
+
+    Usage: /setapi <KEY> <SECRET>  (send in a private chat)
+    Only PREMIUM users (or the admin) may store API keys.
+
+    **IMPORTANT:** For the bot to access your Binance account, you must whitelist our server IPs in your Binance API settings.
+    Please add the following IPs to your Binance API key configuration:
+    13.228.225.19
+    18.142.128.26
+    54.254.162.138
+    """
+    logger.warning("setapi_command is not yet implemented.")
+
+
 async def slip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handles incoming trade slips sent as text messages.
@@ -3007,7 +3011,7 @@ def main() -> None:
     application.add_handler(CommandHandler("ask", ask_command))
     application.add_handler(CommandHandler("usercount", trade.usercount_command))
     application.add_handler(CommandHandler("addcoins", addcoins_command))
-    application.add_handler(CommandHandler("buy", buy_command))
+    application.add_handler(CommandHandler("buy", trade.buy_command))
     application.add_handler(CommandHandler("import_all", import_all_command))
     application.add_handler(CommandHandler("wallet", wallet_command))
     application.add_handler(CommandHandler("checked", checked_command))

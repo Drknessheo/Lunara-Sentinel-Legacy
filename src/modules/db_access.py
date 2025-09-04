@@ -21,7 +21,6 @@ except Exception:
     try:
         if __package__:
             from ... import security
-
             decrypt_data = getattr(security, "decrypt_data", None)
     except Exception:
         # Give up; set decrypt_data to None and allow callers to handle absence.

@@ -117,9 +117,7 @@ DB_NAME = "lunessa.db"
 # --- Security ---
 WEBHOOK_HMAC_SECRET = os.getenv("WEBHOOK_HMAC_SECRET")
 if not WEBHOOK_HMAC_SECRET:
-    print(
-        "Warning: WEBHOOK_HMAC_SECRET is not set. Webhook verification will be skipped."
-    )
+    print("Warning: WEBHOOK_HMAC_SECRET is not set. Webhook verification will be skipped.")
 SLIP_ENCRYPTION_KEY = os.getenv("SLIP_ENCRYPTION_KEY")
 
 # --- User Management ---
@@ -224,8 +222,6 @@ SUBSCRIPTION_TIERS = {
 # This will be crucial for the rest of the code to adapt to the tier system.
 # Default settings used as a simple canonical fallback (tests may patch this).
 DEFAULT_SETTINGS = {"PROFIT_TARGET_PERCENTAGE": 1.0}
-
-
 def get_active_settings(tier: str):
     """
     Returns the settings dictionary for the given subscription tier.

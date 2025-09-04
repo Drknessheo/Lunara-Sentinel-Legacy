@@ -29,11 +29,7 @@ def get_redis_client():
     try:
         import redis
 
-        redis_url = (
-            os.getenv("REDIS_URL")
-            or getattr(config, "REDIS_URL", None)
-            or "redis://localhost:6379/0"
-        )
+        redis_url = os.getenv("REDIS_URL") or getattr(config, "REDIS_URL", None) or "redis://localhost:6379/0"
 
         # Sanitize the Redis URL to remove duplicate schemes
         if redis_url.count("rediss://") > 1:
@@ -45,9 +41,7 @@ def get_redis_client():
             client = redis.from_url(redis_url, ssl_cert_reqs="none")
             return client
         except Exception as e:
-            logger.warning(
-                f"Redis connection failed: {e}. Falling back to in-memory cache."
-            )
+            logger.warning(f"Redis connection failed: {e}. Falling back to in-memory cache.")
             return None
     except Exception:
         return None
@@ -124,18 +118,14 @@ def create_and_store_slip(symbol, side=None, amount=None, price=None):
         if client:
             client.set(f"trade:{trade_id}:data", encrypted_slip)
             client.set(f"trade:{trade_id}:status", fernet.encrypt(b"open"))
-            client.set(
-                f"trade:{trade_id}:quantity", fernet.encrypt(str(amount).encode())
-            )
+            client.set(f"trade:{trade_id}:quantity", fernet.encrypt(str(amount).encode()))
         else:
             raise Exception("no redis")
     except Exception as e:
         logger.error(f"Redis failed, storing slip in fallback cache: {e}")
         fallback_cache[f"trade:{trade_id}:data"] = encrypted_slip
         fallback_cache[f"trade:{trade_id}:status"] = fernet.encrypt(b"open")
-        fallback_cache[f"trade:{trade_id}:quantity"] = fernet.encrypt(
-            str(amount).encode()
-        )
+        fallback_cache[f"trade:{trade_id}:quantity"] = fernet.encrypt(str(amount).encode())
 
     return trade_id
 
@@ -173,9 +163,7 @@ def get_and_decrypt_slip(encrypted_slip_key):
         encrypted_slip_value = fallback_cache.get(lookup_key, None)
 
     if not encrypted_slip_value:
-        logger.warning(
-            f"No value found in Redis or fallback cache for slip key: {encrypted_slip_key}"
-        )
+        logger.warning(f"No value found in Redis or fallback cache for slip key: {encrypted_slip_key}")
         return None
 
     try:
@@ -220,11 +208,7 @@ def delete_slip(encrypted_slip_key):
             else:
                 raise Exception("no redis")
         except Exception:
-            keys_to_remove = [
-                kk
-                for kk in list(fallback_cache.keys())
-                if kk.startswith(f"trade:{trade_id}")
-            ]
+            keys_to_remove = [kk for kk in list(fallback_cache.keys()) if kk.startswith(f"trade:{trade_id}")]
             for kk in keys_to_remove:
                 fallback_cache.pop(kk, None)
         return
@@ -305,8 +289,6 @@ def clear_all_slips():
         for key in client.scan_iter("trade:*"):
             client.delete(key)
     else:
-        keys_to_remove = [
-            k for k in list(fallback_cache.keys()) if k.startswith("trade:")
-        ]
+        keys_to_remove = [k for k in list(fallback_cache.keys()) if k.startswith("trade:")]
         for k in keys_to_remove:
             fallback_cache.pop(k, None)

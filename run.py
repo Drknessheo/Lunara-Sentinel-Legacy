@@ -1,8 +1,6 @@
 import os
 import subprocess
-
 from dotenv import load_dotenv
-
 
 def main():
     """
@@ -16,9 +14,7 @@ def main():
     missing_vars = [var for var in required_vars if not os.getenv(var)]
 
     if missing_vars:
-        print(
-            f"Error: Missing required environment variables: {', '.join(missing_vars)}"
-        )
+        print(f"Error: Missing required environment variables: {', '.join(missing_vars)}")
         print("Please create a .env file based on .env.example and fill in the values.")
         return
 
@@ -33,7 +29,6 @@ def main():
         print("\nBot stopped by user.")
     except subprocess.CalledProcessError as e:
         print(f"Bot process failed with exit code {e.returncode}")
-
 
 if __name__ == "__main__":
     main()
