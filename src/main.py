@@ -7,18 +7,7 @@ import time
 
 # --- Setup logging and path ---
 # This should be the very first thing to run
-# --- Setup logging and path ---
-# This should be the very first thing to run
-import os
-import sys
-
-# Add the project root to the python path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-# Now that the path is set up, we can import our modules
-from src import logging_config
+import logging_config
 logging_config.setup_logging()
 
 print("📍 Entered main.py — after imports")
@@ -910,9 +899,7 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await trade.balance_command(update, context)
 
 
-async def import_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handler for the /import command. Calls the trade module."""
-    await trade.import_last_trade_command(update, context)
+
 
 
 async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2189,7 +2176,19 @@ Unlock the full power of LunessaSignals with our premium tiers!
 ---
 
 To upgrade, use the `/pay` command to see payment methods. After payment, the admin will verify it and activate your new tier.
-    """
+
+**How to activate Premium:**
+1.  Use the `/pay` command to get payment instructions.
+2.  After making the payment, contact the admin with your payment details.
+3.  The admin will verify the payment and activate your premium subscription.
+
+**Binance API IP Whitelisting:**
+For live trading, you need to whitelist our server IPs in your Binance API settings.
+Please add the following IPs to your Binance API key configuration:
+`13.228.225.19`
+`18.142.128.26`
+`54.254.162.138`
+"""
     await update.message.reply_text(subscribe_info, parse_mode=ParseMode.MARKDOWN)
 
 
@@ -2209,7 +2208,18 @@ async def activate_user_command(update: Update, context: ContextTypes.DEFAULT_TY
     logger.warning("activate_user_command is not yet implemented.")
 
 
-async def setapi_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def set_api_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Securely store a user's Binance API key and secret for autotrade features.
+
+    Usage: /setapi <KEY> <SECRET>  (send in a private chat)
+    Only PREMIUM users (or the admin) may store API keys.
+
+    **IMPORTANT:** For the bot to access your Binance account, you must whitelist our server IPs in your Binance API settings.
+    Please add the following IPs to your Binance API key configuration:
+    13.228.225.19
+    18.142.128.26
+    54.254.162.138
+    """
     logger.warning("setapi_command is not yet implemented.")
 
 
@@ -3000,17 +3010,7 @@ def main() -> None:
     application.add_handler(CommandHandler("ask", ask_command))
     application.add_handler(CommandHandler("usercount", trade.usercount_command))
     application.add_handler(CommandHandler("addcoins", addcoins_command))
-    # The /buy command is currently disabled and causes a NameError on deployment.
-    # The handler registration is commented out to prevent the app from crashing.
-    # When the /buy command is re-enabled, this block can be uncommented.
-    # # Guard the /buy handler registration in case `buy_command` is missing
-    # _buy_handler = globals().get("buy_command")
-    # if callable(_buy_handler):
-    #     application.add_handler(CommandHandler("buy", _buy_handler))
-    # else:
-    #     logger.warning(
-    #         "/buy handler not registered because `buy_command` is not defined"
-    #     )
+        application.add_handler(CommandHandler("buy", trade.buy_command))
     application.add_handler(CommandHandler("import_all", import_all_command))
     application.add_handler(CommandHandler("wallet", wallet_command))
     application.add_handler(CommandHandler("checked", checked_command))

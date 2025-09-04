@@ -1,37 +1,30 @@
 FROM python:3.11-slim
 
+# Keep output unbuffered and avoid pip cache
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PYTHONPATH=/app:/app/src
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  build-essential \
+  curl \
+  gcc \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN useradd --create-home appuser
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Install dependencies first to leverage Docker cache
+COPY requirements.txt /app/requirements.txt
+RUN pip install --upgrade pip && pip install -r /app/requirements.txt
 
-RUN pip install --no-cache-dir \
-  python-telegram-bot \
-  google-generativeai \
-  python-dotenv \
-  python-binance==1.0.15 \
-  numpy \
-  matplotlib \
-  cryptography \
-  filelock \
-  pandas \
-  pyarrow \
-  apscheduler \
-  Flask \
-  redis
+# Copy application source
+COPY . /app
+RUN chown -R appuser:appuser /app
 
-# Install supervisor to run multiple processes reliably
-RUN apt-get update && apt-get install -y supervisor && rm -rf /var/lib/apt/lists/*
-
-COPY . src/
-
-ENV PYTHONUNBUFFERED=1
-ENV LOG_LEVEL=INFO
+USER appuser
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=15m --timeout=5s --start-period=10s \
-  CMD curl -f http://localhost:8080/healthz || exit 1
-
-# Use supervisord to manage the health server and bot processes
-COPY supervisord.conf /etc/supervisord.conf
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+# Default to running the package entrypoint
+CMD ["python", "-m", "src.main"]

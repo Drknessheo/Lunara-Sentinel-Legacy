@@ -8,13 +8,36 @@ Replace with the full implementation when available.
 """
 
 # typing.Optional was unused; remove to satisfy linter
-
-
-class TradeError(Exception):
-    """Generic trade-related error used by tests."""
-
-
+import asyncio
+import json
 import logging
+import math
+import os
+import re
+import statistics
+import time
+from datetime import datetime, timezone
+from functools import lru_cache
+
+import numpy as np
+import pandas as pd
+import redis
+from binance.client import Client
+from binance.exceptions import BinanceAPIException
+from telegram import Update
+from telegram.ext import ContextTypes
+
+import config
+import config as _config
+
+from . import gemini_cacher
+from .indicators import calc_atr, calculate_rsi
+from .memory import log_trade_outcome
+from .modules import db_access as db
+
+# adaptive_strategy_job implemented locally below; avoid importing the external symbol to prevent redefinition
+from .risk_management import get_atr_stop, should_pause_trading, update_daily_pl
+from .trade_guard import TradeValidator
 
 logger = logging.getLogger("tradebot")
 logger.setLevel(logging.INFO)
@@ -25,12 +48,9 @@ if not logger.hasHandlers():
     logger.addHandler(handler)
 
 
-# --- TradeError Exception ---
-# Duplicate TradeError removed; top-level TradeError is the canonical exception for tests.
+class TradeError(Exception):
+    """Generic trade-related error used by tests."""
 
-
-from telegram import Update
-from telegram.ext import ContextTypes
 
 HELP_MESSAGE = """🤖 *Lunessa Shai'ra Gork* (@Srskat_bot) – Automated Crypto Trading by LunessaSignals
 
@@ -67,40 +87,6 @@ async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(ABOUT_MESSAGE, parse_mode="Markdown")
 
 
-import asyncio
-import json
-import logging
-import math
-import os
-import re
-import statistics
-import time
-from datetime import datetime, timezone
-from functools import lru_cache
-
-import numpy as np
-import pandas as pd
-import redis
-from binance.client import Client
-from binance.exceptions import BinanceAPIException
-from telegram import Update
-from telegram.ext import ContextTypes
-
-import config
-import config as _config
-import gemini_cacher
-from indicators import calc_atr, calculate_rsi
-from memory import log_trade_outcome
-from modules import db_access as db
-
-# adaptive_strategy_job implemented locally below; avoid importing the external symbol to prevent redefinition
-from risk_management import get_atr_stop, should_pause_trading, update_daily_pl
-from trade_guard import TradeValidator
-
-# --- Market Crash/Big Buyer Shield ---
-# Now imported from risk_management.py
-
-
 @lru_cache(maxsize=128)
 def get_symbol_info(symbol: str):
     """
@@ -108,6 +94,7 @@ def get_symbol_info(symbol: str):
     Returns a dictionary with symbol information or None on error.
     """
     try:
+        ensure_binance_client()
         if not client:
             return None
         return client.get_symbol_info(symbol)
@@ -119,35 +106,67 @@ def get_symbol_info(symbol: str):
         return None
 
 
-# Initialize Binance client with defensive handling.
-# BINANCE_AVAILABLE will be True if the client was successfully created.
+# Lazy Binance client initialization.
+# Avoid performing network calls at import time that can raise in restricted CI/hosts.
+# Use ensure_binance_client() to attempt creation; it will set BINANCE_AVAILABLE=False
+# and populate BINANCE_INIT_ERROR on any error but will not raise.
 BINANCE_AVAILABLE = False
 BINANCE_INIT_ERROR = None
 client = None
-if config.BINANCE_API_KEY and config.BINANCE_SECRET_KEY:
+
+
+def ensure_binance_client() -> None:
+    """Ensure the module-level `client` is created.
+
+    This function is safe to call repeatedly. It will not raise on Binance errors
+    (including HTTP 451 restricted-location). Instead it sets `BINANCE_AVAILABLE`
+    and `BINANCE_INIT_ERROR` accordingly so callers can behave conservatively.
+    """
+    global client, BINANCE_AVAILABLE, BINANCE_INIT_ERROR
+    # Fast path
+    if client is not None and BINANCE_AVAILABLE:
+        return
+
+    # Try to create client if keys are present
+    if not (
+        getattr(config, "BINANCE_API_KEY", None)
+        and getattr(config, "BINANCE_SECRET_KEY", None)
+    ):
+        BINANCE_AVAILABLE = False
+        BINANCE_INIT_ERROR = "API keys not configured"
+        client = None
+        logger.warning(
+            "Binance API keys not found. Trading functions will be disabled."
+        )
+        return
+
     try:
         client = Client(config.BINANCE_API_KEY, config.BINANCE_SECRET_KEY)
         BINANCE_AVAILABLE = True
+        BINANCE_INIT_ERROR = None
         logger.info("Binance client initialized successfully.")
     except BinanceAPIException as e:
+        BINANCE_AVAILABLE = False
         BINANCE_INIT_ERROR = repr(e)
+        client = None
         # Common case in CI or restricted runners: HTTP 451 restricted location.
-        if "451" in repr(e) or "restricted location" in str(e).lower():
+        if (
+            getattr(e, "status_code", None) == 451
+            or "451" in repr(e)
+            or "restricted location" in str(e).lower()
+        ):
             logger.warning(
                 "Binance API unavailable due to restricted location (451). Trading disabled."
             )
         else:
             logger.exception("Failed to initialize Binance client; trading disabled.")
-        client = None
     except Exception as e:
+        BINANCE_AVAILABLE = False
         BINANCE_INIT_ERROR = repr(e)
+        client = None
         logger.exception(
             "Unexpected error initializing Binance client; trading disabled."
         )
-        client = None
-else:
-    logger.warning("Binance API keys not found. Trading functions will be disabled.")
-    client = None
 
 
 def get_user_client(user_id: int):
@@ -189,6 +208,7 @@ def is_weekend():
 def get_current_price(symbol: str):
     """Fetches the current price of a given symbol from Binance."""
     try:
+        ensure_binance_client()
         ticker = client.get_symbol_ticker(symbol=symbol)
         return float(ticker["price"])
     except BinanceAPIException as e:
@@ -206,6 +226,7 @@ def get_monitored_coins():
 def get_rsi(symbol="BTCUSDT", interval=Client.KLINE_INTERVAL_1HOUR, period=14):
     """Calculates the Relative Strength Index (RSI) for a given symbol."""
     try:
+        ensure_binance_client()
         # Fetch klines (candlestick data)
         klines = client.get_historical_klines(
             symbol, interval, f"{period + 100} hours ago UTC"
@@ -230,6 +251,7 @@ def get_bollinger_bands(
 ):
     """Calculates Bollinger Bands for a given symbol."""
     try:
+        ensure_binance_client()
         # Fetch more klines to ensure SMA calculation is accurate
         klines = client.get_historical_klines(
             symbol, interval, f"{period + 50} hours ago UTC"
@@ -262,6 +284,7 @@ def get_macd(
 ):
     """Calculates the MACD for a given symbol."""
     try:
+        ensure_binance_client()
         # Fetch enough klines for the slow EMA + signal line
         klines = client.get_historical_klines(
             symbol, interval, f"{slow_period + signal_period + 50} hours ago UTC"
@@ -294,6 +317,7 @@ def get_macd(
 
 def get_account_balance(user_id: int, asset="USDT"):
     """Fetches the free balance for a specific asset from the Binance spot account."""
+    ensure_binance_client()
     user_client = get_user_client(user_id)
     if not user_client:
         return None
@@ -315,6 +339,7 @@ def get_account_balance(user_id: int, asset="USDT"):
 
 def get_last_trade_from_binance(user_id: int, symbol: str):
     """Fetches the user's most recent trade for a given symbol from Binance."""
+    ensure_binance_client()
     user_client = get_user_client(user_id)
     if not user_client:
         return None
@@ -338,6 +363,7 @@ def get_last_trade_from_binance(user_id: int, symbol: str):
 
 def get_all_spot_balances(user_id: int) -> list[dict] | None:
     """Fetches all non-zero asset balances from the user's Binance spot account."""
+    ensure_binance_client()
     user_client = get_user_client(user_id)
     if not user_client:
         logger.warning(
@@ -362,6 +388,7 @@ def get_all_spot_balances(user_id: int) -> list[dict] | None:
 
 def place_buy_order(user_id: int, symbol: str, usdt_amount: float, is_test=False):
     """Places a live market buy order on Binance for a specific user."""
+    ensure_binance_client()
     user_client = get_user_client(user_id)
     if not user_client:
         logger.error(
@@ -431,6 +458,7 @@ def place_buy_order(user_id: int, symbol: str, usdt_amount: float, is_test=False
 
 def place_sell_order(user_id: int, symbol: str, quantity: float):
     """Places a live market sell order on Binance for a specific user."""
+    ensure_binance_client()
     user_client = get_user_client(user_id)
     if not user_client:
         logger.error(
@@ -480,6 +508,7 @@ async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Handles the /quest command, providing price and RSI for a given symbol.
     Usage: /quest <SYMBOL> (e.g., /quest PEPEUSDT)
     """
+    ensure_binance_client()
     if not client:
         await update.message.reply_text(
             "The connection to the crypto realm (Binance) is not configured. Please check API keys."
@@ -573,6 +602,136 @@ async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"Could not retrieve data for {symbol}. Please ensure it's a valid symbol on Binance (e.g., BTCUSDT)."
         )
+
+
+async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handles the /buy command to manually open a trade.
+    This is a non-blocking operation; it will respond quickly while the trade is processed.
+    Usage: /buy <SYMBOL> <USDT_AMOUNT>
+    """
+    user_id = update.effective_user.id
+
+    # --- Premium User Check ---
+    user_tier = db.get_user_tier_db(user_id)
+    is_admin = user_id == config.ADMIN_USER_ID
+    if user_tier != "PREMIUM" and not is_admin:
+        await update.message.reply_text("The /buy command is a Premium feature. Use /subscribe to upgrade.")
+        return
+
+    mode, paper_balance = db.get_user_trading_mode_and_balance(user_id)
+    settings = db.get_user_effective_settings(user_id)
+
+    # --- Argument Validation ---
+    if len(context.args) < 2:
+        await update.message.reply_text(
+            "Please specify a symbol and the amount in USDT.\n"
+            "Usage: `/buy <SYMBOL> <AMOUNT>`\n"
+            "Example: `/buy BTCUSDT 10`",
+            parse_mode="Markdown",
+        )
+        return
+
+    try:
+        symbol = context.args[0].upper()
+        usdt_amount = float(context.args[1])
+    except (ValueError, IndexError):
+        await update.message.reply_text(
+            "Invalid symbol or amount. Please check your input."
+        )
+        return
+
+    # --- Pre-flight Checks ---
+    symbol_info = get_symbol_info(symbol)
+    if not symbol_info:
+        await update.message.reply_text(
+            f"Symbol `{symbol}` is not valid or available on Binance.",
+            parse_mode="Markdown",
+        )
+        return
+
+    min_trade_size = float(settings.get("TRADE_SIZE_USDT", 5.0))
+    if usdt_amount < min_trade_size:
+        await update.message.reply_text(
+            f"Trade amount must be at least ${min_trade_size:.2f} USDT."
+        )
+        return
+
+    await update.message.reply_text(
+        f"Processing your quest for {usdt_amount:.2f} USDT of {symbol}..."
+    )
+
+    # --- Execute based on Mode ---
+    if mode == "LIVE":
+        api_key, _ = db.get_user_api_keys(user_id)
+        if not api_key and not is_admin:
+            await update.message.reply_text(
+                "Your Binance API keys are not set. Please use `/setapi` first."
+            )
+            return
+
+        try:
+            balance = get_account_balance(user_id, "USDT")
+            if balance is None or balance < usdt_amount:
+                await update.message.reply_text(
+                    f"Insufficient LIVE balance. You have ${balance or 0:.2f} USDT."
+                )
+                return
+
+            # Run blocking call in an executor to not block the bot
+            loop = asyncio.get_event_loop()
+            order, entry_price, quantity = await loop.run_in_executor(
+                None, place_buy_order, user_id, symbol, usdt_amount
+            )
+
+            stop_loss_price = entry_price * (1 - settings["STOP_LOSS_PERCENTAGE"] / 100)
+            take_profit_price = entry_price * (
+                1 + settings["PROFIT_TARGET_PERCENTAGE"] / 100
+            )
+            rsi = get_rsi(symbol)
+
+            trade_id = db.log_trade(
+                user_id=user_id,
+                coin_symbol=symbol,
+                buy_price=entry_price,
+                stop_loss=stop_loss_price,
+                take_profit=take_profit_price,
+                mode="LIVE",
+                quantity=quantity,
+                rsi_at_buy=rsi,
+            )
+
+            message = (
+                f"✅ **Live Quest Started!** (ID: {trade_id})\n\n"
+                f"   - Bought: **{quantity:.8f} {symbol}**\n"
+                f"   - At: `${entry_price:,.8f}`\n"
+                f"   - Value: `${usdt_amount:,.2f}` USDT\n"
+                f"   - ✅ Take Profit: `${take_profit_price:,.8f}`\n"
+                f"   - 🛡️ Stop Loss: `${stop_loss_price:,.8f}`"
+            )
+            await update.message.reply_text(message, parse_mode="Markdown")
+
+        except TradeError as e:
+            await update.message.reply_text(
+                f"⚠️ **Live Buy FAILED** for {symbol}.\n\n*Reason:* `{e}`",
+                parse_mode="Markdown",
+            )
+        except Exception as e:
+            logger.error(
+                f"Unexpected error in /buy command for user {user_id}: {e}",
+                exc_info=True,
+            )
+            await update.message.reply_text(
+                "An unexpected error occurred while placing the buy order."
+            )
+
+    elif mode == "PAPER":
+        # Paper trading logic can be added here if needed.
+        # For now, we'll just acknowledge it.
+        await update.message.reply_text(
+            "Paper trading via /buy is not yet implemented. Use /quest to start a paper trade."
+        )
+
 
 
 async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -724,29 +883,28 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # --- Cached Gemini suggestions (if gemini_cache available) ---
     try:
-        try:
-            from gemini_cache import get_suggestions_for
-
-            cached = get_suggestions_for(config.AI_MONITOR_COINS[:5])
+        # Use the already imported 'gemini_cacher' module.
+        # This assumes 'get_suggestions_for' exists in 'gemini_cacher.py'.
+        if hasattr(gemini_cacher, "get_suggestions_for"):
+            cached = gemini_cacher.get_suggestions_for(config.AI_MONITOR_COINS[:5])
             if cached:
                 message += "\n🤖 Cached AI suggestions:\n"
                 for s, d in (cached or {}).items():
                     message += f" - {s}: {d}\n"
-        except Exception:
-            pass
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Could not retrieve gemini suggestions: {e}")
 
     await update.message.reply_text(message, parse_mode="Markdown")
 
 
-async def import_last_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def import_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the /import command to manually add a trade or import from Binance."""
     user_id = update.effective_user.id
     mode, _ = db.get_user_trading_mode_and_balance(user_id)
 
     # Runtime guard: block import if Binance client unavailable
     try:
+        ensure_binance_client()
         if not BINANCE_AVAILABLE:
             await update.message.reply_text(
                 "Live trading/import is currently disabled because the Binance client is unavailable. Please check /binance_status."
@@ -766,9 +924,9 @@ async def import_last_trade_command(update: Update, context: ContextTypes.DEFAUL
 
     if not context.args:
         await update.message.reply_text(
-            "Please specify a symbol, price, and quantity.\n"
-            "Usage: `/import <SYMBOL> <PRICE> <QUANTITY>`\n"
-            "Example: `/import BTCUSDT 30000 0.01`\n"
+            "Please specify a symbol, price, and quantity.\n" 
+            "Usage: `/import <SYMBOL> <PRICE> <QUANTITY>`\n" 
+            "Example: `/import BTCUSDT 30000 0.01`\n" 
             "You can also use `/import <SYMBOL>` to auto-import your last Binance trade for that symbol.",
             parse_mode="Markdown",
         )
@@ -851,12 +1009,12 @@ async def import_last_trade_command(update: Update, context: ContextTypes.DEFAUL
             )  # RSI at buy is not available for imported trades
 
             await update.message.reply_text(
-                f"✅ **Trade Imported!**\n\n"
-                f"   - **{symbol}** (ID: {trade_id})\n"
-                f"   - Bought at: `${buy_price:,.8f}`\n"
-                f"   - Quantity: `{quantity:.4f}`\n"
-                f"   - ✅ Take Profit: `${take_profit_price:,.8f}`\n"
-                f"   - 🛡️ Stop Loss: `${stop_loss_price:,.8f}`\n\n"
+                f"✅ **Trade Imported!**\n\n" 
+                f"   - **{symbol}** (ID: {trade_id})\n" 
+                f"   - Bought at: `${buy_price:,.8f}`\n" 
+                f"   - Quantity: `{quantity:.4f}`\n" 
+                f"   - ✅ Take Profit: `${take_profit_price:,.8f}`\n" 
+                f"   - 🛡️ Stop Loss: `${stop_loss_price:,.8f}`\n\n" 
                 f"This trade will now be monitored. Use /status to see your open quests.",
                 parse_mode="Markdown",
             )
@@ -886,6 +1044,7 @@ async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # Runtime guard: block close if Binance client unavailable for LIVE trades
     try:
+        ensure_binance_client()
         if not BINANCE_AVAILABLE:
             await update.message.reply_text(
                 "Live trading/close is currently disabled because the Binance client is unavailable. Please check /binance_status."
@@ -1030,6 +1189,10 @@ async def check_btc_volatility_and_alert(context: ContextTypes.DEFAULT_TYPE):
     This helps users understand the overall market pressure.
     """
     try:
+        ensure_binance_client()
+        if not client:
+            logger.warning("Skipping BTC volatility check: Binance client unavailable.")
+            return
         # Fetch the last 2 closed hourly candles for BTC
         klines = client.get_historical_klines(
             "BTCUSDT", Client.KLINE_INTERVAL_1HOUR, "2 hours ago UTC"
@@ -1151,6 +1314,12 @@ async def check_watchlist_for_buys(
         # Check for buy signal (RSI recovery)
         if symbol not in indicator_cache:
             try:
+                ensure_binance_client()
+                if not BINANCE_AVAILABLE:
+                    logger.info(
+                        f"Skipping indicator fetch for {symbol}: Binance unavailable."
+                    )
+                    continue
                 indicator_cache[symbol] = {"rsi": get_rsi(symbol)}
                 time.sleep(0.1)  # Stagger API calls to be safe
             except BinanceAPIException as e:
@@ -1305,6 +1474,10 @@ async def ai_trade_monitor(
         gemini_signal = gemini_info.get("signal", "neutral").lower()
 
         # --- Indicator Signals ---
+        ensure_binance_client()
+        if not client:
+            logger.info(f"AI trade monitor skipping {symbol}: Binance unavailable.")
+            return
         klines = client.get_historical_klines(
             symbol, Client.KLINE_INTERVAL_1HOUR, "100 hours ago UTC"
         )
@@ -1408,69 +1581,43 @@ async def run_monitoring_cycle(
     1. Monitor overall market conditions based on BTC movement.
     2. Check all open trades against their Stop-Loss and Take-Profit levels.
     """
+    ensure_binance_client()
     if not client:
         logger.warning("Market monitor skipped: Binance client not configured.")
         return
 
     logger.info(f"Monitoring {len(open_trades)} open trade(s)...")
-    datetime.now(timezone.utc)
-    for trade in open_trades:
-        # Use dict-style access for sqlite3.Row
-        trade["mode"] if "mode" in trade.keys() else None
-        user_id = trade["user_id"] if "user_id" in trade.keys() else None
-        symbol = trade["coin_symbol"] if "coin_symbol" in trade.keys() else None
-        # Normalize symbol casing coming from DB; many imports mix case (bnbusdt vs BNBUSDT)
-        if symbol:
-            try:
-                symbol_upper = symbol.upper()
-            except Exception:
-                symbol_upper = symbol
-        else:
-            symbol_upper = symbol
-        symbol = symbol_upper
+    for trade_row in open_trades:
+        # Convert sqlite3.Row to a dictionary for consistent and safe access
+        trade = dict(trade_row)
+
+        user_id = trade.get("user_id")
+        symbol = (trade.get("coin_symbol") or "").upper()
+
         if not symbol or symbol not in prices:
             continue
 
         current_price = prices[symbol]
-        pnl_percent = ((current_price - trade["buy_price"]) / trade["buy_price"]) * 100
+        buy_price = trade.get("buy_price")
 
-        try:
-            settings = db.get_user_effective_settings(user_id)
-        except IndexError:
-            logger.error(
-                f"No settings found for user_id {user_id}, using default settings."
-            )
-            settings = db.get_user_effective_settings(None)
+        if not user_id or not buy_price:
+            logger.warning(f"Skipping malformed trade object: {trade}")
+            continue
+
+        pnl_percent = ((current_price - buy_price) / buy_price) * 100
+        settings = db.get_user_effective_settings(user_id)
 
         # Validate trade object for required keys
-        # Treat missing or non-positive quantities as invalid and record them for diagnostics
-        bad_quantity = False
-        try:
-            q = trade.get("quantity") if hasattr(trade, "get") else trade["quantity"]
-        except Exception:
-            q = None
-
-        if q is None or (isinstance(q, (int, float)) and q <= 0):
-            bad_quantity = True
-
-        if bad_quantity:
-            try:
-                trade_id = trade["id"]
-            except Exception:
-                trade_id = "unknown"
+        quantity = trade.get("quantity")
+        if not isinstance(quantity, (int, float)) or quantity <= 0:
+            trade_id = trade.get("id", "unknown")
             # Build a slim, JSON-serializable dict for logging
-            try:
-                trade_repr = dict(trade)
-            except Exception:
-                # sqlite3.Row sometimes doesn't convert directly
-                trade_repr = (
-                    {k: trade[k] for k in trade.keys()}
-                    if hasattr(trade, "keys")
-                    else str(trade)
-                )
+            trade_repr = {
+                k: v for k, v in trade.items() if isinstance(v, (str, int, float, bool))
+            }
 
             logger.error(
-                f"[user_id={user_id}][trade_id={trade_id}][symbol={symbol}] Missing/invalid quantity in trade: {trade_repr}"
+                f"[user_id={user_id}][trade_id={trade_id}][symbol={symbol}] Missing/invalid quantity in trade: {quantity}"
             )
 
             # Push diagnostic entry to Redis (non-fatal)
@@ -1484,7 +1631,7 @@ async def run_monitoring_cycle(
                                 "trade_id": trade_id,
                                 "user_id": user_id,
                                 "symbol": symbol,
-                                "quantity": q,
+                                "quantity": quantity,
                                 "row": trade_repr,
                                 "ts": int(time.time()),
                             }
@@ -1514,10 +1661,9 @@ async def run_monitoring_cycle(
             continue
 
         # Notional guard before any sell/close logic
-        trade["quantity"] * current_price
         if not TradeValidator.is_trade_valid(
             symbol,
-            trade["quantity"],
+            quantity,
             current_price,
             user_id=user_id,
             slip_id=trade.get("id"),
@@ -1532,29 +1678,21 @@ async def run_monitoring_cycle(
             if symbol not in indicator_cache:
                 indicator_cache[symbol] = {"rsi": get_rsi(symbol)}
 
-            current_rsi = (
-                indicator_cache[symbol]["rsi"]
-                if "rsi" in indicator_cache[symbol]
-                else None
-            )
+            current_rsi = indicator_cache.get(symbol, {}).get("rsi")
             rsi_sell_threshold = settings.get("RSI_BEARISH_EXIT_THRESHOLD", 65.0)
             rsi_overbought = settings.get("RSI_OVERBOUGHT_ALERT_THRESHOLD", 80.0)
 
             # We need to know if RSI was recently overbought
             # For simplicity, we check if the rsi_at_buy was high, or we can query history
-            rsi_at_buy = (
-                trade["rsi_at_buy"] if "rsi_at_buy" in trade.keys() else rsi_overbought
-            )
+            rsi_at_buy = trade.get("rsi_at_buy", rsi_overbought)
 
             if (
-                rsi_at_buy >= rsi_overbought
-                and current_rsi is not None
+                current_rsi is not None
+                and rsi_at_buy >= rsi_overbought
                 and current_rsi < rsi_sell_threshold
             ):
-                if "buy_price" in trade and "quantity" in trade:
-                    profit_usdt = (current_price - trade["buy_price"]) * trade[
-                        "quantity"
-                    ]
+                if buy_price and quantity:
+                    profit_usdt = (current_price - buy_price) * quantity
                     notification = (
                         f"📉 **RSI Exit Triggered!** Your {symbol} quest (ID: {trade['id']}) was closed at `${current_price:,.8f}`.\n\n"
                         f"   - **P/L:** `{pnl_percent:.2f}%` (`${profit_usdt:,.2f}` USDT)\n"
@@ -1578,8 +1716,8 @@ async def run_monitoring_cycle(
                     continue  # Move to next trade
 
         # --- Stop-Loss and Take-Profit checks ---
-        if current_price <= trade["stop_loss_price"]:
-            profit_usdt = (current_price - trade["buy_price"]) * trade["quantity"]
+        if current_price <= trade.get("stop_loss_price", float("inf")):
+            profit_usdt = (current_price - buy_price) * quantity
             db.close_trade(
                 trade_id=trade["id"],
                 user_id=user_id,
@@ -1596,8 +1734,8 @@ async def run_monitoring_cycle(
             )
             continue
 
-        if current_price >= trade["take_profit_price"]:
-            profit_usdt = (current_price - trade["buy_price"]) * trade["quantity"]
+        if current_price >= trade.get("take_profit_price", 0):
+            profit_usdt = (current_price - buy_price) * quantity
             db.close_trade(
                 trade_id=trade["id"],
                 user_id=user_id,
