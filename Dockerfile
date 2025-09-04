@@ -33,4 +33,4 @@ USER appuser
 EXPOSE 8080
 
 # Default to running the package entrypoint
-CMD ["python", "-m", "src.main"]
+CMD ["python", "run.py"]
