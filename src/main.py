@@ -7,7 +7,10 @@ import time
 
 # --- Setup logging and path ---
 # This should be the very first thing to run
-import logging_config
+if __package__:
+    from . import logging_config
+else:
+    import logging_config
 
 logging_config.setup_logging()
 
@@ -898,9 +901,6 @@ async def hubspeedy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler for the /balance command. Calls the trade module."""
     await trade.balance_command(update, context)
-
-
-
 
 
 async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1831,7 +1831,9 @@ async def addcoins_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await update.message.reply_text(f"Updated monitored coins: {coins_str}")
 
 
-async def set_api_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def set_api_command_primary(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
     """Securely store a user's Binance API key and secret for autotrade features.
 
     Usage: /setapi <KEY> <SECRET>  (send in a private chat)
@@ -2210,18 +2212,9 @@ async def activate_user_command(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def set_api_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Securely store a user's Binance API key and secret for autotrade features.
-
-    Usage: /setapi <KEY> <SECRET>  (send in a private chat)
-    Only PREMIUM users (or the admin) may store API keys.
-
-    **IMPORTANT:** For the bot to access your Binance account, you must whitelist our server IPs in your Binance API settings.
-    Please add the following IPs to your Binance API key configuration:
-    13.228.225.19
-    18.142.128.26
-    54.254.162.138
-    """
-    logger.warning("setapi_command is not yet implemented.")
+    # Duplicate stub removed; the real implementation lives earlier in this file.
+    # This alias delegates to the primary implementation defined above.
+    return await set_api_command_primary(update, context)
 
 
 async def slip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

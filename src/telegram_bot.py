@@ -6,6 +6,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 import config
 import db
 import trade
+from src.main import set_api_command_primary as set_api_command
 
 # Enable logging
 logging.basicConfig(
@@ -93,27 +94,7 @@ async def wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-async def set_api_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sets the user's Binance API key and secret."""
-    user_id = update.effective_user.id
-
-    if update.effective_chat.type != "private":
-        await update.message.reply_text(
-            "For security reasons, please set your API keys in a private chat with me."
-        )
-        return
-
-    try:
-        api_key = context.args[0]
-        secret_key = context.args[1]
-    except IndexError:
-        await update.message.reply_text(
-            "Please provide both API key and secret. Usage: `/setapi <KEY> <SECRET>`"
-        )
-        return
-
-    db.set_user_api_keys(user_id, api_key, secret_key)
-    await update.message.reply_text("Your Binance API keys have been securely saved.")
+# set_api_command is imported from src.main to avoid duplicate definitions
 
 
 async def set_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

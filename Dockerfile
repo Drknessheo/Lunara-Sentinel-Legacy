@@ -17,6 +17,8 @@ WORKDIR /app
 # Install dependencies (robust): copy source early and use a conditional fallback
 # This avoids build failures when the build context or filename differs (e.g. requirements-dev.txt)
 COPY . /app
+# Ensure run.py is explicitly copied (force layer update if cache stale)
+COPY run.py /app/run.py
 RUN pip install --upgrade pip && \
   if [ -f /app/requirements.txt ]; then \
     pip install -r /app/requirements.txt; \
@@ -33,4 +35,4 @@ USER appuser
 EXPOSE 8080
 
 # Default to running the package entrypoint
-CMD ["python", "run.py"]
+CMD ["python", "/app/run.py"]
