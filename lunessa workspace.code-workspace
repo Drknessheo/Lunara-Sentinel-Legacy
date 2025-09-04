@@ -3,5 +3,9 @@
 		{
 			"path": "."
 		}
-	]
+	],
+	"settings": {
+		"terminal.integrated.defaultProfile.linux": "",
+		"terminal.integrated.defaultProfile.windows": "PowerShell"
+	}
 }

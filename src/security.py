@@ -1,33 +1,37 @@
-import logging
-import os
+import hashlib
+import hmac
+from functools import wraps
 
-from cryptography.fernet import Fernet
+from flask import abort, request
 
-logger = logging.getLogger(__name__)
-
-# Load the encryption key from environment variables
-BINANCE_ENCRYPTION_KEY = os.getenv("BINANCE_ENCRYPTION_KEY")
-if not BINANCE_ENCRYPTION_KEY:
-    raise ValueError(
-        "BINANCE_ENCRYPTION_KEY not found in environment variables. Please generate one and add it to your .env file."
-    )
-
-cipher_suite = Fernet(BINANCE_ENCRYPTION_KEY.encode())
+from src.config import WEBHOOK_HMAC_SECRET
 
 
-def encrypt_data(data: str) -> bytes:
-    """Encrypts a string."""
-    if not data:
-        return None
-    return cipher_suite.encrypt(data.encode())
+def verify_hmac(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not WEBHOOK_HMAC_SECRET:
+            # For security, if the secret is not configured, we should
+            # probably abort. But for development, we can allow it.
+            # In a production environment, this should be a hard failure.
+            print(
+                "Warning: WEBHOOK_HMAC_SECRET is not set. Skipping HMAC verification."
+            )
+            return f(*args, **kwargs)
 
+        signature = request.headers.get("X-Signature")
+        if not signature:
+            abort(401, description="Missing X-Signature header")
 
-def decrypt_data(encrypted_data: bytes) -> str:
-    """Decrypts a string."""
-    if not encrypted_data:
-        return None
-    try:
-        return cipher_suite.decrypt(encrypted_data).decode()
-    except Exception as e:
-        logger.error(f"Failed to decrypt data: {e}")
-        return None
+        mac = hmac.new(
+            WEBHOOK_HMAC_SECRET.encode("utf-8"),
+            msg=request.data,
+            digestmod=hashlib.sha256,
+        )
+
+        if not hmac.compare_digest(mac.hexdigest(), signature):
+            abort(401, description="Invalid signature")
+
+        return f(*args, **kwargs)
+
+    return decorated_function

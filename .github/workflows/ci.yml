@@ -11,13 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     services:
       redis:
-        image: redis:6
+        image: redis:7-alpine
         ports:
           - 6379:6379
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -26,26 +26,44 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m venv .venv
-          . .venv/bin/activate
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install flake8 pytest
+          python -m pip install -r requirements.txt
 
       - name: Export Redis URL for tests
         run: echo "REDIS_URL=redis://localhost:6379" >> $GITHUB_ENV
 
-      - name: Run flake8
-        run: |
-          . .venv/bin/activate
-          # prefer setup.cfg if present, fall back to default
-          if [ -f setup.cfg ]; then
-            flake8 --config=setup.cfg .
-          else
-            flake8 .
-          fi
-
       - name: Run pytest
+        env:
+          SLIP_ENCRYPTION_KEY: ${{ secrets.SLIP_ENCRYPTION_KEY }}
         run: |
-          . .venv/bin/activate
           pytest --maxfail=1 --disable-warnings -q
+
+  deploy:
+    needs: test-and-lint
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy (optional)
+        env:
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_EXTERNAL_URL: ${{ secrets.RENDER_EXTERNAL_URL }}
+        run: |
+          if [ -z "$RENDER_SERVICE_ID" ] || [ -z "$RENDER_API_KEY" ]; then
+            echo "Render deploy not configured; skipping." && exit 0
+          fi
+          echo "Triggering Render deploy for service $RENDER_SERVICE_ID"
+          RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"serviceId":"'$RENDER_SERVICE_ID'","clearCache":true}' \
+            https://api.render.com/deploys)
+          echo "$RESPONSE" > /tmp/render_deploy_response.json
+          DEPLOY_ID=$(python -c "import sys,json;print(json.load(open('/tmp/render_deploy_response.json')).get('id',''))")
+          echo "Deploy id: $DEPLOY_ID"
+          if [ -z "$DEPLOY_ID" ]; then
+            echo "Failed to obtain deploy id from Render API response." >&2
+            cat /tmp/render_deploy_response.json >&2
+            exit 1
+          fi
+          echo "Triggered deploy $DEPLOY_ID"

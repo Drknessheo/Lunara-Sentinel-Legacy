@@ -1,0 +1,3275 @@
+2025-09-01 18:00:40,226 - slip_manager - INFO - Connecting to Redis at rediss://***:***@measured-whale-51756.upstash.io:6379
+2025-09-01 18:01:26,852 - __main__ - INFO - Starting bot with market monitor and AI trade monitor jobs scheduled...
+2025-09-01 18:01:26,853 - __main__ - INFO - Starting bot polling...
+2025-09-01 18:01:27,980 - __main__ - INFO - Running post-initialization setup...
+2025-09-01 18:01:27,980 - __main__ - INFO - Attempting to delete any pre-existing webhook...
+2025-09-01 18:01:28,189 - __main__ - INFO - Webhook deleted successfully.
+2025-09-01 18:01:28,190 - __main__ - INFO - Starting Redis pub/sub listener for real-time toggles...
+2025-09-01 18:01:28,811 - __main__ - INFO - Subscribed to autotrade:notify channel for instant toggles.
+2025-09-01 18:01:28,891 - telegram.ext.Application - INFO - Application started
+2025-09-01 18:01:36,733 - tradebot - INFO - Running scheduled_monitoring_job...
+2025-09-01 18:01:36,734 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+  File "G:\Lunara Bot\src\trade.py", line 1779, in scheduled_monitoring_job
+    user_id = config.ADMIN_USER_ID  # Assuming monitoring is for the admin user
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'config' has no attribute 'ADMIN_USER_ID'
+2025-09-01 18:01:36,907 - src.autotrade_jobs - INFO - Starting autotrade cycle...
+2025-09-01 18:01:36,907 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:01:37,459 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:01:37,463 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:01:37,465 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:01:37,487 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:01:37,495 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:01:37,500 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:01:37,504 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:01:37,508 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:01:37,513 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:01:37,517 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:01:37,523 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:01:37,528 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:01:37,531 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 141, in autotrade_cycle
+    user_id = config.ADMIN_USER_ID
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'config' has no attribute 'ADMIN_USER_ID'
+2025-09-01 18:01:57,856 - __main__ - INFO - HEARTBEAT: redis_ping=True promotion_retry_pending=0
+2025-09-01 18:01:57,876 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+TypeError: object NoneType can't be used in 'await' expression
+2025-09-01 18:02:36,855 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:02:37,061 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:02:37,063 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:02:37,065 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:02:37,068 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:02:37,071 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:02:37,073 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:02:37,075 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:02:37,078 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:02:37,082 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:02:37,089 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:02:37,092 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:02:37,098 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:03:27,162 - asyncio - ERROR - Task was destroyed but it is pending!
+task: <Task pending name='Task-5' coro=<_redis_pubsub_listener() running at G:\Lunara Bot\src\main.py:3252> wait_for=<Future pending cb=[Task.task_wakeup()]>>
+2025-09-01 18:03:36,857 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:03:37,021 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:03:37,023 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:03:37,025 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:03:37,028 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:03:37,030 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:03:37,032 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:03:37,034 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:03:37,036 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:03:37,042 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:03:37,046 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:03:37,049 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:03:37,053 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:04:36,863 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:04:37,035 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:04:37,038 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:04:37,040 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:04:37,043 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:04:37,051 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:04:37,055 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:04:37,058 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:04:37,073 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:04:37,077 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:04:37,087 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:04:37,091 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:04:37,093 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:05:36,859 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:05:37,022 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:05:37,024 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:05:37,026 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:05:37,029 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:05:37,033 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:05:37,036 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:05:37,038 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:05:37,040 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:05:37,043 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:05:37,046 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:05:37,053 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:05:37,055 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:06:36,864 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:06:37,027 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:06:37,030 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:06:37,031 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:06:37,033 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:06:37,035 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:06:37,042 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:06:37,044 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:06:37,046 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:06:37,048 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:06:37,052 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:06:37,055 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:06:37,057 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:06:57,720 - __main__ - INFO - HEARTBEAT: redis_ping=True promotion_retry_pending=0
+2025-09-01 18:06:57,759 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+TypeError: object NoneType can't be used in 'await' expression
+2025-09-01 18:07:36,863 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:07:37,026 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:07:37,030 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:07:37,035 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:07:37,037 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:07:37,039 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:07:37,043 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:07:37,059 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:07:37,068 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:07:37,072 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:07:37,075 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:07:37,079 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:07:37,089 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:07:46,827 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
+2025-09-01 18:07:46,975 - telegram.ext.Application - INFO - Application.stop() complete
+2025-09-01 18:09:13,829 - slip_manager - INFO - Connecting to Redis at rediss://***:***@measured-whale-51756.upstash.io:6379
+2025-09-01 18:09:26,731 - __main__ - INFO - Starting bot with market monitor and AI trade monitor jobs scheduled...
+2025-09-01 18:09:26,731 - __main__ - INFO - Starting bot polling...
+2025-09-01 18:09:27,625 - __main__ - INFO - Running post-initialization setup...
+2025-09-01 18:09:27,626 - __main__ - INFO - Attempting to delete any pre-existing webhook...
+2025-09-01 18:09:27,822 - __main__ - INFO - Webhook deleted successfully.
+2025-09-01 18:09:27,822 - __main__ - INFO - Starting Redis pub/sub listener for real-time toggles...
+2025-09-01 18:09:28,220 - __main__ - INFO - Subscribed to autotrade:notify channel for instant toggles.
+2025-09-01 18:09:28,470 - telegram.ext.Application - INFO - Application started
+2025-09-01 18:09:36,691 - tradebot - INFO - Running scheduled_monitoring_job...
+2025-09-01 18:09:36,691 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+  File "G:\Lunara Bot\src\trade.py", line 1779, in scheduled_monitoring_job
+    user_id = config.ADMIN_USER_ID  # Assuming monitoring is for the admin user
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'config' has no attribute 'ADMIN_USER_ID'
+2025-09-01 18:09:36,732 - src.autotrade_jobs - INFO - Starting autotrade cycle...
+2025-09-01 18:09:36,732 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:09:37,271 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:09:37,273 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:09:37,276 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:09:37,279 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:09:37,283 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:09:37,291 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:09:37,293 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:09:37,300 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:09:37,303 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:09:37,305 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:09:37,309 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:09:37,311 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:09:37,317 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 141, in autotrade_cycle
+    user_id = config.ADMIN_USER_ID
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'config' has no attribute 'ADMIN_USER_ID'
+2025-09-01 18:09:58,010 - __main__ - INFO - HEARTBEAT: redis_ping=True promotion_retry_pending=0
+2025-09-01 18:09:58,033 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+TypeError: object NoneType can't be used in 'await' expression
+2025-09-01 18:10:36,732 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:10:36,898 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:10:36,901 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:10:36,904 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:10:36,907 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:10:36,910 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:10:36,916 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:10:36,921 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:10:36,929 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:10:36,937 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:10:36,945 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:10:36,952 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:10:36,958 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:11:27,142 - asyncio - ERROR - Task was destroyed but it is pending!
+task: <Task pending name='Task-5' coro=<_redis_pubsub_listener() running at G:\Lunara Bot\src\main.py:3252> wait_for=<Future pending cb=[Task.task_wakeup()]>>
+2025-09-01 18:11:36,732 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:11:36,899 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:11:36,904 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:11:36,910 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:11:36,915 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:11:36,923 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:11:36,930 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:11:36,941 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:11:36,946 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:11:36,953 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:11:36,959 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:11:36,962 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:11:36,970 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:12:36,749 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:12:36,952 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:12:36,957 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:12:37,005 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:12:37,059 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:12:37,110 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:12:37,149 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:12:37,207 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:12:37,209 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:12:37,218 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:12:37,224 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:12:37,229 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:12:37,243 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:13:28,580 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
+2025-09-01 18:13:28,598 - telegram.ext.Application - INFO - Application.stop() complete
+2025-09-01 18:20:59,807 - slip_manager - INFO - Connecting to Redis at rediss://***:***@measured-whale-51756.upstash.io:6379
+2025-09-01 18:21:09,898 - __main__ - INFO - Starting bot with market monitor and AI trade monitor jobs scheduled...
+2025-09-01 18:21:09,898 - __main__ - INFO - Starting bot polling...
+2025-09-01 18:21:10,696 - __main__ - INFO - Running post-initialization setup...
+2025-09-01 18:21:10,696 - __main__ - INFO - Attempting to delete any pre-existing webhook...
+2025-09-01 18:21:10,895 - __main__ - INFO - Webhook deleted successfully.
+2025-09-01 18:21:10,895 - __main__ - INFO - Starting Redis pub/sub listener for real-time toggles...
+2025-09-01 18:21:11,268 - __main__ - INFO - Subscribed to autotrade:notify channel for instant toggles.
+2025-09-01 18:21:11,519 - telegram.ext.Application - INFO - Application started
+2025-09-01 18:21:19,876 - tradebot - INFO - Running scheduled_monitoring_job...
+2025-09-01 18:21:19,877 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+  File "G:\Lunara Bot\src\trade.py", line 1779, in scheduled_monitoring_job
+    user_id = config.ADMIN_USER_ID  # Assuming monitoring is for the admin user
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'config' has no attribute 'ADMIN_USER_ID'
+2025-09-01 18:21:19,908 - src.autotrade_jobs - INFO - Starting autotrade cycle...
+2025-09-01 18:21:19,909 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:21:20,460 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:21:20,463 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:21:20,465 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:21:20,468 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:21:20,470 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:21:20,473 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:21:20,477 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:21:20,480 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:21:20,484 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:21:20,490 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:21:20,493 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:21:20,510 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:21:20,512 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 141, in autotrade_cycle
+    user_id = config.ADMIN_USER_ID
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'config' has no attribute 'ADMIN_USER_ID'
+2025-09-01 18:21:41,045 - __main__ - INFO - HEARTBEAT: redis_ping=True promotion_retry_pending=0
+2025-09-01 18:21:41,067 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+TypeError: object NoneType can't be used in 'await' expression
+2025-09-01 18:22:19,901 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:22:20,073 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:22:20,076 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:22:20,080 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:22:20,083 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:22:20,089 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:22:20,093 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:22:20,095 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:22:20,100 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:22:20,107 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:22:20,111 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:22:20,114 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:22:20,121 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:22:29,109 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
+2025-09-01 18:22:29,133 - telegram.ext.Application - INFO - Application.stop() complete
+2025-09-01 18:22:29,203 - __main__ - CRITICAL - Redis pubsub listener terminated unexpectedly: no running event loop
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\main.py", line 3256, in _redis_pubsub_listener
+    async for message in pubsub.listen():
+    ...<9 lines>...
+            logger.error(f"Error processing pubsub message: {e}")
+GeneratorExit
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\main.py", line 3252, in _redis_pubsub_listener
+    async with rc.pubsub(ignore_subscribe_messages=True) as pubsub:
+               ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\site-packages\redis\asyncio\client.py", line 862, in __aexit__
+    await self.aclose()
+  File "G:\Pycharm soft\Lib\site-packages\redis\asyncio\client.py", line 876, in aclose
+    await self.connection.disconnect()
+  File "G:\Pycharm soft\Lib\site-packages\redis\asyncio\connection.py", line 469, in disconnect
+    async with async_timeout(self.socket_connect_timeout):
+               ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\asyncio\timeouts.py", line 161, in timeout
+    loop = events.get_running_loop()
+RuntimeError: no running event loop
+2025-09-01 18:22:29,802 - asyncio - ERROR - Task was destroyed but it is pending!
+task: <Task pending name='Task-5' coro=<_redis_pubsub_listener() done, defined at G:\Lunara Bot\src\main.py:3236> wait_for=<Future pending cb=[Task.task_wakeup()]>>
+2025-09-01 18:26:47,390 - slip_manager - INFO - Connecting to Redis at rediss://***:***@measured-whale-51756.upstash.io:6379
+2025-09-01 18:27:00,547 - __main__ - INFO - Starting bot with market monitor and AI trade monitor jobs scheduled...
+2025-09-01 18:27:00,548 - __main__ - INFO - Starting bot polling...
+2025-09-01 18:27:01,576 - __main__ - INFO - Running post-initialization setup...
+2025-09-01 18:27:01,576 - __main__ - INFO - Attempting to delete any pre-existing webhook...
+2025-09-01 18:27:01,770 - __main__ - INFO - Webhook deleted successfully.
+2025-09-01 18:27:01,771 - __main__ - INFO - Starting Redis pub/sub listener for real-time toggles...
+2025-09-01 18:27:02,207 - __main__ - INFO - Subscribed to autotrade:notify channel for instant toggles.
+2025-09-01 18:27:02,392 - telegram.ext.Application - INFO - Application started
+2025-09-01 18:27:10,472 - tradebot - INFO - Running scheduled_monitoring_job...
+2025-09-01 18:27:10,473 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+  File "G:\Lunara Bot\src\trade.py", line 1779, in scheduled_monitoring_job
+    user_id = config.ADMIN_USER_ID  # Assuming monitoring is for the admin user
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'config' has no attribute 'ADMIN_USER_ID'
+2025-09-01 18:27:10,554 - src.autotrade_jobs - INFO - Starting autotrade cycle...
+2025-09-01 18:27:10,556 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:27:11,076 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:27:11,079 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:27:11,082 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:27:11,087 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:27:11,093 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:27:11,097 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:27:11,099 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:27:11,106 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:27:11,112 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:27:11,115 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:27:11,121 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:27:11,127 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:27:11,130 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 141, in autotrade_cycle
+    user_id = config.ADMIN_USER_ID
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'config' has no attribute 'ADMIN_USER_ID'
+2025-09-01 18:27:31,552 - __main__ - INFO - HEARTBEAT: redis_ping=True promotion_retry_pending=0
+2025-09-01 18:27:31,554 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+TypeError: object NoneType can't be used in 'await' expression
+2025-09-01 18:28:10,562 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:28:10,730 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556374179: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:28:10,733 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376303: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:28:10,737 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756556376954: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:28:10,739 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557608418: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:28:10,741 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=1756557610317: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:28:10,745 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=49: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:28:10,748 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=51: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:28:10,754 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=52: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:28:10,759 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=54: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:28:10,761 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=55: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:28:10,764 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=58: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:28:10,771 - src.autotrade_jobs - ERROR - Error monitoring autotrade for trade_id=59: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 495, in monitor_autotrades
+    val = slip_manager.get_and_decrypt_slip(
+        kk.encode()
+        if isinstance(raw_keys[0], (bytes, bytearray))
+        else kk
+    )
+  File "G:\Lunara Bot\src\slip_manager.py", line 117, in get_and_decrypt_slip
+    fernet = get_fernet()
+  File "G:\Lunara Bot\src\slip_manager.py", line 66, in get_fernet
+    raise ValueError(
+        "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+    )
+ValueError: No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+
+2025-09-01 18:28:14,628 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
+2025-09-01 18:28:14,645 - telegram.ext.Application - INFO - Application.stop() complete
+2025-09-01 18:28:14,726 - __main__ - CRITICAL - Redis pubsub listener terminated unexpectedly: no running event loop
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\main.py", line 3269, in _redis_pubsub_listener
+    async for message in pubsub.listen():
+    ...<9 lines>...
+            logger.error(f"Error processing pubsub message: {e}")
+GeneratorExit
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "G:\Lunara Bot\src\main.py", line 3265, in _redis_pubsub_listener
+    async with rc.pubsub(ignore_subscribe_messages=True) as pubsub:
+               ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\site-packages\redis\asyncio\client.py", line 862, in __aexit__
+    await self.aclose()
+  File "G:\Pycharm soft\Lib\site-packages\redis\asyncio\client.py", line 876, in aclose
+    await self.connection.disconnect()
+  File "G:\Pycharm soft\Lib\site-packages\redis\asyncio\connection.py", line 469, in disconnect
+    async with async_timeout(self.socket_connect_timeout):
+               ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\asyncio\timeouts.py", line 161, in timeout
+    loop = events.get_running_loop()
+RuntimeError: no running event loop
+2025-09-01 18:28:14,809 - asyncio - ERROR - Task was destroyed but it is pending!
+task: <Task pending name='Task-5' coro=<_redis_pubsub_listener() done, defined at G:\Lunara Bot\src\main.py:3249> wait_for=<Future pending cb=[Task.task_wakeup()]>>
+2025-09-01 18:37:23,054 - slip_manager - INFO - Connecting to Redis at rediss://***:***@measured-whale-51756.upstash.io:6379
+2025-09-01 18:37:33,844 - __main__ - INFO - Starting bot with market monitor and AI trade monitor jobs scheduled...
+2025-09-01 18:37:33,845 - __main__ - INFO - Starting bot polling...
+2025-09-01 18:37:34,720 - __main__ - INFO - Running post-initialization setup...
+2025-09-01 18:37:34,722 - __main__ - INFO - Attempting to delete any pre-existing webhook...
+2025-09-01 18:37:34,922 - __main__ - INFO - Webhook deleted successfully.
+2025-09-01 18:37:34,923 - __main__ - INFO - Starting Redis pub/sub listener for real-time toggles...
+2025-09-01 18:37:35,304 - __main__ - INFO - Subscribed to autotrade:notify channel for instant toggles.
+2025-09-01 18:37:35,579 - telegram.ext.Application - INFO - Application started
+2025-09-01 18:37:43,805 - tradebot - INFO - Running scheduled_monitoring_job...
+2025-09-01 18:37:43,806 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+  File "G:\Lunara Bot\src\trade.py", line 1779, in scheduled_monitoring_job
+    user_id = config.ADMIN_USER_ID  # Assuming monitoring is for the admin user
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'config' has no attribute 'ADMIN_USER_ID'
+2025-09-01 18:37:43,863 - src.autotrade_jobs - INFO - Starting autotrade cycle...
+2025-09-01 18:37:43,863 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:37:44,404 - slip_manager - WARNING - No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env.
+2025-09-01 18:37:44,405 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=1756556374179: None
+2025-09-01 18:37:44,406 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=1756556374179: None
+2025-09-01 18:37:44,406 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=1756556376303: None
+2025-09-01 18:37:44,407 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=1756556376303: None
+2025-09-01 18:37:44,407 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=1756556376954: None
+2025-09-01 18:37:44,407 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=1756556376954: None
+2025-09-01 18:37:44,408 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=1756557608418: None
+2025-09-01 18:37:44,408 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=1756557608418: None
+2025-09-01 18:37:44,408 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=1756557610317: None
+2025-09-01 18:37:44,409 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=1756557610317: None
+2025-09-01 18:37:44,409 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=49: None
+2025-09-01 18:37:44,409 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=49: None
+2025-09-01 18:37:44,410 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=51: None
+2025-09-01 18:37:44,410 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=51: None
+2025-09-01 18:37:44,411 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=52: None
+2025-09-01 18:37:44,411 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=52: None
+2025-09-01 18:37:44,412 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=54: None
+2025-09-01 18:37:44,412 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=54: None
+2025-09-01 18:37:44,412 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=55: None
+2025-09-01 18:37:44,413 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=55: None
+2025-09-01 18:37:44,413 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=58: None
+2025-09-01 18:37:44,413 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=58: None
+2025-09-01 18:37:44,414 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=59: None
+2025-09-01 18:37:44,414 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=59: None
+2025-09-01 18:37:44,415 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+  File "G:\Lunara Bot\src\autotrade_jobs.py", line 141, in autotrade_cycle
+    user_id = config.ADMIN_USER_ID
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'config' has no attribute 'ADMIN_USER_ID'
+2025-09-01 18:38:04,891 - __main__ - INFO - HEARTBEAT: redis_ping=True promotion_retry_pending=0
+2025-09-01 18:38:04,913 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+TypeError: object NoneType can't be used in 'await' expression
+2025-09-01 18:38:15,322 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_application.py", line 1311, in process_update
+    await coroutine
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_handlers\basehandler.py", line 158, in handle_update
+    return await self.callback(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Lunara Bot\src\main.py", line 1477, in myprofile_command
+    settings = db.get_user_effective_settings(user_id)
+  File "G:\Lunara Bot\src\modules\db_access.py", line 37, in wrapper
+    result = func(cursor, *args, **kwargs)
+  File "G:\Lunara Bot\src\modules\db_access.py", line 439, in get_user_effective_settings
+    settings = config.get_active_settings(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'config' has no attribute 'get_active_settings'
+2025-09-01 18:38:34,029 - asyncio - ERROR - Task was destroyed but it is pending!
+task: <Task pending name='Task-5' coro=<_redis_pubsub_listener() running at G:\Lunara Bot\src\main.py:3265> wait_for=<Future pending cb=[Task.task_wakeup()]>>
+2025-09-01 18:38:42,024 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
+2025-09-01 18:38:42,038 - telegram.ext.Application - INFO - Application.stop() complete
+2025-09-01 18:45:08,353 - slip_manager - INFO - Connecting to Redis at rediss://***:***@measured-whale-51756.upstash.io:6379
+2025-09-01 18:45:19,688 - __main__ - INFO - Starting bot with market monitor and AI trade monitor jobs scheduled...
+2025-09-01 18:45:19,690 - __main__ - INFO - Starting bot polling...
+2025-09-01 18:45:20,514 - __main__ - INFO - Running post-initialization setup...
+2025-09-01 18:45:20,514 - __main__ - INFO - Attempting to delete any pre-existing webhook...
+2025-09-01 18:45:20,716 - __main__ - INFO - Webhook deleted successfully.
+2025-09-01 18:45:20,717 - __main__ - INFO - Starting Redis pub/sub listener for real-time toggles...
+2025-09-01 18:45:21,100 - __main__ - INFO - Subscribed to autotrade:notify channel for instant toggles.
+2025-09-01 18:45:21,866 - telegram.ext.Application - INFO - Application started
+2025-09-01 18:45:29,653 - tradebot - INFO - Running scheduled_monitoring_job...
+2025-09-01 18:45:29,654 - tradebot - INFO - Admin user ID from config: 6284071528
+2025-09-01 18:45:29,676 - tradebot - INFO - Autotrade status for admin user: True
+2025-09-01 18:45:29,679 - src.gemini_cacher - INFO - Gemini cache miss for BTCUSDT, querying API...
+2025-09-01 18:45:29,956 - tradebot - INFO - Binance client initialized successfully.
+2025-09-01 18:45:30,099 - asyncio - ERROR - Task was destroyed but it is pending!
+task: <Task pending name='Task-5' coro=<_redis_pubsub_listener() running at G:\Lunara Bot\src\main.py:3267> wait_for=<Future pending cb=[Task.task_wakeup()]>>
+2025-09-01 18:45:30,951 - apscheduler.executors.default - WARNING - Run time of job "autotrade_cycle (trigger: interval[0:15:00], next run at: 2025-09-01 13:00:29 UTC)" was missed by 0:00:01.262649
+2025-09-01 18:45:30,953 - apscheduler.executors.default - WARNING - Run time of job "monitor_autotrades (trigger: interval[0:01:00], next run at: 2025-09-01 12:46:29 UTC)" was missed by 0:00:01.264233
+2025-09-01 18:45:31,972 - src.gemini_cacher - INFO - Gemini cache miss for ETHUSDT, querying API...
+2025-09-01 18:45:33,337 - src.gemini_cacher - INFO - Gemini cache miss for BNBUSDT, querying API...
+2025-09-01 18:45:35,259 - src.gemini_cacher - INFO - Gemini cache miss for SOLUSDT, querying API...
+2025-09-01 18:45:36,670 - src.gemini_cacher - INFO - Gemini cache miss for ADAUSDT, querying API...
+2025-09-01 18:45:38,013 - src.gemini_cacher - INFO - Gemini cache miss for XRPUSDT, querying API...
+2025-09-01 18:45:39,373 - src.gemini_cacher - INFO - Gemini cache miss for DOGEUSDT, querying API...
+2025-09-01 18:45:40,724 - src.gemini_cacher - INFO - Gemini cache miss for DOTUSDT, querying API...
+2025-09-01 18:45:42,073 - src.gemini_cacher - INFO - Gemini cache miss for AVAXUSDT, querying API...
+2025-09-01 18:45:43,440 - src.gemini_cacher - INFO - Gemini cache miss for LINKUSDT, querying API...
+2025-09-01 18:45:44,772 - src.gemini_cacher - INFO - Gemini cache miss for ARBUSDT, querying API...
+2025-09-01 18:45:46,118 - src.gemini_cacher - INFO - Gemini cache miss for OPUSDT, querying API...
+2025-09-01 18:45:47,490 - src.gemini_cacher - INFO - Gemini cache miss for LTCUSDT, querying API...
+2025-09-01 18:45:48,854 - src.gemini_cacher - INFO - Gemini cache miss for TRXUSDT, querying API...
+2025-09-01 18:45:50,354 - src.gemini_cacher - INFO - Gemini cache miss for SHIBUSDT, querying API...
+2025-09-01 18:45:51,142 - __main__ - INFO - HEARTBEAT: redis_ping=True promotion_retry_pending=0
+2025-09-01 18:45:51,143 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+TypeError: object NoneType can't be used in 'await' expression
+2025-09-01 18:45:51,690 - src.gemini_cacher - INFO - Gemini cache miss for PEPEUSDT, querying API...
+2025-09-01 18:45:53,022 - src.gemini_cacher - INFO - Gemini cache miss for UNIUSDT, querying API...
+2025-09-01 18:45:54,358 - src.gemini_cacher - INFO - Gemini cache miss for SUIUSDT, querying API...
+2025-09-01 18:45:55,690 - src.gemini_cacher - INFO - Gemini cache miss for INJUSDT, querying API...
+2025-09-01 18:45:57,023 - src.gemini_cacher - INFO - Gemini cache miss for CTKUSDT, querying API...
+2025-09-01 18:45:58,371 - src.gemini_cacher - INFO - Gemini cache miss for ENAUSDT, querying API...
+2025-09-01 18:46:29,696 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-01 18:46:31,665 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556374179:data':
+2025-09-01 18:46:31,747 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556374179:quantity':
+2025-09-01 18:46:31,840 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556374179:status':
+2025-09-01 18:46:31,883 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=1756556374179: None
+2025-09-01 18:46:31,983 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=1756556374179: None
+2025-09-01 18:46:32,171 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376303:data':
+2025-09-01 18:46:32,376 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376303:quantity':
+2025-09-01 18:46:32,534 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376303:status':
+2025-09-01 18:46:32,613 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=1756556376303: None
+2025-09-01 18:46:32,619 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=1756556376303: None
+2025-09-01 18:46:32,841 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376954:data':
+2025-09-01 18:46:32,935 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376954:quantity':
+2025-09-01 18:46:33,042 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376954:status':
+2025-09-01 18:46:33,051 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=1756556376954: None
+2025-09-01 18:46:33,059 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=1756556376954: None
+2025-09-01 18:46:33,133 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557608418:data':
+2025-09-01 18:46:33,222 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557608418:quantity':
+2025-09-01 18:46:33,295 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557608418:status':
+2025-09-01 18:46:33,297 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=1756557608418: None
+2025-09-01 18:46:33,298 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=1756557608418: None
+2025-09-01 18:46:33,363 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557610317:data':
+2025-09-01 18:46:33,422 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557610317:quantity':
+2025-09-01 18:46:33,485 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557610317:status':
+2025-09-01 18:46:33,487 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=1756557610317: None
+2025-09-01 18:46:33,488 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=1756557610317: None
+2025-09-01 18:46:33,554 - slip_manager - ERROR - Decryption failed for slip b'trade:49:quantity':
+2025-09-01 18:46:33,615 - slip_manager - ERROR - Decryption failed for slip b'trade:49:status':
+2025-09-01 18:46:33,616 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=49: None
+2025-09-01 18:46:33,617 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=49: None
+2025-09-01 18:46:33,681 - slip_manager - ERROR - Decryption failed for slip b'trade:51:quantity':
+2025-09-01 18:46:33,747 - slip_manager - ERROR - Decryption failed for slip b'trade:51:status':
+2025-09-01 18:46:33,748 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=51: None
+2025-09-01 18:46:33,749 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=51: None
+2025-09-01 18:46:33,809 - slip_manager - ERROR - Decryption failed for slip b'trade:52:quantity':
+2025-09-01 18:46:33,864 - slip_manager - ERROR - Decryption failed for slip b'trade:52:status':
+2025-09-01 18:46:33,866 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=52: None
+2025-09-01 18:46:33,867 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=52: None
+2025-09-01 18:46:33,928 - slip_manager - ERROR - Decryption failed for slip b'trade:54:quantity':
+2025-09-01 18:46:33,984 - slip_manager - ERROR - Decryption failed for slip b'trade:54:status':
+2025-09-01 18:46:33,987 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=54: None
+2025-09-01 18:46:33,989 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=54: None
+2025-09-01 18:46:34,054 - slip_manager - ERROR - Decryption failed for slip b'trade:55:quantity':
+2025-09-01 18:46:34,115 - slip_manager - ERROR - Decryption failed for slip b'trade:55:status':
+2025-09-01 18:46:34,116 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=55: None
+2025-09-01 18:46:34,117 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=55: None
+2025-09-01 18:46:34,177 - slip_manager - ERROR - Decryption failed for slip b'trade:58:quantity':
+2025-09-01 18:46:34,250 - slip_manager - ERROR - Decryption failed for slip b'trade:58:status':
+2025-09-01 18:46:34,252 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=58: None
+2025-09-01 18:46:34,254 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=58: None
+2025-09-01 18:46:34,321 - slip_manager - ERROR - Decryption failed for slip b'trade:59:quantity':
+2025-09-01 18:46:34,379 - slip_manager - ERROR - Decryption failed for slip b'trade:59:status':
+2025-09-01 18:46:34,381 - src.autotrade_jobs - INFO - Processing reconstructed slip for trade_id=59: None
+2025-09-01 18:46:34,382 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=59: None
+2025-09-01 18:47:13,884 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
+2025-09-01 18:47:13,904 - telegram.ext.Application - INFO - Application.stop() complete

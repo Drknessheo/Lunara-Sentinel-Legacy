@@ -85,7 +85,7 @@ jobs:
           file: ./Dockerfile
 
       - name: Trigger Render deploy with retries
-        if: ${{ secrets.RENDER_API_KEY != '' && secrets.RENDER_SERVICE_ID != '' }}
+        if: ${{ secrets.RENDER_API_KEY && secrets.RENDER_SERVICE_ID }}
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}

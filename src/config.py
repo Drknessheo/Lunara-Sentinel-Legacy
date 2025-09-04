@@ -101,11 +101,7 @@ TELEGRAM_SYNC_LOG_ENABLED = True  # Set to True to enable trade sync logs via Te
 AI_TRADE_INTERVAL_MINUTES = 10
 
 # Telegram and Binance API credentials from .env file
-import os
 
-from dotenv import load_dotenv
-
-load_dotenv()  # Load environment variables from .env file
 
 # --- Telegram ---
 # Support either TELEGRAM_BOT_TOKEN or legacy BOT_TOKEN env var (some deploys set BOT_TOKEN)
@@ -119,40 +115,18 @@ BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY")
 DB_NAME = "lunessa.db"
 
 # --- Security ---
+WEBHOOK_HMAC_SECRET = os.getenv("WEBHOOK_HMAC_SECRET")
+if not WEBHOOK_HMAC_SECRET:
+    print(
+        "Warning: WEBHOOK_HMAC_SECRET is not set. Webhook verification will be skipped."
+    )
 SLIP_ENCRYPTION_KEY = os.getenv("SLIP_ENCRYPTION_KEY")
 
 # --- User Management ---
 ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", 0))
 
 # --- Subscription Tiers ---
-SUBSCRIPTION_TIERS = {
-    "FREE": {
-        "features": ["basic_signals", "manual_trade"],
-        "settings": {
-            "RSI_BUY_THRESHOLD": 30,
-            "RSI_SELL_THRESHOLD": 70,
-            "STOP_LOSS_PERCENTAGE": 5.0,
-        },
-    },
-    "GOLD": {
-        "features": ["premium_signals", "auto_trade"],
-        "settings": {
-            "RSI_BUY_THRESHOLD": 35,
-            "RSI_SELL_THRESHOLD": 75,
-            "STOP_LOSS_PERCENTAGE": 7.0,
-        },
-        "duration_days": 30,
-    },
-    "PLATINUM": {
-        "features": ["all_gold_features", "early_access"],
-        "settings": {
-            "RSI_BUY_THRESHOLD": 40,
-            "RSI_SELL_THRESHOLD": 80,
-            "STOP_LOSS_PERCENTAGE": 10.0,
-        },
-        "duration_days": 90,
-    },
-}
+
 
 # --- AI & Caching Configuration ---
 GEMINI_API_URL = os.getenv("GEMINI_API_URL", "https://api.gemini.example/analysis")
@@ -248,9 +222,27 @@ SUBSCRIPTION_TIERS = {
 
 # --- Helper function to get current settings ---
 # This will be crucial for the rest of the code to adapt to the tier system.
+# Default settings used as a simple canonical fallback (tests may patch this).
+DEFAULT_SETTINGS = {"PROFIT_TARGET_PERCENTAGE": 1.0}
+
+
 def get_active_settings(tier: str):
     """
     Returns the settings dictionary for the given subscription tier.
     """
     # Fallback to FREE tier if the configured tier is invalid
     return SUBSCRIPTION_TIERS.get(tier.upper(), SUBSCRIPTION_TIERS["FREE"])
+
+
+# Ensure plain `import config` (non-package import) resolves to this module
+# when the package is executed as `python -m src.main` or similar. This
+# avoids duplicate module objects where some modules see a different
+# `config` without attributes like ADMIN_USER_ID.
+try:
+    import sys
+
+    sys.modules.setdefault("config", sys.modules[__name__])
+except Exception:
+    # Be conservative: if we can't mutate sys.modules for any reason, just
+    # continue; other guardrails in main.py also attempt to unify modules.
+    pass

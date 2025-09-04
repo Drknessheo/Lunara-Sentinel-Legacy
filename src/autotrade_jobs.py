@@ -63,9 +63,19 @@ import redis
 from telegram.ext import ContextTypes
 
 import config
-import slip_manager
-import trade
-from modules import db_access as autotrade_db
+
+# Local imports: prefer package-relative when running as a module
+if __package__:
+    from . import slip_manager, trade
+    from .modules import db_access as autotrade_db
+
+    pass
+else:
+    import slip_manager
+    import trade
+    from modules import db_access as autotrade_db
+
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +120,9 @@ async def get_trade_suggestions_from_gemini(symbols):
             logger.error(f"Error gathering metrics for {symbol}: {e}")
 
     # Build a single prompt for all coins
-    prompt = "Analyze the current market for the following coins. For each coin, answer with only 'buy' or 'hold'.\n\n"
+    prompt = """Analyze the current market for the following coins. For each coin, answer with only 'buy' or 'hold'.
+
+"""
     for symbol, data in metrics.items():
         prompt += f"Symbol: {symbol}\n"
         for k, v in data.items():
@@ -207,8 +219,56 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if not autotrade_db.get_autotrade_status(user_id):
-        logger.info("Autotrade is disabled. Skipping cycle.")
+    # Determine whether autotrade is enabled for this user.
+    autotrade_enabled = False
+    try:
+        autotrade_enabled = bool(autotrade_db.get_autotrade_status(user_id))
+    except Exception:
+        autotrade_enabled = False
+
+    # Allow Redis-based toggles to override or disable autotrade globally.
+    try:
+        rc = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
+        # Global override — if explicitly set to False/0, skip.
+        g = rc.get("autotrade:global")
+        if g is not None and str(g).lower() in ("false", "0"):
+            logger.info("Global autotrade disabled via Redis flag autotrade:global.")
+            return
+        # New precedence rules for autotrade toggles (clarified keys):
+        # - Global Redis key: autotrade:global (can disable autotrade for everyone)
+        # - For PREMIUM users: autotrade is ON by default unless an admin override exists
+        #   stored at autotrade:override:<user_id>
+        # - For non-PREMIUM users: a user-level preference may exist at autotrade:user:<user_id>
+        #   which takes precedence over the DB setting.
+        try:
+            # Determine user tier from DB helper (decorated call)
+            try:
+                tier = autotrade_db.get_user_tier_db(user_id)
+            except Exception:
+                tier = None
+
+            if tier and str(tier).upper() == "PREMIUM":
+                # PREMIUM users are enabled by default unless an admin override exists
+                admin_override = rc.get(f"autotrade:override:{user_id}")
+                if admin_override is not None:
+                    autotrade_enabled = str(admin_override).lower() in ("true", "1")
+                else:
+                    autotrade_enabled = True
+            else:
+                # Non-premium users: user preference (if present) overrides DB
+                user_pref = rc.get(f"autotrade:user:{user_id}")
+                if user_pref is not None:
+                    autotrade_enabled = str(user_pref).lower() in ("true", "1")
+                # else: keep autotrade_enabled as read from DB earlier
+        except Exception:
+            # If anything goes wrong reading tier or Redis, fall back to DB-only setting
+            pass
+    except Exception:
+        # If Redis is unavailable, fall back to DB-only setting (autotrade_enabled)
+        pass
+
+    if not autotrade_enabled:
+        logger.info("Autotrade is disabled (DB/Redis). Skipping cycle.")
         return
 
     settings = autotrade_db.get_user_effective_settings(user_id)
@@ -480,8 +540,6 @@ async def monitor_autotrades(
                 continue
             if not slip.get("sandpaper"):
                 logger.debug(f"[MONITOR] Skipping non-sandpaper slip: {trade_id}")
-                continue
-                logger.debug(f"Skipping non-sandpaper slip: {trade_id}")
                 continue
 
             # Get per-user effective autotrade settings

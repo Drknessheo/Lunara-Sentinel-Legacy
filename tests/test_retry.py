@@ -1,9 +1,6 @@
 import json
-import os
 import time
 from http.server import BaseHTTPRequestHandler
-
-import pytest
 
 try:
     import redis
@@ -21,21 +18,16 @@ class FailHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"fail")
 
 
-@pytest.mark.skipif(not os.getenv("REDIS_URL"), reason="REDIS_URL not set")
-def test_enqueue_on_webhook_failure(mock_server):
-    if not redis:
-        pytest.skip("redis python package not installed")
-
-    r = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
+def test_enqueue_on_webhook_failure(mock_server, mock_redis):
     # clear any existing keys used by test
-    r.delete("promotion_webhook_retry")
+    mock_redis.delete("autotrade:retry")
     # call the dispatch function via HTTP post to emulate the code path
     # use mock_server fixture base URL; mode defaults to fail
     url = f"{mock_server}/webhook"
     payload = {"event": "promotion", "audit_id": 9999}
 
-    # clear metrics and ensure promotion_webhook_stats is empty
-    r.delete("promotion_webhook_stats")
+    # clear metrics and ensure autotrade:stats is empty
+    mock_redis.delete("autotrade:stats")
 
     # Call the library function to perform send (it should enqueue on failure)
     from src.main import send_promotion_webhook
@@ -45,7 +37,7 @@ def test_enqueue_on_webhook_failure(mock_server):
 
     # allow a moment for Redis
     time.sleep(0.5)
-    items = r.lrange("promotion_webhook_retry", 0, -1)
+    items = mock_redis.lrange("autotrade:retry", 0, -1)
     assert items and len(items) == 1
     obj = json.loads(items[0])
     assert obj["payload"]["audit_id"] == 9999
@@ -53,7 +45,7 @@ def test_enqueue_on_webhook_failure(mock_server):
 
     # After enqueue, metrics helper should have incremented 'pending'
     # The enqueue function increments pending by 1, so confirm it
-    stats = r.hgetall("promotion_webhook_stats")
+    stats = mock_redis.hgetall("autotrade:stats")
     assert stats.get("pending") == "1"
 
     # Simulate worker success: decrease pending and increment total_sent
@@ -61,12 +53,12 @@ def test_enqueue_on_webhook_failure(mock_server):
 
     update_retry_metrics("pending", -1)
     update_retry_metrics("total_sent", 1)
-    stats = r.hgetall("promotion_webhook_stats")
+    stats = mock_redis.hgetall("autotrade:stats")
     assert stats.get("pending") == "0"
     assert stats.get("total_sent") == "1"
 
     # Simulate permanent failure: increment failed and set last_failed_ts
     update_retry_metrics("failed", 1)
-    stats = r.hgetall("promotion_webhook_stats")
+    stats = mock_redis.hgetall("autotrade:stats")
     assert stats.get("failed") == "1"
     assert "last_failed_ts" in stats

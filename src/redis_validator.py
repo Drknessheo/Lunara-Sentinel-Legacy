@@ -1,20 +1,40 @@
 import logging
+import os
 
 import redis
 
 import config
-from modules import db_access as db
+
+if __package__:
+    from .modules import db_access as db
+else:
+    from modules import db_access as db
 
 logger = logging.getLogger(__name__)
 
-# --- Redis Connection ---
-try:
-    # decode_responses=True is crucial for getting strings back from Redis
-    redis_client = redis.from_url(config.REDIS_URL, decode_responses=True)
-    logger.info("Redis validator connected successfully.")
-except Exception as e:
-    logger.error(f"Redis validator failed to connect: {e}")
-    redis_client = None
+# --- Redis Connection (lazy) ---
+# Delay creating the Redis client until first use so importing this module
+# doesn't attempt to connect during package import. Use get_redis_client()
+# to retrieve a ready client or None if unavailable.
+redis_client = None
+
+
+def get_redis_client():
+    global redis_client
+    if redis_client is not None:
+        return redis_client
+    try:
+        url = getattr(config, "REDIS_URL", None) or os.getenv("REDIS_URL")
+        if not url:
+            logger.debug("No REDIS_URL configured; redis validator will be disabled.")
+            return None
+        redis_client = redis.from_url(url, decode_responses=True)
+        logger.info("Redis validator connected successfully.")
+        return redis_client
+    except Exception as e:
+        logger.error(f"Redis validator failed to connect: {e}")
+        redis_client = None
+        return None
 
 
 def validate_trade(slip_data: dict) -> tuple[bool, str]:
@@ -22,7 +42,8 @@ def validate_trade(slip_data: dict) -> tuple[bool, str]:
     Validates a trade slip against all business rules.
     Returns a tuple: (is_valid: bool, reason: str)
     """
-    if not redis_client:
+    rc = get_redis_client()
+    if not rc:
         return False, "Validation failed: Redis connection is not available."
 
     user_id = slip_data["user_id"]
@@ -30,7 +51,7 @@ def validate_trade(slip_data: dict) -> tuple[bool, str]:
 
     # 1. Check for duplicates in Redis (Solves #3)
     redis_key = f"trade_status:{symbol}"
-    if redis_client.exists(redis_key):
+    if rc.exists(redis_key):
         return False, f"A trade for {symbol} is already being monitored in Redis."
 
     # 2. Check for duplicates in main DB from /import (Solves #2)

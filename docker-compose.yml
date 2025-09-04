@@ -1,0 +1,28 @@
+version: '3.8'
+services:
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+
+  app:
+    build: .
+    depends_on:
+      - redis
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN}"
+      ADMIN_USER_ID: "${ADMIN_USER_ID}"
+      SLIP_ENCRYPTION_KEY: "${SLIP_ENCRYPTION_KEY}"
+      ENABLE_AUTOTRADE: "${ENABLE_AUTOTRADE:-false}"
+      WEBHOOK_HMAC_SECRET: "${WEBHOOK_HMAC_SECRET}"
+    volumes:
+      - ./:/app:cached
+    ports:
+      - "8080:8080"
+    command: ["python", "-m", "src.main"]
+
+volumes:
+  redis-data:

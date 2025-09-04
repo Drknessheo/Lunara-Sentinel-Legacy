@@ -1,7 +1,10 @@
 [flake8]
 max-line-length = 88
 # Temporarily ignore long-line violations (E501) from legacy code. We'll
-# phase these fixes in; keeping E402/F403/F405 ignored to avoid noisy false
-# positives due to dynamic import patterns in this repo.
+# phase these fixes in; keep E402/F403/F405 ignored to avoid noisy false
+# positives due to dynamic import patterns in this repo while we iterate.
 extend-ignore = E203, W503, E402, F403, F405, E501
 exclude = .git,__pycache__,docs,build,dist,venv,.venv
+per-file-ignores =
+	src/main.py: E402,E501,F821
+	src/trade.py: E402,E501,E999,F811

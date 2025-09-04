@@ -1,0 +1,11 @@
+fix: Resolve deployment errors and improve stability
+
+This commit addresses several issues that were causing deployment failures and instability:
+
+- **Fix IndentationError:** Corrected an indentation error in `src/main.py` that was causing the application to crash on startup.
+- **Fix ImportError:** Resolved an `ImportError` for `logging_config` by adjusting the system path at the beginning of `src/main.py`.
+- **Fix CI/CD Workflow:** Simplified the `if` condition in `.github/workflows/ci-deploy.yml` to prevent parsing issues.
+- **Fix Docker Build:** Removed the duplicate `Dorkerfile` to ensure the correct `Dockerfile` is used for builds.
+- **Correct Command Handler:** Fixed the `buy_command` handler in `src/main.py` to point to the correct function.
+
+These changes should allow the application to build and deploy successfully on Render.

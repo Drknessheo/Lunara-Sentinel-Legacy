@@ -4,3 +4,4 @@ flake8>=6.0
 black>=24.0
 isort>=5.0
 autoflake>=2.1
+prometheus_client>=0.10.0

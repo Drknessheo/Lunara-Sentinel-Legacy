@@ -2,8 +2,30 @@ import functools
 import logging
 import sqlite3
 
-import config
-from security import decrypt_data
+from src import config
+
+# Allow tests to override the database path by setting this module-level variable.
+# Default to the repository DB file for normal runs.
+DB_PATH = "lunara_bot.db"
+# Import `decrypt_data` from the project's top-level `security.py`.
+# When running as a package (python -m src.main), use a relative import;
+# otherwise fall back to a top-level import for script mode.
+try:
+    # Prefer importing the top-level security module. When running as
+    # `python -m src.main`, project root is added to sys.path by main so
+    # this will succeed.
+    from security import decrypt_data
+except Exception:
+    # Fall back to package-aware import if the top-level import fails (e.g.,
+    # unusual execution environments). Try to import via relative path.
+    try:
+        if __package__:
+            from ... import security
+
+            decrypt_data = getattr(security, "decrypt_data", None)
+    except Exception:
+        # Give up; set decrypt_data to None and allow callers to handle absence.
+        decrypt_data = None
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +35,15 @@ def db_connection(func):
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        conn = sqlite3.connect("lunara_bot.db")
+        # Support shared in-memory DB for tests. A plain ':memory:' creates a
+        # distinct database per connection, which breaks tests that open
+        # multiple connections. Translate ':memory:' to a shared-memory URI.
+        if DB_PATH == ":memory:":
+            # Accept both ':memory:' and ':memory'
+            db_uri = "file::memory:?cache=shared"
+            conn = sqlite3.connect(db_uri, uri=True, check_same_thread=False)
+        else:
+            conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         try:
@@ -36,6 +66,7 @@ SETTING_TO_COLUMN_MAP = {
     "stop_loss": "custom_stop_loss",
     "trailing_activation": "custom_trailing_activation",
     "trailing_drop": "custom_trailing_drop",
+    "profit_target": "custom_profit_target",
 }
 
 CUSTOM_SETTINGS_MAPPING = {
@@ -44,6 +75,7 @@ CUSTOM_SETTINGS_MAPPING = {
     "custom_stop_loss": "STOP_LOSS_PERCENTAGE",
     "custom_trailing_activation": "TRAILING_PROFIT_ACTIVATION_PERCENT",
     "custom_trailing_drop": "TRAILING_STOP_DROP_PERCENT",
+    "custom_profit_target": "PROFIT_TARGET_PERCENTAGE",
 }
 
 
@@ -65,6 +97,7 @@ def update_user_setting(cursor, user_id: int, setting_name: str, value):
         )
 
 
+@db_connection
 def update_user_subscription(
     cursor, user_id: int, tier: str = "PREMIUM", expires: str = None
 ):
@@ -207,6 +240,7 @@ def initialize_database(cursor):
             custom_stop_loss REAL,
             custom_trailing_activation REAL,
             custom_trailing_drop REAL,
+            custom_profit_target REAL,
             trading_mode TEXT DEFAULT 'LIVE',
             paper_balance REAL DEFAULT 10000.0,
             autotrade_enabled INTEGER DEFAULT NULL
@@ -281,6 +315,8 @@ def migrate_schema(cursor):
         cursor.execute("ALTER TABLE users ADD COLUMN custom_stop_loss REAL")
         cursor.execute("ALTER TABLE users ADD COLUMN custom_trailing_activation REAL")
         cursor.execute("ALTER TABLE users ADD COLUMN custom_trailing_drop REAL")
+    if "custom_profit_target" not in user_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN custom_profit_target REAL")
 
 
 @db_connection
