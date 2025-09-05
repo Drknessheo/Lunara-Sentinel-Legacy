@@ -1,36 +1,44 @@
-FROM python:3.11-slim
+# ---- Base Stage ----
+# Use an official Python runtime as a parent image
+FROM python:3.11-slim-buster as base
 
-# Keep output unbuffered and avoid pip cache
-ENV PYTHONUNBUFFERED=1
-ENV PIP_NO_CACHE_DIR=1
-ENV PYTHONPATH=/app:/app/src
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-  build-essential \
-  curl \
-  gcc \
-  && rm -rf /var/lib/apt/lists/*
-
-RUN useradd --create-home appuser
+# Set work directory
 WORKDIR /app
 
-# Install dependencies (robust): copy source early and use a conditional fallback
-# This avoids build failures when the build context or filename differs (e.g. requirements-dev.txt)
-COPY . /app
-RUN pip install --upgrade pip && \
-  if [ -f /app/requirements.txt ]; then \
-    pip install -r /app/requirements.txt; \
-  elif [ -f /app/requirements-dev.txt ]; then \
-    pip install -r /app/requirements-dev.txt; \
-  else \
-    echo "No requirements file found, skipping pip install"; \
-  fi
+# ---- Builder Stage ----
+# This stage is used to install python dependencies
+FROM base as builder
 
-RUN chown -R appuser:appuser /app
+# Install dependencies
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
 
-USER appuser
 
+# ---- Final Stage ----
+# This is the final image that will be deployed
+FROM base
+
+# Install supervisor from system packages
+RUN apt-get update && apt-get install -y supervisor
+
+# Copy the pre-built wheels from the builder stage
+COPY --from=builder /app/wheels /wheels
+
+# Install the python dependencies from the wheels
+RUN pip install --no-cache /wheels/*
+
+# Copy the application code
+COPY . .
+
+# Copy the supervisor configuration
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Expose the port the app runs on
 EXPOSE 8080
 
-# Default to running the package entrypoint
-CMD ["python", "/app/run.py"]
+# Run supervisord
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
