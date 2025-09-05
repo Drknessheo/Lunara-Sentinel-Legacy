@@ -3273,3 +3273,315 @@ TypeError: object NoneType can't be used in 'await' expression
 2025-09-01 18:46:34,382 - src.autotrade_jobs - INFO - [MANUALMONITOR] Processing reconstructed slip for trade_id=59: None
 2025-09-01 18:47:13,884 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
 2025-09-01 18:47:13,904 - telegram.ext.Application - INFO - Application.stop() complete
+2025-09-05 23:23:49,941 - __main__ - INFO - Starting bot with market monitor and AI trade monitor jobs scheduled...
+2025-09-05 23:23:49,949 - __main__ - INFO - Starting bot polling...
+2025-09-05 23:23:51,568 - __main__ - INFO - Running post-initialization setup...
+2025-09-05 23:23:51,568 - __main__ - INFO - Attempting to delete any pre-existing webhook...
+2025-09-05 23:23:51,776 - __main__ - INFO - Webhook deleted successfully.
+2025-09-05 23:23:51,776 - __main__ - INFO - Starting Redis pub/sub listener for real-time toggles...
+2025-09-05 23:23:52,400 - __main__ - INFO - Subscribed to autotrade:notify channel for instant toggles.
+2025-09-05 23:23:52,521 - telegram.ext.Application - INFO - Application started
+2025-09-05 23:23:59,826 - tradebot - INFO - Running scheduled_monitoring_job...
+2025-09-05 23:23:59,827 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+  File "G:\lunara bot\src\trade.py", line 1787, in scheduled_monitoring_job
+    user_id = config.ADMIN_USER_ID  # Assuming monitoring is for the admin user
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'config' has no attribute 'ADMIN_USER_ID'
+2025-09-05 23:23:59,945 - src.autotrade_jobs - INFO - Starting autotrade cycle...
+2025-09-05 23:23:59,945 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-05 23:23:59,947 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_jobqueue.py", line 997, in _run
+    await self.callback(context)
+  File "G:\lunara bot\src\autotrade_jobs.py", line 147, in autotrade_cycle
+    user_id = config.ADMIN_USER_ID
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'config' has no attribute 'ADMIN_USER_ID'
+2025-09-05 23:24:21,157 - apscheduler.executors.default - WARNING - Run time of job "heartbeat_job (trigger: interval[0:05:00], next run at: 2025-09-05 17:29:19 UTC)" was missed by 0:00:01.216926
+2025-09-05 23:24:56,589 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556374179:data':
+2025-09-05 23:24:56,961 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556374179:quantity':
+2025-09-05 23:24:57,317 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556374179:status':
+2025-09-05 23:24:57,658 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376303:data':
+2025-09-05 23:24:58,018 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376303:quantity':
+2025-09-05 23:24:58,376 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376303:status':
+2025-09-05 23:24:58,732 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376954:data':
+2025-09-05 23:24:59,076 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376954:quantity':
+2025-09-05 23:24:59,469 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376954:status':
+2025-09-05 23:24:59,822 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557608418:data':
+2025-09-05 23:25:00,168 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557608418:quantity':
+2025-09-05 23:25:00,528 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557608418:status':
+2025-09-05 23:25:00,884 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557610317:data':
+2025-09-05 23:25:01,247 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557610317:quantity':
+2025-09-05 23:25:01,628 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557610317:status':
+2025-09-05 23:25:01,996 - slip_manager - ERROR - Decryption failed for slip b'trade:49:quantity':
+2025-09-05 23:25:02,350 - slip_manager - ERROR - Decryption failed for slip b'trade:49:status':
+2025-09-05 23:25:02,709 - slip_manager - ERROR - Decryption failed for slip b'trade:51:quantity':
+2025-09-05 23:25:03,073 - slip_manager - ERROR - Decryption failed for slip b'trade:51:status':
+2025-09-05 23:25:03,428 - slip_manager - ERROR - Decryption failed for slip b'trade:52:quantity':
+2025-09-05 23:25:03,784 - slip_manager - ERROR - Decryption failed for slip b'trade:52:status':
+2025-09-05 23:25:04,129 - slip_manager - ERROR - Decryption failed for slip b'trade:54:quantity':
+2025-09-05 23:25:04,485 - slip_manager - ERROR - Decryption failed for slip b'trade:54:status':
+2025-09-05 23:25:04,866 - slip_manager - ERROR - Decryption failed for slip b'trade:55:quantity':
+2025-09-05 23:25:05,295 - slip_manager - ERROR - Decryption failed for slip b'trade:55:status':
+2025-09-05 23:25:05,706 - slip_manager - ERROR - Decryption failed for slip b'trade:58:quantity':
+2025-09-05 23:25:06,085 - slip_manager - ERROR - Decryption failed for slip b'trade:58:status':
+2025-09-05 23:25:06,465 - slip_manager - ERROR - Decryption failed for slip b'trade:59:quantity':
+2025-09-05 23:25:06,845 - slip_manager - ERROR - Decryption failed for slip b'trade:59:status':
+2025-09-05 23:25:06,851 - __main__ - CRITICAL - Redis pubsub listener terminated unexpectedly: Timeout should be used inside a task
+Traceback (most recent call last):
+  File "G:\lunara bot\src\main.py", line 3324, in _redis_pubsub_listener
+    async for message in pubsub.listen():
+    ...<11 lines>...
+            logger.error(f"Error processing pubsub message: {e}")
+GeneratorExit
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "G:\lunara bot\src\main.py", line 3318, in _redis_pubsub_listener
+    async with rc.pubsub(ignore_subscribe_messages=True) as pubsub:
+               ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\site-packages\redis\asyncio\client.py", line 862, in __aexit__
+    await self.aclose()
+  File "G:\Pycharm soft\Lib\site-packages\redis\asyncio\client.py", line 876, in aclose
+    await self.connection.disconnect()
+  File "G:\Pycharm soft\Lib\site-packages\redis\asyncio\connection.py", line 469, in disconnect
+    async with async_timeout(self.socket_connect_timeout):
+               ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\asyncio\timeouts.py", line 90, in __aenter__
+    raise RuntimeError("Timeout should be used inside a task")
+RuntimeError: Timeout should be used inside a task
+2025-09-05 23:25:07,259 - asyncio - ERROR - Task was destroyed but it is pending!
+task: <Task pending name='Task-5' coro=<_redis_pubsub_listener() running at G:\lunara bot\src\main.py:3346> wait_for=<Future pending cb=[Task.task_wakeup()]>>
+2025-09-05 23:25:07,276 - apscheduler.executors.default - WARNING - Run time of job "monitor_autotrades (trigger: interval[0:01:00], next run at: 2025-09-05 17:25:59 UTC)" was missed by 0:00:07.335765
+2025-09-05 23:25:07,277 - apscheduler.executors.default - WARNING - Run time of job "promotion_retry_job (trigger: interval[0:00:15], next run at: 2025-09-05 17:25:19 UTC)" was missed by 0:00:02.456856
+2025-09-05 23:46:49,510 - __main__ - INFO - Starting bot with market monitor and AI trade monitor jobs scheduled...
+2025-09-05 23:46:49,522 - __main__ - INFO - Starting bot polling...
+2025-09-05 23:46:50,552 - __main__ - INFO - Running post-initialization setup...
+2025-09-05 23:46:50,552 - __main__ - INFO - Attempting to delete any pre-existing webhook...
+2025-09-05 23:46:50,772 - __main__ - INFO - Webhook deleted successfully.
+2025-09-05 23:46:50,772 - __main__ - INFO - Starting Redis pub/sub listener for real-time toggles...
+2025-09-05 23:46:51,338 - __main__ - INFO - Subscribed to autotrade:notify channel for instant toggles.
+2025-09-05 23:46:51,573 - telegram.ext.Application - INFO - Application started
+2025-09-05 23:46:59,465 - tradebot - INFO - Running scheduled_monitoring_job...
+2025-09-05 23:46:59,465 - tradebot - INFO - Admin user ID from config: None
+2025-09-05 23:46:59,467 - tradebot - INFO - Scheduled monitoring skipped: Admin user not set.
+2025-09-05 23:46:59,528 - src.autotrade_jobs - INFO - Starting autotrade cycle...
+2025-09-05 23:47:00,425 - src.autotrade_jobs - INFO - Skipping autotrade cycle: Binance client unavailable.
+2025-09-05 23:47:02,074 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-05 23:47:06,881 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556374179:data':
+2025-09-05 23:47:07,534 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556374179:quantity':
+2025-09-05 23:47:07,985 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556374179:status':
+2025-09-05 23:47:08,481 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376303:data':
+2025-09-05 23:47:09,113 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376303:quantity':
+2025-09-05 23:47:10,247 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376303:status':
+2025-09-05 23:47:12,308 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376954:data':
+2025-09-05 23:47:12,819 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376954:quantity':
+2025-09-05 23:47:13,233 - slip_manager - ERROR - Decryption failed for slip b'trade:1756556376954:status':
+2025-09-05 23:47:13,716 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557608418:data':
+2025-09-05 23:47:14,252 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557608418:quantity':
+2025-09-05 23:47:14,717 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557608418:status':
+2025-09-05 23:47:15,141 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557610317:data':
+2025-09-05 23:47:15,556 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557610317:quantity':
+2025-09-05 23:47:16,061 - slip_manager - ERROR - Decryption failed for slip b'trade:1756557610317:status':
+2025-09-05 23:47:16,697 - slip_manager - ERROR - Decryption failed for slip b'trade:49:quantity':
+2025-09-05 23:47:17,327 - slip_manager - ERROR - Decryption failed for slip b'trade:49:status':
+2025-09-05 23:47:17,824 - slip_manager - ERROR - Decryption failed for slip b'trade:51:quantity':
+2025-09-05 23:47:18,346 - slip_manager - ERROR - Decryption failed for slip b'trade:51:status':
+2025-09-05 23:47:18,948 - slip_manager - ERROR - Decryption failed for slip b'trade:52:quantity':
+2025-09-05 23:47:19,394 - slip_manager - ERROR - Decryption failed for slip b'trade:52:status':
+2025-09-05 23:47:19,786 - slip_manager - ERROR - Decryption failed for slip b'trade:54:quantity':
+2025-09-05 23:47:20,296 - slip_manager - ERROR - Decryption failed for slip b'trade:54:status':
+2025-09-05 23:47:20,791 - slip_manager - ERROR - Decryption failed for slip b'trade:55:quantity':
+2025-09-05 23:47:21,197 - slip_manager - ERROR - Decryption failed for slip b'trade:55:status':
+2025-09-05 23:47:22,040 - slip_manager - ERROR - Decryption failed for slip b'trade:58:quantity':
+2025-09-05 23:47:22,917 - slip_manager - ERROR - Decryption failed for slip b'trade:58:status':
+2025-09-05 23:47:24,682 - slip_manager - ERROR - Decryption failed for slip b'trade:59:quantity':
+2025-09-05 23:47:25,498 - slip_manager - ERROR - Decryption failed for slip b'trade:59:status':
+2025-09-05 23:47:25,502 - apscheduler.executors.default - WARNING - Run time of job "promotion_retry_job (trigger: interval[0:00:15], next run at: 2025-09-05 17:47:34 UTC)" was missed by 0:00:06.039892
+2025-09-05 23:47:25,503 - apscheduler.executors.default - WARNING - Run time of job "heartbeat_job (trigger: interval[0:05:00], next run at: 2025-09-05 17:52:19 UTC)" was missed by 0:00:05.992435
+2025-09-05 23:47:29,452 - asyncio - ERROR - Task was destroyed but it is pending!
+task: <Task pending name='Task-5' coro=<_redis_pubsub_listener() done, defined at G:\lunara bot\src\main.py:3304> wait_for=<Future pending cb=[Task.task_wakeup()]>>
+2025-09-05 23:47:59,514 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-05 23:48:15,320 - tradebot - WARNING - Binance API keys not found. Trading functions will be disabled.
+2025-09-05 23:48:15,321 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_application.py", line 1311, in process_update
+    await coroutine
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_handlers\basehandler.py", line 158, in handle_update
+    return await self.callback(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\lunara bot\src\main.py", line 1027, in wallet_command
+    balances = trade.get_all_spot_balances(config.ADMIN_USER_ID)
+  File "G:\lunara bot\src\trade.py", line 367, in get_all_spot_balances
+    user_client = get_user_client(user_id)
+  File "G:\lunara bot\src\trade.py", line 175, in get_user_client
+    if user_id == config.ADMIN_USER_ID:
+                  ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'config' has no attribute 'ADMIN_USER_ID'
+2025-09-05 23:48:59,520 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
+2025-09-05 23:49:28,681 - __main__ - ERROR - Unhandled exception in update handler
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "G:\Pycharm soft\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "G:\Pycharm soft\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\httpcore\_async\connection.py", line 103, in handle_async_request
+    return await self._connection.handle_async_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\site-packages\httpcore\_async\http11.py", line 136, in handle_async_request
+    raise exc
+  File "G:\Pycharm soft\Lib\site-packages\httpcore\_async\http11.py", line 106, in handle_async_request
+    ) = await self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\site-packages\httpcore\_async\http11.py", line 177, in _receive_response_headers
+    event = await self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\site-packages\httpcore\_async\http11.py", line 217, in _receive_event
+    data = await self._network_stream.read(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.READ_NUM_BYTES, timeout=timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\httpcore\_backends\anyio.py", line 32, in read
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "G:\Pycharm soft\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "G:\Pycharm soft\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\request\_httpxrequest.py", line 273, in do_request
+    res = await self._client.request(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "G:\Pycharm soft\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "G:\Pycharm soft\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_application.py", line 1311, in process_update
+    await coroutine
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_handlers\basehandler.py", line 158, in handle_update
+    return await self.callback(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\lunara bot\src\main.py", line 2221, in set_api_command
+    return await set_api_command_primary(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\lunara bot\src\main.py", line 1871, in set_api_command_primary
+    await update.message.reply_text(
+        "Usage: /setapi <KEY> <SECRET> — send this in a private chat with the bot."
+    )
+  File "G:\Pycharm soft\Lib\site-packages\telegram\_message.py", line 1910, in reply_text
+    return await self.get_bot().send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<19 lines>...
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_extbot.py", line 3055, in send_message
+    return await super().send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<21 lines>...
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\telegram\_bot.py", line 1100, in send_message
+    return await self._send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<19 lines>...
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_extbot.py", line 630, in _send_message
+    result = await super()._send_message(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<21 lines>...
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\telegram\_bot.py", line 810, in _send_message
+    result = await self._post(
+             ^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\telegram\_bot.py", line 698, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\telegram\ext\_extbot.py", line 370, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\telegram\_bot.py", line 727, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\telegram\request\_baserequest.py", line 197, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\telegram\request\_baserequest.py", line 304, in _request_wrapper
+    code, payload = await self.do_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "G:\Pycharm soft\Lib\site-packages\telegram\request\_httpxrequest.py", line 290, in do_request
+    raise TimedOut from err
+telegram.error.TimedOut: Timed out

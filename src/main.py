@@ -68,6 +68,10 @@ except Exception:
     # Best-effort; do not fail startup on sys.modules manipulation
     pass
 
+# Expose a module-level admin id which is safe to reference across this module.
+# Use getattr to avoid AttributeError if config was loaded differently.
+ADMIN_ID = getattr(config, "ADMIN_USER_ID", None)
+
 # Local modules: prefer package-relative imports when running as a module
 # (python -m src.main). Fall back to top-level imports to preserve
 # convenience when running as a script (python src/main.py).
@@ -509,7 +513,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     Only admin can set global settings via this minimal implementation.
     """
     user_id = update.effective_user.id
-    if user_id != config.ADMIN_USER_ID:
+    if user_id != ADMIN_ID:
         await update.message.reply_text(
             "Only the admin can change autotrade settings via this command."
         )
@@ -553,7 +557,7 @@ async def mockbuy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     Usage: /mockbuy SYMBOL AMOUNT
     """
     user_id = update.effective_user.id
-    if user_id != config.ADMIN_USER_ID:
+    if user_id != ADMIN_ID:
         await update.message.reply_text("Only the admin can run this command.")
         return
 
@@ -585,7 +589,7 @@ async def autosuggest_command(
 ) -> None:
     """Admin-only: fetch Gemini suggestions and create mock sandpaper buys for recommended coins."""
     user_id = update.effective_user.id
-    if user_id != config.ADMIN_USER_ID:
+    if user_id != ADMIN_ID:
         await update.message.reply_text("Only the admin can run this command.")
         return
 
@@ -2464,7 +2468,8 @@ def main() -> None:
     application.add_handler(
         CommandHandler("quest", quest_command)
     )  # This now handles the main trading logic
-    application.add_handler(CommandHandler("import", import_command))
+    # /import should call the import_all_command implementation
+    application.add_handler(CommandHandler("import", import_all_command))
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("activate", activate_command))
     application.add_handler(CommandHandler("setapi", set_api_command))
@@ -3311,10 +3316,15 @@ async def _redis_pubsub_listener(app: Application) -> None:
         logger.warning("No REDIS_URL configured; pubsub listener disabled.")
         return
 
+    # Keep a persistent connection and ensure we don't use async-timeouts
+    # in a way that raises "Timeout should be used inside a task" during
+    # shutdown. If the pubsub loop is cancelled, exit cleanly.
+    reconnect_delay = 5
     while True:
         try:
             rc = aioredis.from_url(redis_url, decode_responses=True)
-            async with rc.pubsub(ignore_subscribe_messages=True) as pubsub:
+            pubsub = await rc.pubsub(ignore_subscribe_messages=True).__aenter__()
+            try:
                 await pubsub.subscribe("autotrade:notify")
                 logger.info(
                     "Subscribed to autotrade:notify channel for instant toggles."
@@ -3333,16 +3343,35 @@ async def _redis_pubsub_listener(app: Application) -> None:
                         )
                     except Exception as e:
                         logger.error(f"Error processing pubsub message: {e}")
-        except redis.exceptions.ConnectionError as e:
+            finally:
+                # Ensure we close the pubsub context cleanly
+                try:
+                    await pubsub.unsubscribe("autotrade:notify")
+                except Exception:
+                    pass
+                try:
+                    await rc.pubsub(ignore_subscribe_messages=True).__aexit__(
+                        None, None, None
+                    )
+                except Exception:
+                    # Best-effort close; ignore errors during shutdown
+                    pass
+
+        except aioredis.exceptions.ConnectionError as e:
             logger.error(
-                f"Redis pubsub connection error: {e}. Reconnecting in 30 seconds..."
+                f"Redis pubsub connection error: {e}. Reconnecting in {reconnect_delay} seconds..."
             )
-            await asyncio.sleep(30)
+            await asyncio.sleep(reconnect_delay)
+            reconnect_delay = min(60, reconnect_delay * 2)
+        except asyncio.CancelledError:
+            logger.info("Redis pubsub listener task cancelled; exiting listener loop.")
+            break
         except Exception as e:
             logger.critical(
                 f"Redis pubsub listener terminated unexpectedly: {e}", exc_info=True
             )
-            await asyncio.sleep(30)  # Avoid rapid-fire crash loops
+            await asyncio.sleep(reconnect_delay)
+            reconnect_delay = min(60, reconnect_delay * 2)
 
 
 if __name__ == "__main__":

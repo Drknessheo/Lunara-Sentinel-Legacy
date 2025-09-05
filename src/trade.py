@@ -616,7 +616,9 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_tier = db.get_user_tier_db(user_id)
     is_admin = user_id == config.ADMIN_USER_ID
     if user_tier != "PREMIUM" and not is_admin:
-        await update.message.reply_text("The /buy command is a Premium feature. Use /subscribe to upgrade.")
+        await update.message.reply_text(
+            "The /buy command is a Premium feature. Use /subscribe to upgrade."
+        )
         return
 
     mode, paper_balance = db.get_user_trading_mode_and_balance(user_id)
@@ -731,7 +733,6 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "Paper trading via /buy is not yet implemented. Use /quest to start a paper trade."
         )
-
 
 
 async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -924,9 +925,9 @@ async def import_trade_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if not context.args:
         await update.message.reply_text(
-            "Please specify a symbol, price, and quantity.\n" 
-            "Usage: `/import <SYMBOL> <PRICE> <QUANTITY>`\n" 
-            "Example: `/import BTCUSDT 30000 0.01`\n" 
+            "Please specify a symbol, price, and quantity.\n"
+            "Usage: `/import <SYMBOL> <PRICE> <QUANTITY>`\n"
+            "Example: `/import BTCUSDT 30000 0.01`\n"
             "You can also use `/import <SYMBOL>` to auto-import your last Binance trade for that symbol.",
             parse_mode="Markdown",
         )
@@ -1009,12 +1010,12 @@ async def import_trade_command(update: Update, context: ContextTypes.DEFAULT_TYP
             )  # RSI at buy is not available for imported trades
 
             await update.message.reply_text(
-                f"✅ **Trade Imported!**\n\n" 
-                f"   - **{symbol}** (ID: {trade_id})\n" 
-                f"   - Bought at: `${buy_price:,.8f}`\n" 
-                f"   - Quantity: `{quantity:.4f}`\n" 
-                f"   - ✅ Take Profit: `${take_profit_price:,.8f}`\n" 
-                f"   - 🛡️ Stop Loss: `${stop_loss_price:,.8f}`\n\n" 
+                f"✅ **Trade Imported!**\n\n"
+                f"   - **{symbol}** (ID: {trade_id})\n"
+                f"   - Bought at: `${buy_price:,.8f}`\n"
+                f"   - Quantity: `{quantity:.4f}`\n"
+                f"   - ✅ Take Profit: `${take_profit_price:,.8f}`\n"
+                f"   - 🛡️ Stop Loss: `${stop_loss_price:,.8f}`\n\n"
                 f"This trade will now be monitored. Use /status to see your open quests.",
                 parse_mode="Markdown",
             )
@@ -1784,7 +1785,9 @@ async def scheduled_monitoring_job(context: ContextTypes.DEFAULT_TYPE):
     It gathers the latest data and then calls the main monitoring logic.
     """
     logger.info("Running scheduled_monitoring_job...")
-    user_id = config.ADMIN_USER_ID  # Assuming monitoring is for the admin user
+    user_id = getattr(
+        config, "ADMIN_USER_ID", None
+    )  # Assuming monitoring is for the admin user
     logger.info(f"Admin user ID from config: {user_id}")
     if user_id:
         autotrade_status = db.get_autotrade_status(user_id)

@@ -144,7 +144,7 @@ async def get_trade_suggestions_from_gemini(symbols):
 
 async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE):
     logger.info("Starting autotrade cycle...")
-    user_id = config.ADMIN_USER_ID
+    user_id = getattr(config, "ADMIN_USER_ID", None)
 
     # Skip autotrade if Binance client is not available
     try:

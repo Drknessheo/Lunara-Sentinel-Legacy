@@ -11,6 +11,19 @@ def setup_logging():
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
 
+    # On some Windows/Powershell setups the stdout encoding cannot handle
+    # certain Unicode characters (e.g. emojis). If available, reconfigure
+    # stdout to use utf-8 so log messages with emoji don't raise UnicodeEncodeError.
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            try:
+                sys.stdout.reconfigure(encoding="utf-8")
+            except Exception:
+                # Best-effort; don't fail startup if reconfigure isn't allowed
+                pass
+    except Exception:
+        pass
+
     # Configure the root logger
     logging.basicConfig(
         level=logging.INFO,
@@ -21,6 +34,8 @@ def setup_logging():
                 maxBytes=5 * 1024 * 1024,  # 5 MB
                 backupCount=5,
             ),
+            # Use a StreamHandler for stdout; after the stdout.reconfigure
+            # above this will emit UTF-8 safely on modern Pythons.
             logging.StreamHandler(sys.stdout),
         ],
     )
