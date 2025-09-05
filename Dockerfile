@@ -8,15 +8,22 @@ WORKDIR /app
 # Install supervisor
 RUN apt-get update && apt-get install -y supervisor
 
-# Copy requirements and install
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+# Copy the entire repository early to avoid BuildKit per-file checksum errors
+COPY . /app
 
-# Copy the rest of the code
-COPY . .
+# Install requirements if present
+RUN if [ -f /app/requirements.txt ]; then \
+			pip install -r /app/requirements.txt; \
+		else \
+			echo "No requirements.txt found, skipping pip install"; \
+		fi
 
-# Copy the supervisor configuration
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# If a supervisord.conf exists at repo root, install it into supervisor's conf.d
+RUN if [ -f /app/supervisord.conf ]; then \
+			mkdir -p /etc/supervisor/conf.d && cp /app/supervisord.conf /etc/supervisor/conf.d/supervisord.conf; \
+		else \
+			echo "No supervisord.conf found at repo root; continuing without it"; \
+		fi
 
 EXPOSE 8080
 
