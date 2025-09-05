@@ -1,4 +1,4 @@
-FROM python:3.11-slim-buster
+FROM python:3.12-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
@@ -6,7 +6,9 @@ ENV PYTHONUNBUFFERED 1
 WORKDIR /app
 
 # Install supervisor
-RUN apt-get update && apt-get install -y supervisor
+RUN apt-get update && \
+	apt-get install -y --no-install-recommends supervisor && \
+	rm -rf /var/lib/apt/lists/*
 
 # Copy the entire repository early to avoid BuildKit per-file checksum errors
 COPY . /app
