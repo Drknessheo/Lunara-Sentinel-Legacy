@@ -1,14 +1,15 @@
 import os
 import subprocess
+import sys
 
 from dotenv import load_dotenv
 
 
-def main():
+def main() -> int:
+    """Load .env and run the bot as a module using the current Python executable.
+
+    Returns an exit code suitable for sys.exit().
     """
-    Loads environment variables from .env and runs the bot.
-    """
-    print("Loading environment variables from .env file...")
     load_dotenv()
 
     # Check for essential environment variables
@@ -20,20 +21,25 @@ def main():
             f"Error: Missing required environment variables: {', '.join(missing_vars)}"
         )
         print("Please create a .env file based on .env.example and fill in the values.")
-        return
+        return 2
 
     print("Starting Lunara Bot worker...")
+
+    env = os.environ.copy()
+    # Ensure subprocess uses UTF-8 on Windows to avoid encoding errors
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+
     try:
-        # Ensure subprocess uses UTF-8 on Windows to avoid encoding errors
-        env = os.environ.copy()
-        env.setdefault("PYTHONIOENCODING", "utf-8")
-        # Using python -m src.main ensures package imports work correctly.
-        subprocess.run(["python", "-m", "src.main"], check=True, env=env)
+        # Use the same Python interpreter that's running this script
+        subprocess.run([sys.executable, "-m", "src.main"], check=True, env=env)
+        return 0
     except KeyboardInterrupt:
         print("\nBot stopped by user.")
+        return 0
     except subprocess.CalledProcessError as e:
         print(f"Bot process failed with exit code {e.returncode}")
+        return e.returncode
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
