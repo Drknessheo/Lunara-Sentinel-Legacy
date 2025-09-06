@@ -1,3 +1,19 @@
+venv/
+venv
+*.pyc
+__pycache__
+.venv
+.env
+logs/
+*.log
+.vscode/
+.idea/
+dist/
+build/
+*.egg-info/
+lunara_bot.db
+sprttrade.db
+.pytest_cache/
 # Git
 .git
 .gitignore
