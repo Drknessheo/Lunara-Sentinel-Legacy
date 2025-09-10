@@ -70,12 +70,56 @@ def get_fernet() -> Optional[Fernet]:
         )
         return None
 
+    # If key looks like a valid Fernet base64 key (43/44 bytes), try to use directly
     if isinstance(key, str):
-        key = key.encode()
+        key_str = key.strip()
+    else:
+        try:
+            key_str = key.decode()
+        except Exception:
+            key_str = None
+
+    # If key_str decodes as a Fernet key, use it
+    if key_str:
+        try:
+            # Try direct Fernet usage
+            return Fernet(key_str.encode())
+        except Exception:
+            pass
+
+    # Otherwise, derive a Fernet key from the provided passphrase using PBKDF2HMAC
     try:
-        return Fernet(key)
+        import base64
+
+        from cryptography.hazmat.backends import default_backend
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+        salt = (
+            os.getenv("SLIP_ENCRYPTION_SALT")
+            or os.getenv("ENCRYPTION_SALT")
+            or "lunara_default_salt"
+        )
+        if isinstance(salt, str):
+            salt_bytes = salt.encode()
+        else:
+            salt_bytes = salt
+
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt_bytes,
+            iterations=390000,
+            backend=default_backend(),
+        )
+        if isinstance(key, str):
+            password = key.encode()
+        else:
+            password = key
+        derived = base64.urlsafe_b64encode(kdf.derive(password))
+        return Fernet(derived)
     except Exception as e:
-        logger.error(f"Invalid encryption key: {e}")
+        logger.error(f"Failed to derive Fernet key from passphrase: {e}")
         return None
 
 

@@ -651,7 +651,7 @@ def get_user_api_keys(user_id: int) -> tuple[str | None, str | None]:
     For the admin user, it returns the keys directly from the .env configuration.
     """
     # As the father of the bot, you get your keys directly from the sacred .env scroll.
-    if user_id == config.ADMIN_USER_ID:
+    if user_id == getattr(config, "ADMIN_USER_ID", None):
         return config.BINANCE_API_KEY, config.BINANCE_SECRET_KEY
 
     conn = get_db_connection()
@@ -670,7 +670,7 @@ def get_user_api_keys(user_id: int) -> tuple[str | None, str | None]:
 def get_user_tier(user_id: int) -> str:
     """Retrieves a user's subscription tier."""
     # As the father of the bot, you are always granted Premium status.
-    if user_id == config.ADMIN_USER_ID:
+    if user_id == getattr(config, "ADMIN_USER_ID", None):
         return "PREMIUM"
 
     user = get_or_create_user(user_id)

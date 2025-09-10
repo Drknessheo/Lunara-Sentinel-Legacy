@@ -1,4 +1,6 @@
 import asyncio
+import csv
+import io
 import json
 import logging
 import os
@@ -78,6 +80,7 @@ ADMIN_ID = getattr(config, "ADMIN_USER_ID", None)
 if __package__:
     from . import trade, trade_executor
     from .modules import db_access as db
+    from .redis_persistence import RedisPersistence
     from .Simulation import resonance_engine
     from .slip_parser import SlipParseError, parse_slip
 else:
@@ -508,48 +511,83 @@ async def resonate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Simple /settings handler to set autotrade parameters for the invoking user.
-    Usage: /settings key=value key2=value2
-    Only admin can set global settings via this minimal implementation.
+    """/settings handler wired to `autotrade_settings` for validation and storage.
+
+    Usage:
+      /settings <key> <value>
+      /settings <key> reset
+      /settings export
     """
+    try:
+        from autotrade_settings import (
+            KEY_DEFINITIONS,
+            export_settings_csv,
+            validate_and_set,
+        )
+    except Exception as e:
+        logger.error("Failed to load autotrade_settings: %s", e)
+        await update.message.reply_text("Settings subsystem unavailable.")
+        return
+
     user_id = update.effective_user.id
+    # Only admin is allowed to change global settings in this implementation
     if user_id != ADMIN_ID:
         await update.message.reply_text(
             "Only the admin can change autotrade settings via this command."
         )
         return
 
-    # Parse args like key=value
-    settings = {}
-    for token in context.args:
-        if "=" in token:
-            k, v = token.split("=", 1)
-            # coerce numeric values
-            try:
-                if "." in v:
-                    vv = float(v)
-                else:
-                    vv = int(v)
-            except Exception:
-                vv = v
-            settings[k.strip()] = vv
-
-    if not settings:
+    if not context.args:
+        # Show available keys and usage
+        keys_list = "\n".join(
+            [
+                f"`{k}` - {v['name']} (default={v['default']}, range={v.get('min')}-{v.get('max')})"
+                for k, v in KEY_DEFINITIONS.items()
+            ]
+        )
         await update.message.reply_text(
-            "Usage: /settings key=value ...\nExample: /settings PROFIT_TARGET_PERCENTAGE=2.5 TRADE_SIZE_USDT=10"
+            "Usage:\n/settings <key> <value>\n/settings <key> reset\n/settings export\n\nAvailable settings:\n"
+            + keys_list,
+            parse_mode=ParseMode.MARKDOWN,
         )
         return
 
-    try:
-        from autotrade_settings import set_user_settings
+    # export command
+    if len(context.args) == 1 and context.args[0].lower() == "export":
+        csv_text = export_settings_csv(user_id)
+        # Send small CSV as a file if > 4000 chars otherwise inline
+        if len(csv_text) > 3500:
+            await update.message.reply_document(
+                document=csv_text.encode("utf-8"), filename="settings.csv"
+            )
+        else:
+            await update.message.reply_text(
+                f"CSV:\n<pre>{csv_text}</pre>", parse_mode=ParseMode.HTML
+            )
+        return
 
-        set_user_settings(user_id, settings)
-        # Intentionally do not send a reply on success (tests expect only
-        # the subsequent /myprofile to send a message). Log instead.
-        logger.info(f"Settings updated for user {user_id}: {settings}")
+    # Expect pairs: key value (or key reset)
+    if len(context.args) < 2:
+        await update.message.reply_text("Invalid usage. Example: /settings rsi_buy 35")
+        return
+
+    key = context.args[0]
+    raw_value = " ".join(context.args[1:])
+
+    success, msg = validate_and_set(user_id, key, raw_value, admin_scope=True)
+    if success:
+        await update.message.reply_text(f"✅ {msg}")
+    else:
+        await update.message.reply_text(f"❗ {msg}")
+        return
+
+    try:
+        from autotrade_settings import get_user_settings
+
+        current = get_user_settings(user_id) or {}
+        logger.info(f"Settings updated for user {user_id}: {current}")
     except Exception as e:
-        logger.error(f"Failed to save settings: {e}")
-        await update.message.reply_text("Failed to save settings. See logs.")
+        logger.error(f"Settings saved but failed to read back for logging: {e}")
 
 
 async def mockbuy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -704,7 +742,7 @@ async def autosuggest_callback(
             from autotrade_jobs import autotrade_buy_from_suggestions
 
             created = await autotrade_buy_from_suggestions(
-                config.ADMIN_USER_ID,
+                getattr(config, "ADMIN_USER_ID", None),
                 None,
                 context,
                 dry_run=False,
@@ -765,7 +803,7 @@ async def list_sandpaper_command(
 ) -> None:
     """Admin-only: list current sandpaper slips stored in Redis for debugging."""
     user_id = update.effective_user.id
-    if user_id != config.ADMIN_USER_ID:
+    if user_id != getattr(config, "ADMIN_USER_ID", None):
         await update.message.reply_text("Only the admin can run this command.")
         return
 
@@ -795,7 +833,7 @@ async def audit_recent_command(
 ) -> None:
     """Admin-only: show recent autosuggest audit entries from Redis."""
     user_id = update.effective_user.id
-    if user_id != config.ADMIN_USER_ID:
+    if user_id != getattr(config, "ADMIN_USER_ID", None):
         await update.message.reply_text("Only the admin can view audit entries.")
         return
 
@@ -1009,7 +1047,7 @@ async def wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """Displays the user's current spot wallet balances on Binance."""
     user_id = update.effective_user.id
     mode, _ = db.get_user_trading_mode_and_balance(user_id)
-    is_admin = user_id == config.ADMIN_USER_ID
+    is_admin = user_id == getattr(config, "ADMIN_USER_ID", None)
 
     if mode != "LIVE" and not is_admin:
         await update.message.reply_text(
@@ -1023,8 +1061,9 @@ async def wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     try:
         # Admin/creator/father bypasses API key check
+        admin_id = getattr(config, "ADMIN_USER_ID", None)
         if is_admin:
-            balances = trade.get_all_spot_balances(config.ADMIN_USER_ID)
+            balances = trade.get_all_spot_balances(admin_id)
         else:
             balances = trade.get_all_spot_balances(user_id)
         if balances is None:
@@ -1091,86 +1130,7 @@ async def wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
 
 
-async def import_all_command(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
-    """Imports all significant holdings from Binance wallet as new quests."""
-    user_id = update.effective_user.id
-    mode, _ = db.get_user_trading_mode_and_balance(user_id)
 
-    if mode != "LIVE":
-        await update.message.reply_text("Upgrade to Premium to use this feature.")
-        return
-
-    await update.message.reply_text(
-        "Scanning your Binance wallet to import all significant holdings as quests... 🔎 This may take a moment."
-    )
-
-    try:
-        balances = trade.get_all_spot_balances(user_id)
-        if not balances:
-            await update.message.reply_text(
-                "Your spot wallet appears to be empty. Nothing to import."
-            )
-            return
-
-        # Fetch all prices at once
-        all_tickers = trade.client.get_all_tickers()
-        prices = {item["symbol"]: float(item["price"]) for item in all_tickers}
-
-        imported_count = 0
-        skipped_count = 0
-        message_lines = []
-
-        for balance in balances:
-            asset = balance["asset"]
-            total_balance = float(balance["free"]) + float(balance["locked"])
-            symbol = f"{asset}USDT"
-
-            if asset.upper() in ["USDT", "BUSD", "USDC", "FDUSD", "TUSD"]:
-                continue
-
-            price = prices.get(symbol)
-            if not price:
-                continue
-
-            usdt_value = total_balance * price
-            if usdt_value < 10.0:
-                continue
-
-            if db.is_trade_open(user_id, symbol):
-                skipped_count += 1
-                continue
-
-            settings = db.get_user_effective_settings(user_id)
-            stop_loss_price = price * (1 - settings["STOP_LOSS_PERCENTAGE"] / 100)
-            take_profit_price = price * (1 + settings["PROFIT_TARGET_PERCENTAGE"] / 100)
-
-            db.log_trade(
-                user_id=user_id,
-                coin_symbol=symbol,
-                buy_price=price,
-                stop_loss=stop_loss_price,
-                take_profit=take_profit_price,
-                mode="LIVE",
-                trade_size_usdt=usdt_value,
-                quantity=total_balance,
-            )
-            imported_count += 1
-            message_lines.append(f"  ✅ Imported **{symbol}** (~${usdt_value:,.2f})")
-
-        summary_message = "✨ **Import Complete!** ✨\n\n"
-        if message_lines:
-            summary_message += "\n".join(message_lines) + "\n\n"
-        summary_message += f"*Summary:*\n- New Quests Started: `{imported_count}`\n- Already Tracked: `{skipped_count}`\n\n"
-        summary_message += "Use /status to see your newly managed quests."
-
-        await update.message.reply_text(summary_message, parse_mode="Markdown")
-
-    except trade.TradeError as e:
-        await update.message.reply_text(
-            f"⚠️ **Error!**\n\n*Reason:* `{e}`", parse_mode="Markdown"
-        )
 
 
 async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1196,7 +1156,7 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     user_id = update.effective_user.id
     mode, _ = db.get_user_trading_mode_and_balance(user_id)
 
-    is_admin = user_id == config.ADMIN_USER_ID
+    is_admin = user_id == getattr(config, "ADMIN_USER_ID", None)
     if mode != "LIVE" and not is_admin:
         await update.message.reply_text("Upgrade to Premium to use this feature.")
         return
@@ -1234,7 +1194,7 @@ async def checked_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     """Shows which symbols the AI has checked recently."""
     user_id = update.effective_user.id
 
-    if user_id != config.ADMIN_USER_ID:
+    if user_id != getattr(config, "ADMIN_USER_ID", None):
         await update.message.reply_text("This is an admin-only command.")
         return
 
@@ -1329,7 +1289,103 @@ async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
 
     message += "\nKeep honing your skills, seeker. The market's rhythm is complex."
-    await update.message.reply_text(message, parse_mode="Markdown")
+
+    # Send the message and also produce a detailed report via reporter
+    try:
+        await update.message.reply_text(message, parse_mode="Markdown")
+    except Exception:
+        # Fallback to sending plain text
+        await update.message.reply_text(message)
+
+    # Prepare review entries and send a detailed report via reporter.format_performance_report
+    reviews = []
+    for t in closed_trades:
+        reviews.append(
+            {
+                "timestamp": t.get("closed_at") or t.get("sell_ts") or int(time.time()),
+                "rating": round(
+                    ((t["sell_price"] - t["buy_price"]) / t["buy_price"]) * 100, 2
+                ),
+                "review_text": f"Trade {t.get('id')} {t.get('coin_symbol')} P/L: {((t['sell_price'] - t['buy_price'])/t['buy_price'])*100:.2f}%",
+            }
+        )
+
+    try:
+        from reporter import format_performance_report
+
+        report_text = format_performance_report(user_id, reviews)
+        # Send as a single message (Markdown formatted)
+        try:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=report_text,
+                parse_mode="Markdown",
+            )
+        except Exception:
+            # Fallback to plain send without parse mode
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id, text=report_text
+            )
+    except Exception:
+        # If reporter import or send fails, log the report and print
+        logger.exception("Failed to prepare/send performance report; logging instead.")
+        print("\n".join([f"{r['timestamp']}: {r['review_text']}" for r in reviews]))
+
+
+async def review_export_command(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """Admin-only: export a user's performance reviews as a CSV attachment."""
+    user_id = update.effective_user.id
+    if user_id != getattr(config, "ADMIN_USER_ID", None):
+        await update.message.reply_text("This is an admin-only command.")
+        return
+
+    target_user = str(user_id)
+    if context.args:
+        target_user = context.args[0]
+
+    try:
+        import performance_reviews
+
+        reviews = performance_reviews.get_reviews(str(target_user))
+    except Exception as e:
+        logger.exception("Failed to load reviews for export: %s", e)
+        await update.message.reply_text("Failed to load reviews for export.")
+        return
+
+    # Build CSV in memory
+    csv_io = io.StringIO()
+    writer = csv.writer(csv_io)
+    writer.writerow(["id", "timestamp", "iso_timestamp", "rating", "review_text"])
+    for r in reviews:
+        ts = int(r.get("timestamp", 0) or 0)
+        writer.writerow(
+            [
+                r.get("id"),
+                ts,
+                datetime.fromtimestamp(ts, tz=timezone.utc).isoformat(),
+                r.get("rating"),
+                r.get("review_text"),
+            ]
+        )
+
+    csv_bytes = csv_io.getvalue().encode("utf-8")
+    csv_io.close()
+
+    bio = io.BytesIO(csv_bytes)
+    bio.name = (
+        f"reviews_{target_user}_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.csv"
+    )
+
+    try:
+        await context.bot.send_document(chat_id=update.effective_chat.id, document=bio)
+    except Exception:
+        # Fallback: send plain text preview
+        await update.message.reply_text(
+            "Unable to send CSV document; here is a preview:\n"
+            + csv_bytes.decode("utf-8")[:4000]
+        )
 
 
 async def top_trades_command(
@@ -1743,7 +1799,7 @@ async def view_settings_command(
 async def autotrade_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Admin command to control the AI autotrading feature."""
     user_id = update.effective_user.id
-    if user_id != config.ADMIN_USER_ID:
+    if user_id != getattr(config, "ADMIN_USER_ID", None):
         await update.message.reply_text("This is an admin-only command.")
         return
 
@@ -1793,7 +1849,10 @@ To enable again, use <code>/autotrade on</code>.""",
 async def addcoins_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Premium command to add or reset coins for AI monitoring."""
     user_id = update.effective_user.id
-    if user_id != config.ADMIN_USER_ID and db.get_user_tier_db(user_id) != "PREMIUM":
+    if (
+        user_id != getattr(config, "ADMIN_USER_ID", None)
+        and db.get_user_tier_db(user_id) != "PREMIUM"
+    ):
         await update.message.reply_text("Upgrade to Premium to use this feature.")
         return
 
@@ -1973,7 +2032,7 @@ async def verifypayment_command(
 ) -> None:
     """Verifies payment and upgrades user tier."""
     user_id = update.effective_user.id
-    if user_id != config.ADMIN_USER_ID:
+    if user_id != getattr(config, "ADMIN_USER_ID", None):
         await update.message.reply_text(
             "This command can only be used by the bot administrator."
         )
@@ -2030,7 +2089,7 @@ async def confirm_payment_command(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     """Admin command to confirm payment and activate a standard subscription."""
-    if update.effective_user.id != config.ADMIN_USER_ID:
+    if update.effective_user.id != getattr(config, "ADMIN_USER_ID", None):
         await update.message.reply_text(
             "⛔ You are not authorized to perform this action."
         )
@@ -2235,7 +2294,14 @@ async def slip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     try:
         # 1. Parse the slip
         slip_data = parse_slip(slip_text)
-        logger.info(f"Successfully parsed slip for user {user_id}: {slip_data}")
+        # Avoid logging raw slip_data which may contain API keys or secrets
+        try:
+            from .logging_utils import mask_secrets
+
+            safe_slip = mask_secrets(slip_data)
+        except Exception:
+            safe_slip = "[masked slip data]"
+        logger.info(f"Successfully parsed slip for user {user_id}: {safe_slip}")
         slip_data["user_id"] = user_id
 
         # 2. Validate the trade
@@ -2353,9 +2419,11 @@ def main() -> None:
         logger.exception("Unexpected error evaluating ENABLE_AUTOTRADE")
 
     # --- Application Setup ---
+    persistence = RedisPersistence(redis_url=os.getenv("REDIS_URL"))
     application = (
         Application.builder()
         .token(config.TELEGRAM_BOT_TOKEN)
+        .persistence(persistence)
         .post_init(post_init)
         .build()
     )
@@ -2371,21 +2439,37 @@ def main() -> None:
         )
 
     async def promotion_retry_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Background job that processes `promotion_webhook_retry` queue (runs under job_queue)."""
-        try:
-            rc = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
-        except Exception:
-            return
+        """Background job that processes `promotion_webhook_retry` queue (runs under job_queue).
 
+        This implementation avoids performing blocking Redis network calls on the
+        event loop by delegating to asyncio.to_thread. It also traps connection
+        failures and exits early so the JobQueue executor doesn't raise.
+        """
         MAX_PER_RUN = 10
         MAX_ATTEMPTS = getattr(config, "PROMOTION_WEBHOOK_MAX_ATTEMPTS", 5)
 
-        for _ in range(MAX_PER_RUN):
-            raw = None
+        # Helper to obtain a redis client; return None on failure
+        def _get_redis_client():
             try:
-                raw = rc.lpop("promotion_webhook_retry")
-            except Exception:
+                return redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
+            except Exception as e:
+                logger.debug(f"promotion_retry_job: could not create redis client: {e}")
+                return None
+
+        rc = await asyncio.to_thread(_get_redis_client)
+        if not rc:
+            # Redis temporarily unavailable; skip this run
+            return
+
+        for _ in range(MAX_PER_RUN):
+            try:
+                raw = await asyncio.to_thread(rc.lpop, "promotion_webhook_retry")
+            except Exception as e:
+                # Network or connection problem — bail out this run and rely on
+                # the heartbeat / job scheduler to retry later.
+                logger.debug(f"promotion_retry_job: redis lpop failed: {e}")
                 break
+
             if not raw:
                 break
 
@@ -2393,6 +2477,9 @@ def main() -> None:
                 item = json.loads(raw)
             except Exception:
                 # malformed item, skip
+                logger.debug(
+                    "promotion_retry_job: malformed JSON in retry item; skipping"
+                )
                 continue
 
             payload = item.get("payload") or {}
@@ -2400,18 +2487,66 @@ def main() -> None:
             next_try = float(item.get("next_try", 0) or 0)
             now = time.time()
             if next_try and next_try > now:
-                # Not ready yet; requeue at tail
+                # Not ready yet; requeue at tail. Use to_thread to avoid blocking.
                 try:
-                    rc.rpush("promotion_webhook_retry", raw)
-                except Exception:
-                    logger.debug("Failed to requeue item not ready yet")
+                    await asyncio.to_thread(rc.rpush, "promotion_webhook_retry", raw)
+                except Exception as e:
+                    logger.debug(
+                        f"promotion_retry_job: failed to requeue not-ready item: {e}"
+                    )
                 # stop processing to avoid spinning
                 break
 
-            # attempt send
-            success, status, body = dispatch_promotion_webhook_sync(payload)
+            # attempt send (this is network IO but quick; keep synchronous helper)
+            try:
+                success, status, body = await asyncio.to_thread(
+                    dispatch_promotion_webhook_sync, payload
+                )
+            except Exception as e:
+                logger.debug(
+                    f"promotion_retry_job: dispatch_promotion_webhook_sync raised: {e}"
+                )
+                # treat as transient failure; requeue with backoff
+                attempts += 1
+                err = str(e)
+                if attempts < MAX_ATTEMPTS:
+                    backoff = min(2**attempts, 300)
+                    item["attempts"] = attempts
+                    item["last_error"] = err
+                    item["next_try"] = now + backoff
+                    try:
+                        await asyncio.to_thread(
+                            rc.rpush, "promotion_webhook_retry", json.dumps(item)
+                        )
+                    except Exception:
+                        logger.debug(
+                            "promotion_retry_job: failed to requeue after dispatch exception"
+                        )
+                else:
+                    try:
+                        item["attempts"] = attempts
+                        item["last_error"] = err
+                        item["failed_at"] = datetime.now(timezone.utc).isoformat()
+                        await asyncio.to_thread(
+                            rc.lpush, "promotion_webhook_failed", json.dumps(item)
+                        )
+                        await asyncio.to_thread(
+                            rc.ltrim, "promotion_webhook_failed", 0, 9999
+                        )
+                        try:
+                            await asyncio.to_thread(update_retry_metrics, "pending", -1)
+                            await asyncio.to_thread(update_retry_metrics, "failed", 1)
+                        except Exception:
+                            pass
+                    except Exception:
+                        logger.debug(
+                            "promotion_retry_job: failed to move item to failed list after dispatch exception"
+                        )
+                # continue to next item
+                continue
+
             if success:
-                # record success for auditing
+                # record success for auditing and update metrics (offload blocking calls)
                 try:
                     log_entry = json.dumps(
                         {
@@ -2421,14 +2556,13 @@ def main() -> None:
                             "timestamp": datetime.now(timezone.utc).isoformat(),
                         }
                     )
-                    rc.lpush("promotion_log", log_entry)
-                    rc.ltrim("promotion_log", 0, 499)
+                    await asyncio.to_thread(rc.lpush, "promotion_log", log_entry)
+                    await asyncio.to_thread(rc.ltrim, "promotion_log", 0, 499)
                 except Exception:
                     pass
-                # update metrics: one less pending, one more total_sent
                 try:
-                    update_retry_metrics("pending", -1)
-                    update_retry_metrics("total_sent", 1)
+                    await asyncio.to_thread(update_retry_metrics, "pending", -1)
+                    await asyncio.to_thread(update_retry_metrics, "total_sent", 1)
                 except Exception:
                     pass
                 continue
@@ -2441,41 +2575,53 @@ def main() -> None:
                     item["last_error"] = err
                     item["next_try"] = now + backoff
                     try:
-                        rc.rpush("promotion_webhook_retry", json.dumps(item))
+                        await asyncio.to_thread(
+                            rc.rpush, "promotion_webhook_retry", json.dumps(item)
+                        )
                     except Exception:
-                        logger.debug("Failed to requeue failed webhook")
+                        logger.debug(
+                            "promotion_retry_job: Failed to requeue failed webhook"
+                        )
                 else:
                     # give up; move to failed list for manual inspection
                     try:
                         item["attempts"] = attempts
                         item["last_error"] = err
                         item["failed_at"] = datetime.now(timezone.utc).isoformat()
-                        rc.lpush("promotion_webhook_failed", json.dumps(item))
-                        rc.ltrim("promotion_webhook_failed", 0, 9999)
-                        # update metrics: pending decreased, failed increased
+                        await asyncio.to_thread(
+                            rc.lpush, "promotion_webhook_failed", json.dumps(item)
+                        )
+                        await asyncio.to_thread(
+                            rc.ltrim, "promotion_webhook_failed", 0, 9999
+                        )
                         try:
-                            update_retry_metrics("pending", -1)
-                            update_retry_metrics("failed", 1)
+                            await asyncio.to_thread(update_retry_metrics, "pending", -1)
+                            await asyncio.to_thread(update_retry_metrics, "failed", 1)
                         except Exception:
                             pass
                     except Exception:
-                        logger.debug("Failed to move item to failed list")
+                        logger.debug(
+                            "promotion_retry_job: Failed to move item to failed list"
+                        )
         return
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(
+        CommandHandler("binance_status", trade.binance_status_command)
+    )
     application.add_handler(CommandHandler("about", trade.about_command))
     application.add_handler(
         CommandHandler("quest", quest_command)
     )  # This now handles the main trading logic
-    # /import should call the import_all_command implementation
-    application.add_handler(CommandHandler("import", import_all_command))
+    
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("activate", activate_command))
     application.add_handler(CommandHandler("setapi", set_api_command))
     application.add_handler(CommandHandler("balance", balance_command))
     application.add_handler(CommandHandler("close", close_command))
     application.add_handler(CommandHandler("review", review_command))
+    application.add_handler(CommandHandler("review_export", review_export_command))
     application.add_handler(
         CommandHandler("resonate", resonate_command)
     )  # This now calls the simulation
@@ -2812,6 +2958,110 @@ def main() -> None:
     # Register promotion log command
     application.add_handler(CommandHandler("promotion_log", promotion_log_command))
 
+    async def clear_logs_command(
+        update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """Admin-only: clear common Redis log lists and optionally truncate the on-disk log file.
+
+        Usage:
+          /clear_logs            - show what would be cleared
+          /clear_logs confirm    - actually clear Redis lists
+          /clear_logs file confirm - also truncate logs/lunara_bot.log on disk
+        """
+        user_id = update.effective_user.id
+        if user_id != getattr(config, "ADMIN_USER_ID", None):
+            await update.message.reply_text("Unauthorized.")
+            return
+
+        args = context.args if context and context.args else []
+        do_confirm = len(args) and args[-1].lower() == "confirm"
+        do_file = len(args) and "file" in [a.lower() for a in args]
+
+        redis_keys = [
+            "promotion_log",
+            "promotion_webhook_failed",
+            "promotion_webhook_retry",
+            "trade_issues",
+            "autosuggest_audit",
+            "autotrade:skipped_events",
+        ]
+
+        if not do_confirm:
+            await update.message.reply_text(
+                "This will clear the following Redis lists: ``{}``\nRun `/clear_logs confirm` to proceed.\nAdd the word `file` to also truncate the on-disk log file.".format(
+                    ", ".join(redis_keys)
+                ),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return
+
+        # Perform deletion
+        deleted = {}
+        try:
+            rc = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
+        except Exception:
+            rc = None
+
+        if rc:
+            for k in redis_keys:
+                try:
+                    cnt = rc.delete(k)
+                    deleted[k] = cnt
+                except Exception as e:
+                    deleted[k] = f"error:{e}"
+        else:
+            for k in redis_keys:
+                deleted[k] = "redis_unavailable"
+
+        file_result = None
+        if do_file:
+            try:
+                log_path = os.path.join("logs", "lunara_bot.log")
+                # Truncate the file safely
+                with open(log_path, "w", encoding="utf-8") as fh:
+                    fh.truncate(0)
+                file_result = "truncated"
+            except Exception as e:
+                file_result = f"error:{e}"
+
+        reply = [f"Cleared Redis keys (result):"]
+        for k, v in deleted.items():
+            reply.append(f" - {k}: {v}")
+        if do_file:
+            reply.append(f"On-disk log file: {file_result}")
+
+        await update.message.reply_text("\n".join(reply))
+
+    application.add_handler(CommandHandler("clear_logs", clear_logs_command))
+
+    async def refresh_cache_command(
+        update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """Admin-only: clear in-memory cached bot_data used by /status so it fetches fresh data.
+
+        Usage: /refresh_cache
+        """
+        user_id = update.effective_user.id
+        if user_id != getattr(config, "ADMIN_USER_ID", None):
+            await update.message.reply_text("Unauthorized.")
+            return
+
+        keys_to_clear = ["all_prices", "checked_symbols", "market_state"]
+        cleared = []
+        for k in keys_to_clear:
+            if k in context.bot_data:
+                try:
+                    del context.bot_data[k]
+                    cleared.append(k)
+                except Exception:
+                    pass
+
+        await update.message.reply_text(
+            f"Cleared in-memory cache keys: {', '.join(cleared) if cleared else 'none'}"
+        )
+
+    application.add_handler(CommandHandler("refresh_cache", refresh_cache_command))
+
     async def status_command_bot(
         update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
@@ -3009,8 +3259,8 @@ def main() -> None:
     application.add_handler(CommandHandler("ask", ask_command))
     application.add_handler(CommandHandler("usercount", trade.usercount_command))
     application.add_handler(CommandHandler("addcoins", addcoins_command))
-    application.add_handler(CommandHandler("buy", trade.buy_command))
-    application.add_handler(CommandHandler("import_all", import_all_command))
+    # /buy command intentionally removed: autotrade executes self-trades for users
+    
     application.add_handler(CommandHandler("wallet", wallet_command))
     application.add_handler(CommandHandler("checked", checked_command))
     application.add_handler(CommandHandler("cleanslips", clean_slips_command))
@@ -3151,26 +3401,487 @@ def main() -> None:
 
     application.add_handler(CommandHandler("retry_stats", retry_stats_command))
 
-    async def binance_status_command(
+    async def whoami_command(
         update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
+        """Admin-only diagnostic: show resolved admin id, Binance client status, and Redis connectivity."""
         user_id = update.effective_user.id
         if user_id != getattr(config, "ADMIN_USER_ID", None):
             await update.message.reply_text("Unauthorized.")
             return
+
+        lines = []
+        lines.append(
+            f"Configured ADMIN_USER_ID: {getattr(config, 'ADMIN_USER_ID', None)}"
+        )
+        lines.append(f"Module-level ADMIN_ID: {ADMIN_ID}")
+
+        # Binance client status
         try:
             import trade as _trade
 
             available = getattr(_trade, "BINANCE_AVAILABLE", False)
-            err = getattr(_trade, "BINANCE_INIT_ERROR", None)
-            msg = [f"BINANCE_AVAILABLE={available}"]
-            if err:
-                msg.append(f"INIT_ERROR={_trade.BINANCE_INIT_ERROR}")
-            await update.message.reply_text("\n".join(msg))
+            init_err = getattr(_trade, "BINANCE_INIT_ERROR", None)
+            lines.append(f"BINANCE_AVAILABLE: {available}")
+            if init_err:
+                lines.append(f"BINANCE_INIT_ERROR: {init_err}")
         except Exception as e:
-            await update.message.reply_text(f"Failed to read binance status: {e}")
+            lines.append(f"BINANCE status: error reading trade module: {e}")
 
-    application.add_handler(CommandHandler("binance_status", binance_status_command))
+        # Redis connectivity
+        try:
+            rc = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
+            try:
+                pong = await asyncio.to_thread(
+                    lambda: rc.ping() if hasattr(rc, "ping") else False
+                )
+            except Exception:
+                pong = False
+            try:
+                pending = await asyncio.to_thread(rc.llen, "promotion_webhook_retry")
+            except Exception:
+                pending = "n/a"
+            lines.append(f"Redis ping: {pong}")
+            lines.append(f"promotion_webhook_retry pending: {pending}")
+        except Exception as e:
+            lines.append(f"Redis: error creating client: {e}")
+
+        await update.message.reply_text("\n".join(lines))
+
+    application.add_handler(CommandHandler("whoami", whoami_command))
+
+    async def test_slip_command(
+        update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """Admin-only diagnostic to inspect and attempt to decrypt a specific slip key.
+
+        Usage:
+          /test_slip <slip_key_or_trade_id> [delete]
+
+        If `delete` is provided, the slip will be removed after the diagnostic.
+        """
+        user_id = update.effective_user.id
+        if user_id != getattr(config, "ADMIN_USER_ID", None):
+            await update.message.reply_text("Unauthorized.")
+            return
+
+        if not context.args:
+            await update.message.reply_text(
+                "Usage: /test_slip <slip_key_or_trade_id> [delete]\nExample: /test_slip 1756556374179 or /test_slip trade:1756556374179:data delete"
+            )
+            return
+
+        raw_key = context.args[0]
+        do_delete = len(context.args) > 1 and context.args[1].lower() in (
+            "delete",
+            "purge",
+        )
+
+        # Normalize lookup key
+        if ":" not in raw_key:
+            lookup_key = f"trade:{raw_key}:data"
+        else:
+            lookup_key = raw_key
+
+        import slip_manager as _sm
+
+        lines = [f"Inspecting slip key: {lookup_key}"]
+
+        # Attempt to read raw value from Redis/fallback
+        try:
+            client = _sm.get_redis_client()
+            if client:
+                raw_val = client.get(lookup_key)
+            else:
+                raw_val = _sm.fallback_cache.get(lookup_key)
+        except Exception as e:
+            raw_val = None
+            lines.append(f"Error reading from Redis/fallback: {e}")
+
+        if raw_val is None:
+            lines.append("No value found for that key.")
+            await update.message.reply_text("\n".join(lines))
+            return
+
+        # Show metadata about raw value
+        try:
+            if isinstance(raw_val, (bytes, bytearray)):
+                b = bytes(raw_val)
+            elif isinstance(raw_val, str):
+                b = raw_val.encode()
+            else:
+                b = str(raw_val).encode()
+            lines.append(f"Raw value length: {len(b)} bytes")
+            # show first 120 bytes as base64-safe hex snippet
+            snippet = b[:120]
+            try:
+                import base64
+
+                snippet_b64 = base64.b64encode(snippet).decode()
+                lines.append(f"Raw snippet (base64, first 120 bytes): {snippet_b64}")
+            except Exception:
+                lines.append(f"Raw snippet (hex): {snippet[:120].hex()}")
+        except Exception as e:
+            lines.append(f"Failed to examine raw bytes: {e}")
+
+        # Attempt decryption using slip_manager.get_fernet()
+        try:
+            fernet = _sm.get_fernet()
+            if not fernet:
+                lines.append(
+                    "Fernet instance not available (missing SLIP_ENCRYPTION_KEY or derivation failed)."
+                )
+            else:
+                try:
+                    # Ensure bytes
+                    enc = b
+                    try:
+                        dec = fernet.decrypt(enc)
+                        text = dec.decode("utf-8", errors="replace").strip()
+                        lines.append("Decryption: SUCCESS")
+                        # Try to parse JSON
+                        try:
+                            import json as _json
+
+                            parsed = _json.loads(text)
+                            import pprint
+
+                            pretty = pprint.pformat(parsed)
+                            # Truncate long output
+                            if len(pretty) > 3000:
+                                pretty = pretty[:3000] + "\n...truncated..."
+                            lines.append("Decrypted payload:")
+                            lines.append(pretty)
+                        except Exception:
+                            # Not JSON; show raw text (truncated)
+                            display = (
+                                text
+                                if len(text) <= 2000
+                                else text[:2000] + "\n...truncated..."
+                            )
+                            lines.append("Decrypted text:")
+                            lines.append(display)
+                    except Exception as e:
+                        # Provide exception details for debugging
+                        lines.append(f"Decryption: FAILED — {type(e).__name__}: {e}")
+                except Exception as e:
+                    lines.append(f"Decryption attempt raised: {e}")
+        except Exception as e:
+            lines.append(f"Failed to prepare Fernet: {e}")
+
+        # If requested, delete the slip after inspection
+        if do_delete:
+            try:
+                _sm.delete_slip(lookup_key)
+                lines.append("Slip deleted (per request).")
+            except Exception as e:
+                lines.append(f"Failed to delete slip: {e}")
+
+        # Send the diagnostic message (truncate if too large)
+        out = "\n".join(lines)
+        if len(out) > 4000:
+            out = out[:3990] + "\n...truncated..."
+        await update.message.reply_text(out)
+
+    application.add_handler(CommandHandler("test_slip", test_slip_command))
+
+    async def diagnose_slips_command(
+        update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """
+        Scans Redis for all slips grouped by trade id, attempts decryption using
+        opinionated `slip_manager` helpers, and reports a concise summary.
+
+        Optional actions: quarantine | purge
+
+        Usage: /diagnose_slips [quarantine|purge]
+        """
+        user_id = update.effective_user.id
+        if user_id != ADMIN_ID:
+            await update.message.reply_text("Unauthorized.")
+            return
+
+        args = context.args or []
+        action = None
+        dry_run = False
+        # Accept flexible ordering: /diagnose_slips [quarantine|purge] [--dry-run]
+        for a in args:
+            aa = a.lower().strip()
+            if aa in ("quarantine", "purge") and action is None:
+                action = aa
+            elif aa in ("--dry-run", "-n", "dry-run", "--noop"):
+                dry_run = True
+            elif aa in ("--csv", "--export-csv", "--csv-file"):
+                csv_export = True
+            else:
+                # ignore unknown tokens to be lenient
+                continue
+
+        if action and action not in ("quarantine", "purge"):
+            await update.message.reply_text(
+                "Invalid action. Use 'quarantine' or 'purge'."
+            )
+            return
+
+        await update.message.reply_text(
+            "Starting slip diagnostic scan... This may take a moment. I'll reply with a summary when finished."
+        )
+
+        total_trades = 0
+        decrypted_trades = 0
+        failed_slips = []
+
+        try:
+            # Strong opinion: prefer slip_manager APIs for Redis/fallback handling
+            client = slip_manager.get_redis_client()
+            fernet = slip_manager.get_fernet()
+            if not fernet:
+                await update.message.reply_text(
+                    "Encryption key (SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY) is not configured — aborting diagnostic."
+                )
+                return
+
+            # Collect trade ids from Redis or fallback cache
+            if client:
+                try:
+                    raw_keys = await asyncio.to_thread(
+                        lambda: list(client.scan_iter("trade:*"))
+                    )
+                except Exception:
+                    raw_keys = []
+            else:
+                raw_keys = [
+                    k
+                    for k in slip_manager.fallback_cache.keys()
+                    if k.startswith("trade:")
+                ]
+
+            trade_ids = set()
+            for k in raw_keys:
+                try:
+                    ks = k.decode() if isinstance(k, (bytes, bytearray)) else str(k)
+                except Exception:
+                    ks = str(k)
+                parts = ks.split(":")
+                if len(parts) >= 2 and parts[0] == "trade":
+                    trade_ids.add(parts[1])
+
+            # Use slip_manager.list_all_slips() to get successfully decrypted slips
+            decrypted_slips_list = slip_manager.list_all_slips()
+            decrypted_ids = set()
+            for s in decrypted_slips_list:
+                key = s.get("key")
+                if isinstance(key, str) and key.startswith("trade:"):
+                    parts = key.split(":")
+                    if len(parts) >= 2:
+                        decrypted_ids.add(parts[1])
+
+            total_trades = len(trade_ids)
+
+            # For each trade id that wasn't returned as decrypted, try a targeted check
+            for tid in sorted(trade_ids):
+                if tid in decrypted_ids:
+                    decrypted_trades += 1
+                    continue
+
+                # Not part of decrypted set — attempt per-field decryption to capture precise errors
+                keys_for_tid = []
+                if client:
+                    try:
+                        keys_for_tid = await asyncio.to_thread(
+                            lambda: list(client.scan_iter(f"trade:{tid}:*"))
+                        )
+                    except Exception:
+                        keys_for_tid = []
+                else:
+                    keys_for_tid = [
+                        k
+                        for k in slip_manager.fallback_cache.keys()
+                        if k.startswith(f"trade:{tid}:")
+                    ]
+
+                # Always include canonical data key first
+                candidate_keys = [f"trade:{tid}:data"] + [
+                    k.decode() if isinstance(k, (bytes, bytearray)) else str(k)
+                    for k in keys_for_tid
+                ]
+
+                success = False
+                for ck in candidate_keys:
+                    try:
+                        # Use slip_manager.get_and_decrypt_slip which encapsulates decryption + fallback logic
+                        result = await asyncio.to_thread(
+                            slip_manager.get_and_decrypt_slip, ck
+                        )
+                        if result is not None:
+                            decrypted_trades += 1
+                            success = True
+                            break
+                        else:
+                            # If key exists but result is None, try to detect cause by inspecting raw value
+                            if client:
+                                raw_val = await asyncio.to_thread(client.get, ck)
+                            else:
+                                raw_val = slip_manager.fallback_cache.get(ck)
+                            if raw_val is None:
+                                # No value found for this key; keep scanning other keys
+                                continue
+                            # If there was a raw value but get_and_decrypt_slip returned None, attempt direct Fernet decrypt to capture error
+                            try:
+                                raw_bytes = (
+                                    raw_val.encode()
+                                    if isinstance(raw_val, str)
+                                    else raw_val
+                                )
+                                await asyncio.to_thread(fernet.decrypt, raw_bytes)
+                                # If decrypt succeeds here, treat as decrypted (paranoid)
+                                decrypted_trades += 1
+                                success = True
+                                break
+                            except Exception as e:
+                                failed_slips.append(
+                                    {
+                                        "key": ck,
+                                        "error": str(e),
+                                        "type": type(e).__name__,
+                                    }
+                                )
+                                # continue trying other keys for this trade id
+                    except Exception as e:
+                        failed_slips.append(
+                            {"key": ck, "error": str(e), "type": type(e).__name__}
+                        )
+
+                if not success:
+                    # If none of the fields decrypted, record a summary failure for the trade id
+                    # If there were no candidate keys (shouldn't happen), record a generic message
+                    if not candidate_keys:
+                        failed_slips.append(
+                            {
+                                "key": f"trade:{tid}:*",
+                                "error": "no keys found",
+                                "type": "KeyError",
+                            }
+                        )
+
+            # Optionally quarantine or purge failures. Support dry-run simulation.
+            action_taken = 0
+            planned_actions = []
+            if action and failed_slips:
+                for failure in failed_slips:
+                    k = failure.get("key")
+                    try:
+                        if dry_run:
+                            planned_actions.append({"action": action, "key": k})
+                        else:
+                            if action == "quarantine":
+                                # Prefer rename for Redis, fallback to moving in fallback_cache
+                                if client:
+                                    try:
+                                        await asyncio.to_thread(
+                                            client.rename, k, f"archive:{k}"
+                                        )
+                                    except Exception:
+                                        # Fallback: copy value to archive and delete original
+                                        try:
+                                            val = await asyncio.to_thread(client.get, k)
+                                            if val is not None:
+                                                await asyncio.to_thread(
+                                                    client.set, f"archive:{k}", val
+                                                )
+                                                await asyncio.to_thread(
+                                                    client.delete, k
+                                                )
+                                        except Exception:
+                                            pass
+                                else:
+                                    v = slip_manager.fallback_cache.pop(k, None)
+                                    if v is not None:
+                                        slip_manager.fallback_cache[f"archive:{k}"] = v
+                            elif action == "purge":
+                                # Use slip_manager.delete_slip which is opinionated about trade ids
+                                try:
+                                    await asyncio.to_thread(slip_manager.delete_slip, k)
+                                except Exception:
+                                    if client:
+                                        try:
+                                            await asyncio.to_thread(client.delete, k)
+                                        except Exception:
+                                            pass
+                                    else:
+                                        slip_manager.fallback_cache.pop(k, None)
+                        action_taken += 1
+                    except Exception as e:
+                        logger.debug(f"Failed to perform action {action} on {k}: {e}")
+
+            # Build summary
+            summary_lines = ["Slip Diagnostic Report:\n"]
+            summary_lines.append(f"Total trades found: {total_trades}")
+            summary_lines.append(
+                f"Trades with at least one decrypted field: {decrypted_trades}"
+            )
+            summary_lines.append(
+                f"Trades with decryption failures (sampled fields): {len(failed_slips)}"
+            )
+            if action:
+                summary_lines.append(
+                    f"Action requested: {action} — applied to {action_taken} items."
+                )
+
+            if failed_slips:
+                summary_lines.append("--- Sample Failures (up to 5) ---")
+                for fs in failed_slips[:5]:
+                    summary_lines.append(f"Key: {fs.get('key')}")
+                    summary_lines.append(f"Error: {fs.get('type')}: {fs.get('error')}")
+                    summary_lines.append("")
+                if len(failed_slips) > 5:
+                    summary_lines.append(
+                        f"...and {len(failed_slips) - 5} more failures."
+                    )
+
+                # If CSV export requested or large result set, generate CSV and send as document
+                try:
+                    if csv_export or len(failed_slips) > 50:
+                        import csv as _csv
+                        import io as _io
+
+                        sio = _io.StringIO()
+                        writer = _csv.writer(sio)
+                        writer.writerow(["key", "error_type", "error_message"])
+                        for fs in failed_slips:
+                            writer.writerow(
+                                [fs.get("key"), fs.get("type"), fs.get("error")]
+                            )
+                        csv_bytes = sio.getvalue().encode("utf-8")
+                        bio = _io.BytesIO(csv_bytes)
+                        bio.seek(0)
+                        # Send as a document to the admin who requested the command
+                        try:
+                            await update.message.reply_document(
+                                document=bio,
+                                filename="diagnose_slips_failures.csv",
+                                caption="Full failure list (CSV)",
+                            )
+                        except Exception:
+                            # Fallback: send as a plain message if document sending fails
+                            await update.message.reply_text(
+                                "Failed to send CSV file as document; here's a short sample:"
+                            )
+                            await update.message.reply_text(
+                                "\n".join(summary_lines[:40])
+                            )
+                except Exception as _csv_err:
+                    logger.debug(f"Failed to prepare/send CSV export: {_csv_err}")
+
+            await update.message.reply_text("\n".join(summary_lines))
+
+        except Exception as e:
+            logger.exception("diagnose_slips_command failed: %s", e)
+            await update.message.reply_text(
+                f"Diagnostic failed: {type(e).__name__}: {e}"
+            )
+
+    application.add_handler(CommandHandler("diagnose_slips", diagnose_slips_command))
 
     # --- Message Handlers ---
     application.add_error_handler(_global_error_handler)
@@ -3217,19 +3928,34 @@ def main() -> None:
     job_queue.run_repeating(autotrade_jobs.monitor_autotrades, interval=60, first=10)
 
     # Add a lightweight heartbeat job: pings Redis and logs a simple metric every 5 minutes.
-    def heartbeat_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def heartbeat_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
-            rc = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
-            # perform a PING with short timeout
+            # Redis client used here may be a blocking client; run blocking calls
+            # in a thread to avoid blocking the event loop and to ensure the
+            # job callback is awaitable (JobQueue expects an awaitable callback).
             try:
-                pong = rc.ping() if hasattr(rc, "ping") else False
+                rc = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
+            except Exception:
+                rc = None
+
+            if rc is None:
+                logger.debug("Heartbeat: Redis client unavailable")
+                return
+
+            try:
+                pong = await asyncio.to_thread(
+                    lambda: rc.ping() if hasattr(rc, "ping") else False
+                )
             except Exception:
                 pong = False
-            # Log basic Redis status and queue length to help remote diagnostics
+
             try:
-                pending = rc.llen("promotion_webhook_retry")
+                pending = await asyncio.to_thread(
+                    lambda: rc.llen("promotion_webhook_retry")
+                )
             except Exception:
                 pending = None
+
             logger.info(
                 "HEARTBEAT: redis_ping=%s promotion_retry_pending=%s", pong, pending
             )
@@ -3241,6 +3967,76 @@ def main() -> None:
         job_queue.run_repeating(heartbeat_job, interval=300, first=30)
     except Exception:
         logger.debug("Failed to schedule heartbeat job via job_queue")
+
+    # Daily Facebook auto-post job (admin-controlled via env vars)
+    async def daily_facebook_post_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            # Determine configured target time and whether auto-posting is enabled
+            token = os.getenv("FB_ACCESS_TOKEN")
+            page_id = os.getenv("FACEBOOK_PAGE_ID")
+            auto_post = os.getenv("AUTO_POST_FACEBOOK", "false").lower() in (
+                "1",
+                "true",
+                "yes",
+            )
+            if not token or not page_id:
+                logger.debug("Facebook credentials not configured; skipping daily post")
+                return
+
+            # For each admin-defined user (for now only ADMIN_ID), compose a summary and post
+            try:
+                import facebook_poster
+                import performance_reviews
+            except Exception as e:
+                logger.exception("Failed to import review/facebook modules: %s", e)
+                return
+
+            target_user = str(getattr(config, "ADMIN_USER_ID", None) or "")
+            if not target_user:
+                logger.debug("No ADMIN_USER_ID configured; skipping FB post")
+                return
+
+            reviews = performance_reviews.get_reviews(target_user)
+            if not reviews:
+                logger.debug("No reviews to post for user %s", target_user)
+                return
+
+            msg = facebook_poster.format_facebook_post(target_user, reviews)
+
+            # Append a marketing hashtag (derived from app name)
+            hashtag = os.getenv("MARKETING_HASHTAG", "#LunessaSignals")
+            if hashtag and not msg.endswith("\n"):
+                msg = msg + "\n\n" + hashtag
+
+            logger.info(
+                "Daily Facebook post composed for user %s; auto_post=%s",
+                target_user,
+                auto_post,
+            )
+            if auto_post:
+                ok = facebook_poster.post_to_facebook(token, page_id, msg)
+                logger.info("Facebook post result: %s", ok)
+            else:
+                # Not auto-posting: log and save to file for manual review
+                logger.info(
+                    "AUTO_POST_FACEBOOK disabled; saving scheduled post to logs"
+                )
+                logger.info(msg)
+        except Exception as e:
+            logger.exception("daily_facebook_post_job failed: %s", e)
+
+    # Schedule the daily Facebook posting job. Time can be configured with FACEBOOK_POST_TIME_UTC (HH:MM)
+    try:
+        fb_time = os.getenv("FACEBOOK_POST_TIME_UTC", "08:30")
+        hh, mm = (int(x) for x in fb_time.split(":"))
+        job_queue.run_daily(
+            daily_facebook_post_job,
+            time=datetime(1, 1, 1, hh, mm, 0, tzinfo=timezone.utc).time(),
+        )
+    except Exception:
+        logger.debug(
+            "Failed to schedule daily_facebook_post_job; check FACEBOOK_POST_TIME_UTC format"
+        )
 
     logger.info(
         "Starting bot with market monitor and AI trade monitor jobs scheduled..."
@@ -3262,7 +4058,7 @@ async def clean_slips_command(
 ) -> None:
     """Admin command to list and optionally delete Redis trade slips."""
     user_id = update.effective_user.id
-    if user_id != config.ADMIN_USER_ID:
+    if user_id != getattr(config, "ADMIN_USER_ID", None):
         await update.message.reply_text("This is an admin-only command.")
         return
 
@@ -3357,10 +4153,25 @@ async def _redis_pubsub_listener(app: Application) -> None:
                     # Best-effort close; ignore errors during shutdown
                     pass
 
-        except aioredis.exceptions.ConnectionError as e:
-            logger.error(
-                f"Redis pubsub connection error: {e}. Reconnecting in {reconnect_delay} seconds..."
-            )
+        except Exception as e:
+            # redis.asyncio may or may not expose an 'exceptions' namespace depending on
+            # the installed package version. Do a safe lookup for ConnectionError and
+            # re-raise to the generic handler if it isn't the type we expect.
+            conn_err_cls = None
+            try:
+                conn_err_cls = getattr(aioredis, "exceptions", None)
+                if conn_err_cls:
+                    conn_err_cls = getattr(conn_err_cls, "ConnectionError", None)
+            except Exception:
+                conn_err_cls = None
+
+            if conn_err_cls and isinstance(e, conn_err_cls):
+                logger.error(
+                    f"Redis pubsub connection error: {e}. Reconnecting in {reconnect_delay} seconds..."
+                )
+                await asyncio.sleep(reconnect_delay)
+                reconnect_delay = min(60, reconnect_delay * 2)
+                continue
             await asyncio.sleep(reconnect_delay)
             reconnect_delay = min(60, reconnect_delay * 2)
         except asyncio.CancelledError:

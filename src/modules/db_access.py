@@ -7,25 +7,30 @@ from src import config
 # Allow tests to override the database path by setting this module-level variable.
 # Default to the repository DB file for normal runs.
 DB_PATH = "lunara_bot.db"
-# Import `decrypt_data` from the project's top-level `security.py`.
-# When running as a package (python -m src.main), use a relative import;
-# otherwise fall back to a top-level import for script mode.
+# Import `decrypt_data` from the project's `src.security` module.
+# Different execution contexts (script mode, package mode, tests) can cause
+# plain imports to fail, so try several strategies and fall back to None.
+decrypt_data = None
 try:
-    # Prefer importing the top-level security module. When running as
-    # `python -m src.main`, project root is added to sys.path by main so
-    # this will succeed.
-    from security import decrypt_data
-except Exception:
-    # Fall back to package-aware import if the top-level import fails (e.g.,
-    # unusual execution environments). Try to import via relative path.
-    try:
-        if __package__:
-            from ... import security
+    # Try the easy/legacy form first (when running from repo root/script mode)
+    from security import decrypt_data as _dd  # type: ignore
 
-            decrypt_data = getattr(security, "decrypt_data", None)
+    decrypt_data = _dd
+except Exception:
+    try:
+        # Try importing as a package module (when running `python -m src.main`)
+        from src import security as _sec  # type: ignore
+
+        decrypt_data = getattr(_sec, "decrypt_data", None)
     except Exception:
-        # Give up; set decrypt_data to None and allow callers to handle absence.
-        decrypt_data = None
+        try:
+            # As a last resort, use importlib to import by module name
+            import importlib
+
+            _m = importlib.import_module("src.security")
+            decrypt_data = getattr(_m, "decrypt_data", None)
+        except Exception:
+            decrypt_data = None
 
 logger = logging.getLogger(__name__)
 

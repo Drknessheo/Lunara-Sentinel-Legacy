@@ -195,9 +195,10 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE):
                             text += f"- {sym} at {t}\n"
                         try:
                             # best-effort notify admin
-                            if context and getattr(context, "bot", None):
+                            admin_id = getattr(config, "ADMIN_USER_ID", None)
+                            if admin_id and context and getattr(context, "bot", None):
                                 await context.bot.send_message(
-                                    chat_id=config.ADMIN_USER_ID, text=text
+                                    chat_id=admin_id, text=text
                                 )
                         except Exception:
                             logger.info(
@@ -546,7 +547,8 @@ async def monitor_autotrades(
             try:
                 from autotrade_settings import get_effective_settings
 
-                settings = get_effective_settings(config.ADMIN_USER_ID)
+                admin_id = getattr(config, "ADMIN_USER_ID", None)
+                settings = get_effective_settings(admin_id)
             except Exception:
                 settings = {"PROFIT_TARGET_PERCENTAGE": 1.0}
 
@@ -566,9 +568,8 @@ async def monitor_autotrades(
                             f"[MANUALMONITOR] DRY RUN - Would sell {slip['amount']} {slip['symbol']} for trade_id={trade_id} at price={current_price} (pnl={pnl_percent:.2f}%)"
                         )
                     else:
-                        trade.place_sell_order(
-                            config.ADMIN_USER_ID, slip["symbol"], slip["amount"]
-                        )
+                        admin_id = getattr(config, "ADMIN_USER_ID", None)
+                        trade.place_sell_order(admin_id, slip["symbol"], slip["amount"])
 
                     # delete all keys related to this trade (skip deletion in dry_run)
                     if dry_run:
@@ -589,9 +590,15 @@ async def monitor_autotrades(
                     # Send notification via bot if available, otherwise log
                     msg_text = f"🤖 Autotrade closed: Sold {slip['amount']:.4f} {slip['symbol']} at ${current_price:.8f} for a {pnl_percent:.2f}% gain."
                     if context and getattr(context, "bot", None):
-                        await context.bot.send_message(
-                            chat_id=config.ADMIN_USER_ID, text=msg_text
-                        )
+                        admin_id = getattr(config, "ADMIN_USER_ID", None)
+                        if admin_id:
+                            await context.bot.send_message(
+                                chat_id=admin_id, text=msg_text
+                            )
+                        else:
+                            logger.info(
+                                f"[MANUALMONITOR] No admin_id configured, message: {msg_text}"
+                            )
                     else:
                         logger.info(f"[MANUALMONITOR] {msg_text}")
                 except Exception as trade_exc:

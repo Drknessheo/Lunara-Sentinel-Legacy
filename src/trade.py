@@ -22,16 +22,26 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 import redis
+import requests
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
+from requests.adapters import HTTPAdapter
 from telegram import Update
 from telegram.ext import ContextTypes
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
+from urllib3.util.retry import Retry
 
 import config
 import config as _config
 
 from . import gemini_cacher
 from .indicators import calc_atr, calculate_rsi
+from .logging_utils import mask_secrets
 from .memory import log_trade_outcome
 from .modules import db_access as db
 
@@ -87,8 +97,31 @@ async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(ABOUT_MESSAGE, parse_mode="Markdown")
 
 
+async def binance_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Checks and reports the status of the Binance client connection."""
+    ensure_binance_client()  # Make sure the status is current
+    if BINANCE_AVAILABLE:
+        message = "✅ **Binance Client Status: Connected**\n\nThe bot is successfully connected to Binance."
+        try:
+            # Perform a lightweight check to confirm connectivity
+            client.ping()
+            message += "\n\n`Ping successful.`"
+        except Exception as e:
+            message += f"\n\n⚠️ **Connection Warning:**\nAn error occurred during a health check: `{str(e)}`"
+    else:
+        message = "❌ **Binance Client Status: Disconnected**\n\nThe bot could not connect to Binance. Trading functions are disabled."
+        if BINANCE_INIT_ERROR:
+            message += f"\n\n*Error Details:*\n`{BINANCE_INIT_ERROR}`"
+            if "restricted location" in BINANCE_INIT_ERROR.lower() or "451" in BINANCE_INIT_ERROR:
+                message += "\n\n*Action Required:*\nThis error often means your server's IP is blocked by Binance. Please add the following Render Singapore IPs to your Binance API key's whitelist:\n`13.228.225.19`\n`18.142.128.26`\n`54.254.162.138`"
+
+    await update.message.reply_text(message, parse_mode="Markdown")
+
+
 @lru_cache(maxsize=128)
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
 def get_symbol_info(symbol: str):
+
     """
     Fetches and caches trading rules for a symbol, like precision.
     Returns a dictionary with symbol information or None on error.
@@ -123,79 +156,249 @@ def ensure_binance_client() -> None:
     and `BINANCE_INIT_ERROR` accordingly so callers can behave conservatively.
     """
     global client, BINANCE_AVAILABLE, BINANCE_INIT_ERROR
+
     # Fast path
     if client is not None and BINANCE_AVAILABLE:
         return
 
-    # Try to create client if keys are present
-    if not (
-        getattr(config, "BINANCE_API_KEY", None)
-        and getattr(config, "BINANCE_SECRET_KEY", None)
-    ):
+    # Try to create client if keys are present. Prefer config values but fall back
+    # to the current process environment in case config was imported earlier.
+    api_key = getattr(config, "BINANCE_API_KEY", None) or os.getenv("BINANCE_API_KEY")
+    secret_key = getattr(config, "BINANCE_SECRET_KEY", None) or os.getenv("BINANCE_SECRET_KEY")
+
+    # Normalize empty strings to None
+    if isinstance(api_key, str):
+        api_key = api_key.strip() or None
+    if isinstance(secret_key, str):
+        secret_key = secret_key.strip() or None
+
+    if not (api_key and secret_key):
         BINANCE_AVAILABLE = False
         BINANCE_INIT_ERROR = "API keys not configured"
         client = None
-        logger.warning(
-            "Binance API keys not found. Trading functions will be disabled."
-        )
+        logger.warning("Binance API keys not found. Trading functions will be disabled.")
         return
 
-    try:
-        client = Client(config.BINANCE_API_KEY, config.BINANCE_SECRET_KEY)
+    # Create a requests.Session with retries to supply to the Binance client
+    def _build_session(timeout: int = 10, max_retries: int = 3) -> requests.Session:
+        session = requests.Session()
+        retries = Retry(
+            total=max_retries,
+            backoff_factor=0.5,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=("GET", "POST", "PUT", "DELETE", "HEAD"),
+        )
+        adapter = HTTPAdapter(max_retries=retries)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        # Attach a default timeout via requests_params when creating client below
+        return session
+
+    def _create_binance_client(api_key: str, secret_key: str):
+        # Prefer passing a requests_session when supported; fall back to requests_params
+        session = _build_session()
+        try:
+            # The python-binance client accepts requests_params for timeouts
+            c = Client(api_key, secret_key, requests_params={"timeout": 10})
+            # If client exposes an internal session attribute, try to attach ours for retries
+            if hasattr(c, "session"):
+                try:
+                    c.session = session
+                except Exception:
+                    pass
+            elif hasattr(c, "_session"):
+                try:
+                    c._session = session
+                except Exception:
+                    pass
+
+            # Lightweight health-check
+            try:
+                c.ping()
+            except Exception as ping_err:
+                # Propagate ping errors as initialization errors but return client as None
+                return None, ping_err
+
+            return c, None
+        except BinanceAPIException as be:
+            return None, be
+        except Exception as e:
+            return None, e
+
+    # Attempt to create client with a single creation attempt; keep init errors non-fatal
+    created_client, creation_err = _create_binance_client(api_key, secret_key)
+    if created_client:
+        client = created_client
         BINANCE_AVAILABLE = True
         BINANCE_INIT_ERROR = None
         logger.info("Binance client initialized successfully.")
-    except BinanceAPIException as e:
-        BINANCE_AVAILABLE = False
-        BINANCE_INIT_ERROR = repr(e)
-        client = None
-        # Common case in CI or restricted runners: HTTP 451 restricted location.
-        if (
-            getattr(e, "status_code", None) == 451
-            or "451" in repr(e)
-            or "restricted location" in str(e).lower()
-        ):
-            logger.warning(
-                "Binance API unavailable due to restricted location (451). Trading disabled."
-            )
+        return
+
+    # Failure path
+    client = None
+    BINANCE_AVAILABLE = False
+    BINANCE_INIT_ERROR = repr(creation_err) if creation_err is not None else "Unknown error"
+    # Recognize common restricted-location / 451 responses
+    try:
+        err_text = str(creation_err) if creation_err is not None else ""
+        if "451" in err_text or "restricted location" in err_text.lower():
+            logger.warning("Binance API unavailable due to restricted location (451). Trading disabled.")
         else:
             logger.exception("Failed to initialize Binance client; trading disabled.")
-    except Exception as e:
-        BINANCE_AVAILABLE = False
-        BINANCE_INIT_ERROR = repr(e)
-        client = None
-        logger.exception(
-            "Unexpected error initializing Binance client; trading disabled."
-        )
+    except Exception:
+        logger.exception("Failed to initialize Binance client; trading disabled.")
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
+def get_historical_klines_with_retry(*args, **kwargs):
+    """Wrapper for get_historical_klines_with_retry with retry logic."""
+    ensure_binance_client()
+    if not client:
+        return None
+    return get_historical_klines_with_retry(*args, **kwargs)
 
 
 def get_user_client(user_id: int):
     """Creates a Binance client instance for a specific user using their stored keys."""
     # For the admin user, prioritize API keys from config.py (loaded from .env)
-    if user_id == config.ADMIN_USER_ID:
-        if config.BINANCE_API_KEY and config.BINANCE_SECRET_KEY:
+    # Prefer environment values first (more reliable across import timing), then fall back to config
+    env_admin = os.getenv("ADMIN_USER_ID") or os.getenv("ADMIN_ID") or os.getenv("TELEGRAM_CREATOR_ID")
+    admin_id = None
+    if env_admin:
+        try:
+            admin_id = int(env_admin)
+        except Exception:
+            admin_id = env_admin
+    else:
+        admin_id = getattr(config, "ADMIN_USER_ID", None)
+
+    is_admin = False
+    if admin_id is not None:
+        try:
+            # Try numeric comparison first (handles ints and numeric strings)
+            is_admin = int(admin_id) == int(user_id)
+        except Exception:
+            # Fall back to string comparison, allowing values like '@username' or plain usernames
             try:
-                return Client(config.BINANCE_API_KEY, config.BINANCE_SECRET_KEY)
-            except Exception as e:
-                logger.error(
-                    f"Failed to create Binance client for ADMIN_USER_ID from config: {e}"
-                )
-                return None
-        else:
-            logger.warning(
-                "ADMIN_USER_ID detected, but BINANCE_API_KEY or BINANCE_SECRET_KEY not found in config."
+                is_admin = str(user_id) == str(admin_id) or str(user_id) == str(admin_id).lstrip("@")
+            except Exception:
+                is_admin = False
+
+    # Debug info to help troubleshoot admin detection and key resolution
+    try:
+        logger.debug(
+            "get_user_client called: admin_id=%r user_id=%r is_admin=%s BINANCE_AVAILABLE=%s",
+            admin_id,
+            user_id,
+            is_admin,
+            BINANCE_AVAILABLE,
+        )
+    except Exception:
+        pass
+
+    if is_admin:
+        # Prefer environment variables (set from .env) first, then config attributes
+        api_key = (
+            os.getenv("BINANCE_API_KEY") or getattr(config, "BINANCE_API_KEY", None)
+        )
+        secret_key = (
+            os.getenv("BINANCE_SECRET_KEY") or getattr(config, "BINANCE_SECRET_KEY", None)
+        )
+
+        # Normalize empty strings to None
+        if isinstance(api_key, str):
+            api_key = api_key.strip() or None
+        if isinstance(secret_key, str):
+            secret_key = secret_key.strip() or None
+
+        # Diagnostic: report which key-paths are available (masked/presence only)
+        try:
+            logger.debug(
+                "get_user_client: user_id=%s is_admin=%s admin_id=%r env_keys_present=%s BINANCE_AVAILABLE=%s",
+                user_id,
+                is_admin,
+                admin_id,
+                "yes" if (api_key and secret_key) else "no",
+                BINANCE_AVAILABLE,
             )
-            return None
+        except Exception:
+            pass
+
+        if api_key and secret_key:
+            # Masked logging for visibility without revealing secrets
+            try:
+                api_display = mask_secrets(api_key) or "(present)"
+            except Exception:
+                api_display = "(present)"
+            logger.info("Admin Binance API keys detected (masked): %s", api_display)
+            try:
+                # Reuse the same creation logic as ensure_binance_client
+                # Build a session and attempt a lightweight ping during creation
+                def _build_session_local(timeout: int = 10):
+                    s = requests.Session()
+                    return s
+
+                try:
+                    c = Client(api_key, secret_key, requests_params={"timeout": 10})
+                    try:
+                        c.ping()
+                        return c
+                    except Exception as ping_err:
+                        logger.error("Admin client ping failed: %s", mask_secrets(str(ping_err)))
+                except Exception as e:
+                    logger.error(
+                        "Failed to create Binance client for ADMIN_USER_ID from provided keys: %s",
+                        mask_secrets(str(e)),
+                    )
+                # continue to fallback
+
+        # Fallback: if module-level client was created successfully, reuse it
+        if BINANCE_AVAILABLE and client:
+            logger.info(
+                "Reusing shared Binance client for admin user %s (shared client)", user_id
+            )
+            return client
+
+        # If admin but no keys and no shared client, still attempt to reuse shared client
+        # when the process has BINANCE_AVAILABLE set — defensive logging
+        if not api_key or not secret_key:
+            logger.info(
+                "Admin path active but no direct API keys found; BINANCE_AVAILABLE=%s",
+                BINANCE_AVAILABLE,
+            )
+
+        logger.warning(
+            "ADMIN_USER_ID detected, but no usable Binance API keys found for user %s.", user_id
+        )
+        return None
 
     # For other users, fetch API keys from the database
     api_key, secret_key = db.get_user_api_keys(user_id)
     if not api_key or not secret_key:
-        logger.warning(f"API keys not found for user {user_id}.")
+        logger.warning("API keys not found for user %s.", user_id)
         return None
     try:
-        return Client(api_key, secret_key)
+        # Do not log raw keys; show masked presence only
+        api_display = mask_secrets(api_key) or "(present)"
+        logger.info("Creating per-user Binance client for %s (key=%s)", user_id, api_display)
+        # Use a safer creation flow (timeout and ping check)
+        try:
+            c = Client(api_key, secret_key, requests_params={"timeout": 10})
+            try:
+                c.ping()
+                return c
+            except Exception as ping_err:
+                logger.error("Per-user client ping failed for %s: %s", user_id, mask_secrets(str(ping_err)))
+                return None
+        except Exception as e:
+            logger.error(
+                "Failed to create Binance client for user %s: %s",
+                user_id,
+                mask_secrets(str(e)),
+            )
+            return None
     except Exception as e:
-        logger.error(f"Failed to create Binance client for user {user_id}: {e}")
+        logger.exception("Unexpected error while creating per-user Binance client for %s: %s", user_id, str(e))
         return None
 
 
@@ -205,6 +408,7 @@ def is_weekend():
     return datetime.now(timezone.utc).weekday() >= 5
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
 def get_current_price(symbol: str):
     """Fetches the current price of a given symbol from Binance."""
     try:
@@ -220,15 +424,33 @@ def get_current_price(symbol: str):
 
 
 def get_monitored_coins():
-    return config.AI_MONITOR_COINS
+    """Return the configured list of monitored coins.
+
+    Gracefully handle missing configuration by falling back to an
+    environment variable `AI_MONITOR_COINS` (comma-separated) or an empty list.
+    """
+    try:
+        val = getattr(config, "AI_MONITOR_COINS", None)
+        if val:
+            return val
+    except Exception:
+        pass
+
+    # Try environment variable fallback (comma-separated)
+    env_val = os.getenv("AI_MONITOR_COINS")
+    if env_val:
+        return [s.strip() for s in env_val.split(",") if s.strip()]
+
+    return []
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
 def get_rsi(symbol="BTCUSDT", interval=Client.KLINE_INTERVAL_1HOUR, period=14):
     """Calculates the Relative Strength Index (RSI) for a given symbol."""
     try:
         ensure_binance_client()
         # Fetch klines (candlestick data)
-        klines = client.get_historical_klines(
+        klines = get_historical_klines_with_retry(
             symbol, interval, f"{period + 100} hours ago UTC"
         )
         if len(klines) < period:
@@ -246,6 +468,7 @@ def get_rsi(symbol="BTCUSDT", interval=Client.KLINE_INTERVAL_1HOUR, period=14):
         return None
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
 def get_bollinger_bands(
     symbol, interval=Client.KLINE_INTERVAL_1HOUR, period=20, std_dev=2
 ):
@@ -253,7 +476,7 @@ def get_bollinger_bands(
     try:
         ensure_binance_client()
         # Fetch more klines to ensure SMA calculation is accurate
-        klines = client.get_historical_klines(
+        klines = get_historical_klines_with_retry(
             symbol, interval, f"{period + 50} hours ago UTC"
         )
         if len(klines) < period:
@@ -275,6 +498,7 @@ def get_bollinger_bands(
         return None, None, None, None
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
 def get_macd(
     symbol,
     interval=Client.KLINE_INTERVAL_1HOUR,
@@ -286,7 +510,7 @@ def get_macd(
     try:
         ensure_binance_client()
         # Fetch enough klines for the slow EMA + signal line
-        klines = client.get_historical_klines(
+        klines = get_historical_klines_with_retry(
             symbol, interval, f"{slow_period + signal_period + 50} hours ago UTC"
         )
         if len(klines) < slow_period + signal_period:
@@ -315,6 +539,8 @@ def get_macd(
         return None, None, None
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
 def get_account_balance(user_id: int, asset="USDT"):
     """Fetches the free balance for a specific asset from the Binance spot account."""
     ensure_binance_client()
@@ -329,7 +555,7 @@ def get_account_balance(user_id: int, asset="USDT"):
             f"Binance API error getting account balance for user {user_id}: {e}"
         )
         # Pass the specific error message up to the command handler
-        raise TradeError(f"Binance API Error: {e.message}")
+        raise TradeError(f"Binance API Error: {str(e)}")
     except Exception as e:
         logger.error(
             f"An unexpected error occurred getting account balance for user {user_id}: {e}"
@@ -337,6 +563,7 @@ def get_account_balance(user_id: int, asset="USDT"):
         raise TradeError(f"An unexpected error occurred: {e}")
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
 def get_last_trade_from_binance(user_id: int, symbol: str):
     """Fetches the user's most recent trade for a given symbol from Binance."""
     ensure_binance_client()
@@ -361,6 +588,7 @@ def get_last_trade_from_binance(user_id: int, symbol: str):
         return None
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
 def get_all_spot_balances(user_id: int) -> list[dict] | None:
     """Fetches all non-zero asset balances from the user's Binance spot account."""
     ensure_binance_client()
@@ -380,12 +608,13 @@ def get_all_spot_balances(user_id: int) -> list[dict] | None:
         return balances
     except BinanceAPIException as e:
         logger.error(f"Binance API error getting all balances for user {user_id}: {e}")
-        raise TradeError(f"Binance API Error: {e.message}")
+        raise TradeError(f"Binance API Error: {str(e)}")
     except Exception as e:
         logger.error(f"Unexpected error getting all balances for user {user_id}: {e}")
         raise TradeError(f"An unexpected error occurred: {e}")
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
 def place_buy_order(user_id: int, symbol: str, usdt_amount: float, is_test=False):
     """Places a live market buy order on Binance for a specific user."""
     ensure_binance_client()
@@ -446,9 +675,9 @@ def place_buy_order(user_id: int, symbol: str, usdt_amount: float, is_test=False
 
     except BinanceAPIException as e:
         logger.error(
-            f"LIVE BUY order failed for {symbol} for user {user_id}: {e.message}"
+            f"LIVE BUY order failed for {symbol} for user {user_id}: {e}"
         )
-        raise TradeError(f"Binance API Error: {e.message}")
+        raise TradeError(f"Binance API Error: {str(e)}")
     except Exception as e:
         logger.error(
             f"An unexpected error occurred during LIVE BUY for {symbol} for user {user_id}: {e}"
@@ -456,6 +685,7 @@ def place_buy_order(user_id: int, symbol: str, usdt_amount: float, is_test=False
         raise TradeError(f"An unexpected error occurred: {e}")
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
 def place_sell_order(user_id: int, symbol: str, quantity: float):
     """Places a live market sell order on Binance for a specific user."""
     ensure_binance_client()
@@ -497,10 +727,11 @@ def place_sell_order(user_id: int, symbol: str, quantity: float):
         )
         return order
     except BinanceAPIException as e:
+        msg = str(e)
         logger.error(
-            f"LIVE SELL order failed for {symbol} for user {user_id}: {e.message}"
+            "LIVE SELL order failed for %s for user %s: %s", symbol, user_id, mask_secrets(msg)
         )
-        raise TradeError(f"Binance API Error on Sell: {e.message}")
+        raise TradeError(f"Binance API Error on Sell: {msg}")
 
 
 async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -614,7 +845,7 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # --- Premium User Check ---
     user_tier = db.get_user_tier_db(user_id)
-    is_admin = user_id == config.ADMIN_USER_ID
+    is_admin = user_id == getattr(config, "ADMIN_USER_ID", None)
     if user_tier != "PREMIUM" and not is_admin:
         await update.message.reply_text(
             "The /buy command is a Premium feature. Use /subscribe to upgrade."
@@ -748,7 +979,7 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Live mode logic
-    is_admin = user_id == config.ADMIN_USER_ID
+    is_admin = user_id == getattr(config, "ADMIN_USER_ID", None)
     api_key, _ = db.get_user_api_keys(user_id)
     if not api_key and not is_admin:
         await update.message.reply_text(
@@ -846,7 +1077,8 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 message += "  No assets found in your spot wallet.\n"
         except TradeError as e:
-            message += f"  *Could not retrieve wallet balances: {e.message}*\n"
+            # TradeError should contain a readable string; use str(e)
+            message += f"  *Could not retrieve wallet balances: {str(e)}*\n"
         except Exception as e:
             logger.error(f"Unexpected error fetching wallet balances for status: {e}")
             message += (
@@ -1195,7 +1427,7 @@ async def check_btc_volatility_and_alert(context: ContextTypes.DEFAULT_TYPE):
             logger.warning("Skipping BTC volatility check: Binance client unavailable.")
             return
         # Fetch the last 2 closed hourly candles for BTC
-        klines = client.get_historical_klines(
+        klines = get_historical_klines_with_retry(
             "BTCUSDT", Client.KLINE_INTERVAL_1HOUR, "2 hours ago UTC"
         )
         if len(klines) < 2:
@@ -1365,7 +1597,7 @@ async def check_watchlist_for_buys(
                     continue
 
                 # --- ATR-based stop-loss ---
-                klines = client.get_historical_klines(
+                klines = get_historical_klines_with_retry(
                     symbol, Client.KLINE_INTERVAL_1HOUR, "30 hours ago UTC"
                 )
                 atr = calc_atr(klines, period=14) if klines else None
@@ -1479,7 +1711,7 @@ async def ai_trade_monitor(
         if not client:
             logger.info(f"AI trade monitor skipping {symbol}: Binance unavailable.")
             return
-        klines = client.get_historical_klines(
+        klines = get_historical_klines_with_retry(
             symbol, Client.KLINE_INTERVAL_1HOUR, "100 hours ago UTC"
         )
         if not klines or len(klines) < 20:
@@ -1648,7 +1880,7 @@ async def run_monitoring_cycle(
                 if getattr(_config, "NOTIFY_ADMIN_ON_TRADE_ISSUE", False) and getattr(
                     _config, "ADMIN_USER_ID", None
                 ):
-                    admin_id = _config.ADMIN_USER_ID
+                    admin_id = getattr(_config, "ADMIN_USER_ID", None)
                     # context is available in this function; send a short alert
                     await context.bot.send_message(
                         chat_id=admin_id,
@@ -1785,10 +2017,15 @@ async def scheduled_monitoring_job(context: ContextTypes.DEFAULT_TYPE):
     It gathers the latest data and then calls the main monitoring logic.
     """
     logger.info("Running scheduled_monitoring_job...")
-    user_id = getattr(
-        config, "ADMIN_USER_ID", None
-    )  # Assuming monitoring is for the admin user
-    logger.info(f"Admin user ID from config: {user_id}")
+    # Resolve admin id from config or environment to handle import-order issues.
+    user_id = getattr(config, "ADMIN_USER_ID", None) or os.getenv("ADMIN_USER_ID")
+    # Coerce to int when possible
+    try:
+        user_id = int(user_id) if user_id is not None and str(user_id).strip() != "" else None
+    except Exception:
+        # leave as-is (None) if conversion fails
+        user_id = None
+    logger.info(f"Admin user ID resolved for monitoring: {user_id}")
     if user_id:
         autotrade_status = db.get_autotrade_status(user_id)
         logger.info(f"Autotrade status for admin user: {autotrade_status}")
@@ -1857,7 +2094,7 @@ async def adaptive_strategy_job():
 def get_micro_vwap(symbol, interval=Client.KLINE_INTERVAL_1MINUTE, window=20):
     """Calculates Micro-VWAP (short-term VWAP) for a given symbol."""
     try:
-        klines = client.get_historical_klines(
+        klines = get_historical_klines_with_retry(
             symbol, interval, f"{window} minutes ago UTC"
         )
         if len(klines) < window:
@@ -1874,7 +2111,7 @@ def get_micro_vwap(symbol, interval=Client.KLINE_INTERVAL_1MINUTE, window=20):
 def get_bid_ask_volume_ratio(symbol, interval=Client.KLINE_INTERVAL_1MINUTE, window=20):
     """Estimates bid/ask volume ratio using kline buy/sell volume approximation."""
     try:
-        klines = client.get_historical_klines(
+        klines = get_historical_klines_with_retry(
             symbol, interval, f"{window} minutes ago UTC"
         )
         if len(klines) < window:
@@ -1892,7 +2129,7 @@ def get_bid_ask_volume_ratio(symbol, interval=Client.KLINE_INTERVAL_1MINUTE, win
 def get_mad(symbol, interval=Client.KLINE_INTERVAL_1HOUR, window=20):
     """Calculates Mean Absolute Deviation (MAD) for a given symbol."""
     try:
-        klines = client.get_historical_klines(
+        klines = get_historical_klines_with_retry(
             symbol, interval, f"{window} hours ago UTC"
         )
         if len(klines) < window:
