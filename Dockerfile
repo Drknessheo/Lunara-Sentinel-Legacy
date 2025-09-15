@@ -10,8 +10,13 @@ RUN apt-get update && \
 	apt-get install -y --no-install-recommends supervisor && \
 	rm -rf /var/lib/apt/lists/*
 
-# Copy dependency files and install first to leverage Docker layer caching
+# Copy dependency files
 COPY requirements.txt .
+
+# Upgrade pip and install build tools before installing other requirements
+RUN pip install --upgrade pip setuptools wheel
+
+# Install requirements
 RUN pip install -r requirements.txt
 
 # Copy the rest of the application code
