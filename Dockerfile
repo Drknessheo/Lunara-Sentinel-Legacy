@@ -13,6 +13,10 @@ RUN apt-get update && \
 # Copy the entire repository early to avoid BuildKit per-file checksum errors
 COPY . /app
 
+# --- DEBUGGING STEP ---
+# List the contents of the /app directory to see what was copied.
+RUN ls -la /app
+
 # Install requirements if present
 RUN if [ -f /app/requirements.txt ]; then \
 		pip install -r /app/requirements.txt; \
