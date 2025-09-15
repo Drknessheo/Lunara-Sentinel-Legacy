@@ -4,6 +4,15 @@ import sys
 
 from dotenv import load_dotenv
 
+# This function will be called by the command center (iq.py)
+def semantic_trigger():
+    """
+    This is the semantic entry point for the Lunara Bot blueprint.
+    It logs a message to the command center to signify that the bot has been activated.
+    """
+    # This print statement is a structured log for the Command Center.
+    # It confirms the blueprint's activation with a Bengali narration.
+    print("[COMMAND_CENTER_EVENT] Blueprint: lunara-bot, Event: Activated, Narration: লুযারা বট সক্রিয় করা হয়েছে।")
 
 def main() -> int:
     """Load .env and run the bot as a module using the current Python executable.
@@ -42,4 +51,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # When this script is executed directly, it runs the main bot function.
+    # The command center will import and call semantic_trigger() instead.
     raise SystemExit(main())
