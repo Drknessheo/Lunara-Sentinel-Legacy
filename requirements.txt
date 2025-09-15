@@ -9,3 +9,4 @@ requests==2.31.0
 tenacity==8.2.3
 cryptography
 prometheus-flask-exporter
+matplotlib
