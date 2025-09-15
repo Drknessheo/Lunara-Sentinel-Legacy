@@ -11,9 +11,7 @@ class RedisPersistence(BasePersistence):
     """A class to implement persistence using Redis."""
 
     def __init__(self, redis_url: str):
-        super().__init__(
-            store_user_data=True, store_chat_data=True, store_bot_data=True
-        )
+        super().__init__()
         self.redis = redis.from_url(redis_url, decode_responses=True)
 
     def _get_key(self, key_type: str, key: Any) -> str:
