@@ -10,22 +10,16 @@ RUN apt-get update && \
 	apt-get install -y --no-install-recommends supervisor && \
 	rm -rf /var/lib/apt/lists/*
 
-# Copy the entire repository by referencing the parent of the build context
-COPY .. /app
+# Copy dependency files and install first to leverage Docker layer caching
+COPY requirements.txt .
+RUN pip install -r requirements.txt
 
-# Install requirements if present
-RUN if [ -f /app/requirements.txt ]; then \
-		pip install -r /app/requirements.txt; \
-	else \
-		echo "No requirements.txt found, skipping pip install"; \
-	fi
+# Copy the rest of the application code
+COPY . .
 
-# If a supervisord.conf exists at repo root, install it into supervisor's conf.d
-RUN if [ -f /app/supervisord.conf ]; then \
-		mkdir -p /etc/supervisor/conf.d && cp /app/supervisord.conf /etc/supervisor/conf.d/supervisord.conf; \
-	else \
-		echo "No supervisord.conf found at repo root; continuing without it"; \
-	fi
+# Place the supervisor config in the correct directory
+RUN mkdir -p /etc/supervisor/conf.d/ && \
+    cp supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 EXPOSE 8080
 
