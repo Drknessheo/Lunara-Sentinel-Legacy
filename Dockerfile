@@ -10,12 +10,8 @@ RUN apt-get update && \
 	apt-get install -y --no-install-recommends supervisor && \
 	rm -rf /var/lib/apt/lists/*
 
-# Copy the entire repository early to avoid BuildKit per-file checksum errors
-COPY . /app
-
-# --- DEBUGGING STEP ---
-# List the contents of the /app directory to see what was copied.
-RUN ls -la /app
+# Copy the entire repository by referencing the parent of the build context
+COPY .. /app
 
 # Install requirements if present
 RUN if [ -f /app/requirements.txt ]; then \
