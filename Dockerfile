@@ -5,18 +5,20 @@ ENV PYTHONUNBUFFERED 1
 
 WORKDIR /app
 
-# Install supervisor
+# Install supervisor and scientific computing libraries from Debian repositories
+# This is faster and more reliable than building them with pip.
 RUN apt-get update && \
-	apt-get install -y --no-install-recommends supervisor && \
+	apt-get install -y --no-install-recommends supervisor python3-numpy python3-pandas && \
 	rm -rf /var/lib/apt/lists/*
 
 # Copy dependency files
 COPY requirements.txt .
 
-# Upgrade pip and install build tools before installing other requirements
+# Upgrade pip and install build tools. While numpy/pandas are handled by apt,
+# other libraries might need this.
 RUN pip install --upgrade pip setuptools wheel
 
-# Install requirements
+# Install remaining requirements
 RUN pip install -r requirements.txt
 
 # Copy the rest of the application code

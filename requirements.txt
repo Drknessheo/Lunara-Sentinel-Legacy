@@ -2,8 +2,6 @@ python-telegram-bot==21.0.1
 python-binance==1.0.19
 redis==5.0.1
 python-dotenv==1.0.0
-pandas==2.0.3
-numpy==1.24.4
 ta==0.10.2
 gunicorn==21.2.0
 Flask==3.0.0
