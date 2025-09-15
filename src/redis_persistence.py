@@ -117,3 +117,7 @@ class RedisPersistence(BasePersistence):
         conversations[str(key)] = new_state
         redis_key = self._get_key("conversations", name)
         self.redis.set(redis_key, json.dumps(conversations))
+
+    def flush(self) -> None:
+        """Flushes all data in redis."""
+        self.redis.flushdb()
