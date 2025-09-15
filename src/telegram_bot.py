@@ -1,144 +1,58 @@
+"""
+This is the main entry point for the Telegram bot.
+
+It sets up the command handlers, schedules the background jobs, and starts the bot.
+"""
+
+import asyncio
 import logging
+import os
 
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
-import config
-import db
-import trade
-from src.main import set_api_command_primary as set_api_command
+from . import trade
+from .core import autotrade_engine
+from .utils import redis_utils
+from . import config
 
-# Enable logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
 logger = logging.getLogger(__name__)
 
 
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sends a welcome message when the /start command is issued."""
-    await update.message.reply_text(
-        "Welcome to Lunara Bot! I can help you with your crypto trading. "
-        "Use /help to see a list of available commands."
-    )
-
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sends a help message when the /help command is issued."""
-    help_text = """
-    Here are the available commands:
-    `/start` - Welcome message
-    `/help` - Shows this help message
-    `/quest <SYMBOL>` - Get price/RSI and watch a symbol for a buy signal.
-    `/import <SYMBOL> [PRICE]` - Import a trade from Binance or manually.
-    `/status` - View your open trades and watchlist.
-    `/performance` - View win/loss and PnL performance per coin.
-    `/balance` - Check your USDT balance (live or paper).
-    `/wallet` - View all your spot wallet balances (live only).
-    `/close <TRADE_ID>` - Manually close an open trade.
-    `/setapi <KEY> <SECRET>` - Set your Binance API keys (in private chat).
-    `/mode <LIVE|PAPER>` - Switch between live and paper trading.
-    """
-    await update.message.reply_text(help_text, parse_mode="Markdown")
-
-
-async def wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the /wallet command."""
-    user_id = update.effective_user.id
-    mode, _ = db.get_user_trading_mode_and_balance(user_id)
-
-    if mode == "PAPER":
-        await update.message.reply_text(
-            "You are in Paper Trading mode. The /wallet command is for live trading only."
-        )
-        return
-
-    api_key, _ = db.get_user_api_keys(user_id)
-    if not api_key:
-        await update.message.reply_text(
-            "Your Binance API keys are not set. Please use `/setapi <key> <secret>` in a private chat with me."
-        )
-        return
-
-    await update.message.reply_text(
-        "Fetching your spot wallet balances from Binance..."
-    )
-    try:
-        balances = trade.get_all_spot_balances(user_id)
-        if not balances:
-            await update.message.reply_text(
-                "You do not seem to have any assets in your spot wallet."
-            )
-            return
-
-        # Sort balances by asset name
-        balances.sort(key=lambda x: x["asset"])
-
-        message = "💎 **Your Spot Wallet** 💎\n\n"
-        for bal in balances:
-            # Only show assets with a free balance greater than a small threshold
-            if float(bal["free"]) > 0.00000001:
-                message += f"**{bal['asset']}:** `{bal['free']}`\n"
-
-        await update.message.reply_text(message, parse_mode="Markdown")
-
-    except trade.TradeError as e:
-        await update.message.reply_text(
-            f"Could not retrieve your wallet balance.\n\n*Reason:* `{e}`\n\nPlease check your API key permissions and IP restrictions on Binance.",
-            parse_mode="Markdown",
-        )
-    except Exception as e:
-        logger.error(f"An unexpected error occurred in wallet_command: {e}")
-        await update.message.reply_text(
-            "An unexpected error occurred while fetching your wallet."
-        )
-
-
-# set_api_command is imported from src.main to avoid duplicate definitions
-
-
-async def set_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sets the user's trading mode (LIVE or PAPER)."""
-    user_id = update.effective_user.id
-
-    try:
-        mode = context.args[0].upper()
-        if mode not in ["LIVE", "PAPER"]:
-            raise ValueError("Invalid mode.")
-    except (IndexError, ValueError):
-        await update.message.reply_text(
-            "Please specify a valid mode: `/mode LIVE` or `/mode PAPER`."
-        )
-        return
-
-    db.set_user_trading_mode(user_id, mode)
-    await update.message.reply_text(
-        f"Your trading mode has been set to **{mode}**.", parse_mode="Markdown"
-    )
-
-
 def main() -> None:
-    """Start the bot."""
-    if not config.TELEGRAM_BOT_TOKEN:
-        logger.error("TELEGRAM_BOT_TOKEN not found in config. Please set it.")
-        return
+    """Set up the bot and run it."""
+    logger.info("Starting Lunara Bot...")
 
+    # Ensure required configuration is present
+    if not config.TELEGRAM_BOT_TOKEN:
+        raise ValueError("TELEGRAM_BOT_TOKEN is not set!")
+    if not config.REDIS_URL:
+        raise ValueError("REDIS_URL is not set!")
+
+    # --- Application Setup ---
     application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
 
-    # Add command handlers
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("quest", trade.quest_command))
-    application.add_handler(CommandHandler("balance", trade.balance_command))
-    application.add_handler(CommandHandler("wallet", wallet_command))
-    application.add_handler(CommandHandler("import", trade.import_last_trade_command))
-    application.add_handler(CommandHandler("status", trade.status_command))
-    application.add_handler(CommandHandler("performance", trade.performance_command))
+    # --- Command Handlers ---
+    application.add_handler(CommandHandler("start", trade.help_command))
+    application.add_handler(CommandHandler("help", trade.help_command))
+    application.add_handler(CommandHandler("about", trade.about_command))
+    application.add_handler(CommandHandler("myprofile", trade.myprofile_command))
+    application.add_handler(CommandHandler("setapi", trade.set_api_keys_command))
     application.add_handler(CommandHandler("close", trade.close_trade_command))
-    application.add_handler(CommandHandler("setapi", set_api_command))
-    application.add_handler(CommandHandler("mode", set_mode_command))
+    application.add_handler(CommandHandler("clear_redis", trade.clear_redis_command))
 
-    logger.info("Starting bot...")
+    # --- Background Jobs ---
+    job_queue = application.job_queue
+    job_queue.run_repeating(
+        autotrade_engine.autotrade_cycle,
+        interval=config.AUTOTRADE_SCHEDULE_MINUTES * 60,
+        first=10,  # Start after 10 seconds
+    )
+    logger.info(
+        f"Autotrade cycle scheduled to run every {config.AUTOTRADE_SCHEDULE_MINUTES} minutes."
+    )
+
+    # --- Start the Bot ---
+    logger.info("Starting bot polling...")
     application.run_polling()
 
 
