@@ -18,6 +18,7 @@ import time
 import pandas as pd
 import numpy as np
 from datetime import datetime, timezone
+from telegram.ext import ContextTypes
 
 # Assuming the new modular structure
 from . import binance_client

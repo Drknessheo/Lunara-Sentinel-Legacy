@@ -3,7 +3,7 @@ import time
 
 import requests
 
-URL = os.getenv("KEEP_ALIVE_URL", "https://lunessasignels.onrender.com/health")
+URL = os.getenv("KEEP_ALIVE_URL", "https://lunessasignels.onrender.com/healthz")
 DELAY = int(os.getenv("KEEP_ALIVE_DELAY_SEC", str(14 * 60)))
 
 if __name__ == "__main__":
