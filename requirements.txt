@@ -15,9 +15,11 @@ cryptography==45.0.7
 cycler==0.12.1
 dateparser==1.2.2
 fakeredis==2.31.1
+filelock
 Flask==3.1.2
 fonttools==4.59.2
 frozenlist==1.7.0
+google-generativeai
 gunicorn==23.0.0
 h11==0.16.0
 httpcore==1.0.9
