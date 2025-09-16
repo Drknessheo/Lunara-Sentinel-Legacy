@@ -370,10 +370,11 @@ def main() -> None:
     
     # --- Other command handlers from trade.py or this file ---
     application.add_handler(CommandHandler("balance", trade.balance_command))
+    application.add_handler(CommandHandler("wallet", trade.wallet_command))
     application.add_handler(CommandHandler("setapi", trade.set_api_keys_command))
     application.add_handler(CommandHandler("addcoins", trade.addcoins_command))
     application.add_handler(CommandHandler("binance_status", trade.binance_status_command))
-
+    application.add_handler(CommandHandler("settings", trade.settings_command))
 
     # --- Job Queue ---
     job_queue = application.job_queue
