@@ -65,7 +65,7 @@ from telegram.ext import ContextTypes
 from . import config
 from . import slip_manager
 from . import trade
-from . import db_access as autotrade_db
+from .modules import db_access as autotrade_db
 
 logger = logging.getLogger(__name__)
 
