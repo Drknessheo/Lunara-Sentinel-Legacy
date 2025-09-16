@@ -15,10 +15,14 @@ from telegram.ext import ContextTypes
 # Local Application/Library Specific Imports
 from . import config
 from . import slip_manager
-from . import trade
+# --- CIRCULAR IMPORT REMOVED ---
+# The import of 'trade' is removed to break the circular dependency.
+# This module will now use core logic functions directly.
+# from . import trade 
+from .core import trading_logic, binance_client # Import core logic modules
 from . import gemini_cache
 from . import autotrade_settings
-from . import db as new_db  # Import the new thread-safe db module
+from . import db as new_db
 
 # --- Globals & Configuration ---
 logger = logging.getLogger(__name__)
@@ -67,14 +71,14 @@ async def monitor_autotrades(context: ContextTypes.DEFAULT_TYPE = None, dry_run:
             symbol = slip_data["symbol"]
             buy_price = float(slip_data["price"])
 
-            current_price = trade.get_current_price(symbol)
+            # CORRECTED: Call the core binance_client for price data
+            current_price = await binance_client.get_current_price(symbol)
             if not current_price:
                 logger.warning(f"Could not fetch current price for {symbol}. Skipping trade {trade_id}.")
                 continue
 
             pnl_percent = ((current_price - buy_price) / buy_price) * 100
             
-            # Use user's profit target, or global default
             target_pct = float(settings.get("PROFIT_TARGET_PERCENTAGE", 1.0))
 
             if pnl_percent >= target_pct:
@@ -87,15 +91,13 @@ async def monitor_autotrades(context: ContextTypes.DEFAULT_TYPE = None, dry_run:
                     logger.info(f"[MONITOR] DRY RUN - Would sell {amount_to_sell} {symbol} for user {user_id} (Trade ID: {trade_id}) at P/L {pnl_percent:.2f}%")
                 else:
                     logger.info(f"Attempting to place sell order for user {user_id}, trade {trade_id}")
-                    # 1. Place the sell order using user's credentials (via user_id)
-                    sell_success = trade.place_sell_order(user_id, symbol, float(amount_to_sell))
+                    # CORRECTED: Call the core trading_logic to place the sell order
+                    sell_success = await trading_logic.place_sell_order_logic(user_id, symbol, float(amount_to_sell))
                     
                     if sell_success:
-                        # 2. Mark the trade as closed in the main database
                         new_db.mark_trade_closed(trade_id, reason="autotrade_sell")
                         logger.info(f"[MONITOR] Marked trade_id={trade_id} as 'autotrade_sell' in the database.")
 
-                        # 3. Purge the slips from Redis
                         slip_manager.delete_slip(f"trade:{trade_id}")
                         
                         msg_text = f"🤖 Autotrade closed: Sold {amount_to_sell} {symbol} @ ${current_price:.4f} for a {pnl_percent:.2f}% gain."
