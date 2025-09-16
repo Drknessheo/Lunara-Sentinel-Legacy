@@ -110,10 +110,10 @@ Your ultimate guide to mastering the crypto markets.
 *🛠️ Utilities*
 /ask QUESTION - Ask the AI Oracle about trading.
 /safety - Read important trading advice.
-/pay - See how to support LunessaSignals\'s development.
+/pay - See how to support LunessaSignals's development.
 
 *🛡️ Admin Commands*
-/autotrade on \\| off - \\[Admin\\] Enable or disable automatic trading for all users.
+/autotrade on \| off - \\[Admin\\] Enable or disable automatic trading for all users.
 /binance_status - \\[Admin\\] Check the connection status to the Binance API.
 /diagnose_slips - \\[Admin\\] Run a diagnostic check on the slips database to identify corrupted data.
 /settings - \\[Admin\\] Customize global trading parameters.
@@ -129,16 +129,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db.get_or_create_user(user.id)
     logger.info(f"User {user.id} ({user.username}) started the bot.")
     welcome_message = (
-        f"🌑 <b>A new trader emerges from the shadows.</b> {user.mention_html()}, you have been summoned by <b>Lunessa Shai\'ra Gork</b>, Sorceress of DeFi and guardian of RSI gates.\\n\\n"
-        f"Your journey begins now. I will monitor the markets for you, alert you to opportunities, and manage your trades.\\n\\n"
-        f"<b>Key Commands:</b>\\n/quest <code>SYMBOL</code> - Analyze a cryptocurrency.\\n/status - View your open trades and watchlist.\\n/help - See all available commands.\\n\\n"
+        f"🌑 <b>A new trader emerges from the shadows.</b> {user.mention_html()}, you have been summoned by <b>Lunessa Shai'ra Gork</b>, Sorceress of DeFi and guardian of RSI gates.\n\n"
+        f"Your journey begins now. I will monitor the markets for you, alert you to opportunities, and manage your trades.\n\n"
+        f"<b>Key Commands:</b>\n/quest <code>SYMBOL</code> - Analyze a cryptocurrency.\n/status - View your open trades and watchlist.\n/help - See all available commands.\n\n"
         f"To unlock live trading, please provide your Binance API keys using the <code>/setapi</code> command in a private message with me."
     )
     await update.message.reply_html(welcome_message)
 
 
 async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays the user\'s profile information, including tier and settings."""
+    """Displays the user's profile information, including tier and settings."""
     user_id = update.effective_user.id
     user_record = db.get_user(user_id)
     if not user_record:
@@ -150,28 +150,28 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     trading_mode, paper_balance = db.get_user_trading_mode_and_balance(user_id)
     
     username = update.effective_user.username or "(not set)"
-    autotrade = "Enabled" if settings.get(\'AUTOTRADE_ENABLED\') else "Disabled"
+    autotrade = "Enabled" if settings.get('AUTOTRADE_ENABLED') else "Disabled"
     
     message = f"""*Your Profile*
 
 *User ID:* `{user_id}`
 *Username:* @{username}
-*Tier:* {user_record[\'tier\']}
+*Tier:* {user_record['tier']}
 *Trading Mode:* {trading_mode}
 *Autotrade:* {autotrade}"""
     
     if trading_mode == "LIVE":
-        message += "\\n*USDT Balance:* (see /wallet)"
+        message += "\n*USDT Balance:* (see /wallet)"
     else:
-        message += f"\\n*Paper Balance:* ${paper_balance:,.2f}"
+        message += f"\n*Paper Balance:* ${paper_balance:,.2f}"
     
-    message += "\\n\\n*Effective Settings:*"
-    message += f"\\n- RSI Buy: {settings.get(\'RSI_BUY_THRESHOLD\', \'N/A\')}"
-    message += f"\\n- RSI Sell: {settings.get(\'RSI_SELL_THRESHOLD\', \'N/A\')}"
-    message += f"\\n- Stop Loss: {settings.get(\'STOP_LOSS_PERCENTAGE\', \'N/A\')}%"
-    message += f"\\n- Trailing Activation: {settings.get(\'TRAILING_PROFIT_ACTIVATION_PERCENT\', \'N/A\')}%"
-    message += f"\\n- Trailing Drop: {settings.get(\'TRAILING_STOP_DROP_PERCENT\', \'N/A\')}%"
-    message += f"\\n- Trade Size (USDT): {settings.get(\'TRADE_SIZE_USDT\', \'N/A\')}"
+    message += "\n\n*Effective Settings:*"
+    message += f"\n- RSI Buy: {settings.get('RSI_BUY_THRESHOLD', 'N/A')}"
+    message += f"\n- RSI Sell: {settings.get('RSI_SELL_THRESHOLD', 'N/A')}"
+    message += f"\n- Stop Loss: {settings.get('STOP_LOSS_PERCENTAGE', 'N/A')}%"
+    message += f"\n- Trailing Activation: {settings.get('TRAILING_PROFIT_ACTIVATION_PERCENT', 'N/A')}%"
+    message += f"\n- Trailing Drop: {settings.get('TRAILING_STOP_DROP_PERCENT', 'N/A')}%"
+    message += f"\n- Trade Size (USDT): {settings.get('TRADE_SIZE_USDT', 'N/A')}"
 
     await update.message.reply_text(message, parse_mode="Markdown")
 
@@ -184,11 +184,11 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("Could not find your profile. Please try /start.")
         return
 
-    tier = user_record[\'tier\']
-    expires_str = user_record[\'subscription_expires\']
-    autotrade_status = "✅ Enabled" if db.get_user_effective_settings(user_id).get(\'AUTOTRADE_ENABLED\') else "❌ Disabled"
+    tier = user_record['tier']
+    expires_str = user_record['subscription_expires']
+    autotrade_status = "✅ Enabled" if db.get_user_effective_settings(user_id).get('AUTOTRADE_ENABLED') else "❌ Disabled"
 
-    subscription_message = f"👤 **Subscription Status**\\n- Tier: **{tier.capitalize()}**\\n- Auto-trade: {autotrade_status}\\n"
+    subscription_message = f"👤 **Subscription Status**\n- Tier: **{tier.capitalize()}**\n- Auto-trade: {autotrade_status}\n"
 
     if tier != "FREE" and expires_str:
         try:
@@ -197,13 +197,13 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             if expires_dt > now_utc:
                 days_remaining = (expires_dt - now_utc).days
                 expiry_date_formatted = expires_dt.strftime("%d %b %Y")
-                subscription_message += f"- Expires: **{expiry_date_formatted}** ({days_remaining} days left)\\n"
+                subscription_message += f"- Expires: **{expiry_date_formatted}** ({days_remaining} days left)\n"
             else:
-                subscription_message += "- Status: **Expired**\\n"
+                subscription_message += "- Status: **Expired**\n"
         except (ValueError, TypeError):
-            subscription_message += "- Expiry: *Not set*\\n"
+            subscription_message += "- Expiry: *Not set*\n"
 
-    subscription_message += "\\n" + ("-" * 20) + "\\n\\n"
+    subscription_message += "\n" + ("-" * 20) + "\n\n"
 
     open_trades = db.get_open_trades(user_id)
     if not open_trades:
@@ -220,15 +220,15 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         current_price = trade.get_current_price(symbol)
         trade_id = trade_item["id"]
         
-        message += f"\\n🔹 **{symbol}** (ID: {trade_id})"
+        message += f"\n🔹 **{symbol}** (ID: {trade_id})"
 
         if current_price:
             pnl_percent = ((current_price - buy_price) / buy_price) * 100
             pnl_emoji = "📈" if pnl_percent >= 0 else "📉"
             message += (
-                f"\\n   {pnl_emoji} P/L: `{pnl_percent:+.2f}%`"
-                f"\\n   Bought: `${buy_price:,.8f}`"
-                f"\\n   Current: `${current_price:,.8f}`"
+                f"\n   {pnl_emoji} P/L: `{pnl_percent:+.2f}%`"
+                f"\n   Bought: `${buy_price:,.8f}`"
+                f"\n   Current: `${current_price:,.8f}`"
             )
     
     await update.message.reply_text(
@@ -251,10 +251,10 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
 
-    message = "🏆 **Hall of Legends: Global Top Quests** 🏆\\n\\n_These are the most glorious victories across the realm:_\\n\\n"
+    message = "🏆 **Hall of Legends: Global Top Quests** 🏆\n\n_These are the most glorious victories across the realm:_\n\n"
     rank_emojis = ["🥇", "🥈", "🥉"]
 
-    # CORRECTED: Changed \`trade\` to \`trade_entry\` to fix the bug
+    # CORRECTED: Changed `trade` to `trade_entry` to fix the bug
     for i, trade_entry in enumerate(top_trades):
         emoji = rank_emojis[i] if i < len(rank_emojis) else "🔹"
         user_id = trade_entry["user_id"]
@@ -265,9 +265,9 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception as e:
             logger.warning(f"Could not fetch user name for {user_id} for leaderboard: {e}")
 
-        message += f"{emoji} **{trade_entry[\'coin_symbol\']}**: `{trade_entry[\'pnl_percent\']:+.2f}%` (by {user_name})\\n"
+        message += f"{emoji} **{trade_entry['coin_symbol']}**: `{trade_entry['pnl_percent']:+.2f}%` (by {user_name})\n"
 
-    message += "\\nWill your name be etched into legend?"
+    message += "\nWill your name be etched into legend?"
     await update.message.reply_text(message, parse_mode="Markdown")
 
 async def import_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -280,7 +280,7 @@ async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await trade.close_trade_command(update, context)
 
 async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Reviews the user\'s completed trade performance."""
+    """Reviews the user's completed trade performance."""
     user_id = update.effective_user.id
     closed_trades = db.get_closed_trades(user_id)
 
@@ -288,9 +288,9 @@ async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("You have no completed trades to review.")
         return
 
-    wins = sum(1 for t in closed_trades if t[\'win_loss\'] == \'win\')
+    wins = sum(1 for t in closed_trades if t['win_loss'] == 'win')
     losses = len(closed_trades) - wins
-    total_pnl = sum(t[\'pnl_percentage\'] for t in closed_trades)
+    total_pnl = sum(t['pnl_percentage'] for t in closed_trades)
     win_rate = (wins / len(closed_trades)) * 100 if closed_trades else 0
     avg_pnl = total_pnl / len(closed_trades) if closed_trades else 0
 
@@ -306,7 +306,7 @@ async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def top_trades_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays the user\'s top 3 most profitable closed trades."""
+    """Displays the user's top 3 most profitable closed trades."""
     user_id = update.effective_user.id
     # CORRECTED: This uses the correct DB function now
     top_trades = db.get_user_top_trades(user_id, limit=3)
@@ -315,12 +315,12 @@ async def top_trades_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("You have no completed profitable quests to rank.")
         return
 
-    message = "🏆 **Your Hall of Fame** 🏆\\n\\n_Here are your most legendary victories:_\\n\\n"
+    message = "🏆 **Your Hall of Fame** 🏆\n\n_Here are your most legendary victories:_\n\n"
     rank_emojis = ["🥇", "🥈", "🥉"]
 
     for i, trade_entry in enumerate(top_trades):
         emoji = rank_emojis[i] if i < len(rank_emojis) else "🔹"
-        message += f"{emoji} **{trade_entry[\'coin_symbol\']}**: `{trade_entry[\'pnl_percent\']:+.2f}%`\\n"
+        message += f"{emoji} **{trade_entry['coin_symbol']}**: `{trade_entry['pnl_percent']:+.2f}%`\n"
 
     await update.message.reply_text(message, parse_mode="Markdown")
 
