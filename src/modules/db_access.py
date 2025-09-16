@@ -256,6 +256,17 @@ def get_user_effective_settings(cursor, user_id: int) -> dict:
             settings[settings_key] = user_data[db_key]
     return settings
 
+
+@db_connection
+def set_user_trading_mode(cursor, user_id: int, mode: str):
+    """Sets the user's trading mode ('LIVE' or 'PAPER')."""
+    if mode not in ('LIVE', 'PAPER'):
+        raise ValueError("Trading mode must be 'LIVE' or 'PAPER'")
+    _get_or_create_user(cursor, user_id)  # Ensure user exists
+    cursor.execute(
+        "UPDATE users SET trading_mode = ? WHERE user_id = ?", (mode, user_id)
+    )
+
 __all__ = [
     "add_coins_to_watchlist",
     "get_or_create_user",
@@ -269,4 +280,5 @@ __all__ = [
     "update_user_setting",
     "update_user_subscription",
     "get_user_trading_mode_and_balance",
+    "set_user_trading_mode",
 ]

@@ -416,3 +416,26 @@ async def addcoins_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /quest command for premium users."""
     await update.message.reply_text("This is a placeholder for the premium quest command.")
+
+async def toggle_paper_trading_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Toggles the user's trading mode between LIVE and PAPER."""
+    user_id = update.effective_user.id
+    try:
+        current_mode, _ = db.get_user_trading_mode_and_balance(user_id)
+        new_mode = 'LIVE' if current_mode == 'PAPER' else 'PAPER'
+        db.set_user_trading_mode(user_id, new_mode)
+
+        if new_mode == 'PAPER':
+            message = "Paper trading mode has been enabled. Your trades will be simulated and will not use real funds."
+        else:
+            message = "Live trading mode has been activated. The bot will now execute trades with real funds."
+
+        await update.message.reply_text(f"✅ {message}")
+
+    except Exception as e:
+        logger.error(f"Failed to toggle paper trading for user {user_id}: {e}")
+        await update.message.reply_text("An error occurred while switching trading modes. Please try again later.")
+
+async def autotrade_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Placeholder for autotrade command."""
+    await update.message.reply_text("Autotrade command is not yet implemented.")
