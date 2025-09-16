@@ -63,6 +63,12 @@ def get_user(cursor, user_id: int):
     return user
 
 @db_connection
+def get_user_trading_mode_and_balance(cursor, user_id: int):
+    """Gets the user's trading mode and paper balance."""
+    user = _get_or_create_user(cursor, user_id)
+    return user["trading_mode"], user["paper_balance"]
+
+@db_connection
 def add_coins_to_watchlist(cursor, user_id: int, coins: list[str]):
     """Adds a list of coins to a user's watchlist."""
     for coin in coins:
@@ -262,4 +268,5 @@ __all__ = [
     "store_user_api_keys",
     "update_user_setting",
     "update_user_subscription",
+    "get_user_trading_mode_and_balance",
 ]
