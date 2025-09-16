@@ -18,14 +18,14 @@ from binance.client import Client as BinanceClient
 from binance.exceptions import BinanceAPIException
 
 
-# CORRECTED: Using absolute imports from the 'src' directory
-from core import binance_client
-from core import trading_logic
-from core.binance_client import TradeError
-from modules import db_access as db
-from utils import redis_utils
-import config
-import slip_manager
+# CORRECTED: Using relative imports for containerized deployment
+from .core import binance_client
+from .core import trading_logic
+from .core.binance_client import TradeError
+from .modules import db_access as db
+from .utils import redis_utils
+from . import config
+from . import slip_manager
 
 
 logger = logging.getLogger(__name__)
