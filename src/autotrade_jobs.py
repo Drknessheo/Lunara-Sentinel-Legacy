@@ -613,7 +613,7 @@ async def force_create_mock_slips(
         to_create = symbols[:max_create]
         for symbol in to_create:
             try:
-                tid = await mock_autotrade_buy(
+                tid = await mock_autrade_buy(
                     user_id,
                     symbol,
                     amount=float(

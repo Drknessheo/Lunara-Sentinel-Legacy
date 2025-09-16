@@ -22,7 +22,7 @@ from binance.exceptions import BinanceAPIException
 from .core import binance_client
 from .core import trading_logic
 from .core.binance_client import TradeError
-from . import db_access as db
+from .modules import db_access as db
 from .utils import redis_utils
 from . import config
 from . import slip_manager
@@ -304,7 +304,7 @@ async def usercount_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays the user's balance."""
     user_id = update.effective_user.id
-    mode, paper_balance = db.get_user_trading_mode_and_.balance(user_id)
+    mode, paper_balance = db.get_user_trading_mode_and_balance(user_id)
     if mode == "PAPER":
         await update.message.reply_text(f"Your paper balance is: ${paper_balance:,.2f} USDT")
     else:
