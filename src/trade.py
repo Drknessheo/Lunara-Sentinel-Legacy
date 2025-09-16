@@ -76,6 +76,9 @@ async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("ðŸ🪙 Your wallet is currently empty. Use /setapi to begin trading.")
 
+async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("This command is not yet implemented. It will be used to customize global trading parameters.")
+
 async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the /myprofile command, showing open trades, wallet holdings, and settings."""
     user_id = update.effective_user.id
