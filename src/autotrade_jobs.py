@@ -51,7 +51,6 @@ async def monitor_autotrades(context: ContextTypes.DEFAULT_TYPE = None, dry_run:
     for slip_item in all_slips:
         try:
             slip_data = slip_item.get('data', {})
-            # Corrected line: No more mismatched quotes.
             trade_id = slip_item.get('key', '').split(':')[1]
 
             if not slip_data or not slip_data.get("sandpaper"):
