@@ -64,18 +64,10 @@ from telegram.ext import ContextTypes
 
 import config
 
-# Local imports: prefer package-relative when running as a module
-if __package__:
-    from . import slip_manager, trade
-    from .modules import db_access as autotrade_db
-
-    pass
-else:
-    import slip_manager
-    import trade
-    from modules import db_access as autotrade_db
-
-    pass
+# CORRECTED: Using absolute imports
+import slip_manager
+import trade
+from modules import db_access as autotrade_db
 
 logger = logging.getLogger(__name__)
 

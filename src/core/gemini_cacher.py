@@ -1,9 +1,9 @@
 import json
 import redis
-from src.config import REDIS_URL
+import config
 
 class GeminiCacher:
-    def __init__(self, redis_url=REDIS_URL):
+    def __init__(self, redis_url=config.REDIS_URL):
         self.redis = redis.from_url(redis_url)
 
     def get(self, key):

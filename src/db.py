@@ -648,12 +648,7 @@ def store_user_api_keys(user_id: int, api_key: str, secret_key: str):
 def get_user_api_keys(user_id: int) -> tuple[str | None, str | None]:
     """
     Retrieves and decrypts a user's Binance API keys.
-    For the admin user, it returns the keys directly from the .env configuration.
     """
-    # As the father of the bot, you get your keys directly from the sacred .env scroll.
-    if user_id == getattr(config, "ADMIN_USER_ID", None):
-        return config.BINANCE_API_KEY, config.BINANCE_SECRET_KEY
-
     conn = get_db_connection()
     row = conn.execute(
         "SELECT api_key, secret_key FROM users WHERE user_id = ?", (user_id,)

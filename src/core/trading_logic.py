@@ -20,16 +20,16 @@ import numpy as np
 from datetime import datetime, timezone
 from telegram.ext import ContextTypes
 
-# Assuming the new modular structure
-from . import binance_client
-from .binance_client import TradeError
-from .. import config
-from ..indicators import calculate_rsi, calc_atr
-from ..modules import db_access as db
-from ..risk_management import get_atr_stop, should_pause_trading
-from ..memory import log_trade_outcome
-from ..trade_guard import TradeValidator
-from . import gemini_cacher
+# CORRECTED: Using absolute imports
+from core import binance_client
+from core.binance_client import TradeError
+import config
+from indicators import calculate_rsi, calc_atr
+from modules import db_access as db
+from risk_management import get_atr_stop, should_pause_trading
+from memory import log_trade_outcome
+from trade_guard import TradeValidator
+from core import gemini_cacher
 
 logger = logging.getLogger(__name__)
 

@@ -22,10 +22,9 @@ from tenacity import (
 from urllib3.util.retry import Retry
 from functools import lru_cache
 
-# Assuming config and db_access are available in the new structure
-from .. import config
-from ..modules import db_access as db
-from ..logging_utils import mask_secrets
+# CORRECTED: Using absolute imports
+import config
+from modules import db_access as db
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +121,8 @@ def get_symbol_info(symbol: str):
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
 def get_historical_klines(*args, **kwargs):
-    """Wrapper for client.get_historical_klines with retry logic."""
+    """
+    Wrapper for client.get_historical_klines with retry logic."""
     ensure_binance_client()
     if not client:
         raise TradeError("Binance client not available for fetching klines.")
@@ -131,7 +131,8 @@ def get_historical_klines(*args, **kwargs):
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
 def get_current_price(symbol: str):
-    """Fetches the current price of a given symbol from Binance."""
+    """
+    Fetches the current price of a given symbol from Binance."""
     ensure_binance_client()
     if not client:
         raise TradeError("Binance client not available for fetching price.")

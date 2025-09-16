@@ -14,15 +14,18 @@ import asyncio
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
+from binance.client import Client as BinanceClient
+from binance.exceptions import BinanceAPIException
 
 
-from .core import binance_client
-from .core import trading_logic
-from .core.binance_client import TradeError
-from .modules import db_access as db
-from .utils import redis_utils
-from . import config
-from . import slip_manager
+# CORRECTED: Using absolute imports from the 'src' directory
+from core import binance_client
+from core import trading_logic
+from core.binance_client import TradeError
+from modules import db_access as db
+from utils import redis_utils
+import config
+import slip_manager
 
 
 logger = logging.getLogger(__name__)
@@ -344,15 +347,48 @@ def get_current_price(symbol: str) -> float | None:
         return None
 
 def get_all_spot_balances(user_id: int) -> list | None:
-    """Gets all spot balances for a given user."""
-    if not client:
-        return None
+    """
+    Retrieves and returns all spot account balances from Binance for a given user.
+    For the admin, it uses keys from the config. For others, it fetches from the DB.
+    """
+    api_key, secret_key = None, None
+    is_admin = user_id == getattr(config, "ADMIN_USER_ID", None)
+
+    if is_admin:
+        api_key = config.BINANCE_API_KEY
+        secret_key = config.BINANCE_SECRET_KEY
+    else:
+        api_key, secret_key = db.get_user_api_keys(user_id)
+
+    if not api_key or not secret_key:
+        logger.warning(f"API keys not found for user {user_id}.")
+        # To provide a better error message to the user, we raise a TradeError.
+        raise TradeError("API keys are not set. Please use /setapi.")
+
     try:
-        # This is a placeholder for the actual balance retrieval logic.
-        return [{"asset": "USDT", "free": "1000.0", "locked": "0.0"}]
+        # Create a dedicated client for this user
+        user_client = BinanceClient(api_key, secret_key)
+        
+        # Verify connection
+        user_client.ping()
+
+        account_info = user_client.get_account()
+        balances = account_info.get("balances", [])
+        
+        # Filter for assets with a positive balance
+        non_zero_balances = [
+            bal for bal in balances if float(bal["free"]) > 0 or float(bal["locked"]) > 0
+        ]
+        return non_zero_balances
+
+    except BinanceAPIException as e:
+        logger.error(f"Binance API error for user {user_id}: {e}")
+        # Pass a user-friendly error message
+        raise TradeError(f"Binance API error: {e.message}")
     except Exception as e:
-        logger.error(f"Error getting all spot balances for user {user_id}: {e}")
-        return None
+        logger.error(f"Unexpected error getting balances for user {user_id}: {e}")
+        raise TradeError("An unexpected error occurred while fetching balances.")
+
 
 async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /quest command for premium users."""
