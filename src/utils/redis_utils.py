@@ -1,19 +1,10 @@
-"""
-This module provides utility functions for interacting with Redis.
-"""
-
 import redis
-import os
+from config import REDIS_URL, REDIS_TOKEN
 
-def clear_redis_cache():
-    """Clears the Redis cache."""
-    try:
-        redis_url = os.getenv("REDIS_URL")
-        if not redis_url:
-            return False, "REDIS_URL not configured."
+redis_client = redis.from_url(REDIS_URL, password=REDIS_TOKEN, ssl_cert_reqs=None)
 
-        r = redis.from_url(redis_url)
-        r.flushall()
-        return True, "Redis cache cleared successfully."
-    except Exception as e:
-        return False, f"An error occurred while clearing the Redis cache: {e}"
+def delete_redis_slip(trade_id):
+    """
+    Deletes a trade slip from Redis.
+    """
+    redis_client.delete(f"trade_slip:{trade_id}")
