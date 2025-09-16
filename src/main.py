@@ -6,8 +6,6 @@ import logging
 import os
 import sys
 import time
-import threading
-from flask import Flask
 
 # --- Setup logging and path ---
 # This should be the very first thing to run
@@ -76,16 +74,6 @@ else:
 
 logger = logging.getLogger(__name__)
 
-# --- Flask Health Check ---
-app = Flask(__name__)
-
-@app.route('/health')
-def health_check():
-    return 'OK', 200
-
-def run_flask_app():
-    app.run(host='0.0.0.0', port=8080)
-
 HELP_MESSAGE = """🔮 *LunessaSignals Guide* 🔮
 
 Your ultimate guide to mastering the crypto markets.
@@ -98,18 +86,18 @@ Your ultimate guide to mastering the crypto markets.
 /help - Show this help message.
 
 *🔗 Account & Wallet*
-/setapi `KEY SECRET` - Link your Binance keys (in a private chat).
+/setapi KEY SECRET - Link your Binance keys (in a private chat).
 /linkbinance - Instructions for creating secure API keys.
 /wallet - View your full Binance Spot Wallet.
 /balance - Check your LIVE or PAPER balance.
 
 *📈 Trading & Analysis*
-/quest `SYMBOL` - Scan a crypto pair for opportunities.
+/quest SYMBOL - Scan a crypto pair for opportunities.
 /status - View your open trades and watchlist.
-/close `ID` - Manually complete a quest (trade).
-/import `SYMBOL [PRICE]` - Log an existing trade.
+/close ID - Manually complete a quest (trade).
+/import SYMBOL [PRICE] - Log an existing trade.
 /papertrade - Toggle practice mode.
-/addcoins `SYMBOL1 SYMBOL2...` - Add coins to your watchlist.
+/addcoins SYMBOL1 SYMBOL2... - Add coins to your watchlist.
 
 *✨ Performance & Community*
 /review - See your personal performance stats.
@@ -119,12 +107,12 @@ Your ultimate guide to mastering the crypto markets.
 /referral - Get your referral link to invite friends.
 
 *🛠️ Utilities*
-/ask `QUESTION` - Ask the AI Oracle about trading.
+/ask QUESTION - Ask the AI Oracle about trading.
 /safety - Read important trading advice.
 /pay - See how to support LunessaSignals's development.
 
 *🛡️ Admin Commands*
-/autotrade `on | off` - [Admin] Enable or disable automatic trading for all users.
+/autotrade on | off - [Admin] Enable or disable automatic trading for all users.
 /binance_status - [Admin] Check the connection status to the Binance API.
 /diagnose_slips - [Admin] Run a diagnostic check on the slips database to identify corrupted data.
 /settings - [Admin] Customize global trading parameters.
@@ -408,9 +396,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    # Start the Flask app in a separate thread
-    flask_thread = threading.Thread(target=run_flask_app)
-    flask_thread.daemon = True
-    flask_thread.start()
-
     main()
