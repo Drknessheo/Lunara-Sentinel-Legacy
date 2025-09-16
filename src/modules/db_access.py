@@ -65,6 +65,17 @@ def db_connection(func):
     return wrapper
 
 
+@db_connection
+def add_coins_to_watchlist(cursor, user_id: int, coins: list[str]):
+    """Adds a list of coins to a user's watchlist."""
+    for coin in coins:
+        try:
+            cursor.execute(
+                "INSERT INTO watchlist (user_id, coin_symbol) VALUES (?, ?)", (user_id, coin)
+            )
+        except sqlite3.IntegrityError:
+            # Ignore if the coin is already in the watchlist
+            pass
 SETTING_TO_COLUMN_MAP = {
     "rsi_buy": "custom_rsi_buy",
     "rsi_sell": "custom_rsi_sell",

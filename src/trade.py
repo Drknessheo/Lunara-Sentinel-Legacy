@@ -45,6 +45,7 @@ HELP_MESSAGE = """ðŸ¤– *Lunessa Shai'ra Gork* (@Srskat_bot) â€“ Automa
 /myprofile â€“ View your open trades, balances, and settings
 /setapi `KEY SECRET` â€“ Securely add your Binance API keys (in private chat)
 /close `ID` â€“ Manually close an open trade by its ID
+/addcoins `SYMBOL1 SYMBOL2...` - Add coins to your watchlist
 
 *Utility Commands:*
 /clear_redis â€“ Clear the bot's cache (for debugging)
@@ -303,7 +304,7 @@ async def usercount_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays the user's balance."""
     user_id = update.effective_user.id
-    mode, paper_balance = db.get_user_trading_mode_and_balance(user_id)
+    mode, paper_balance = db.get_user_trading_mode_and_.balance(user_id)
     if mode == "PAPER":
         await update.message.reply_text(f"Your paper balance is: ${paper_balance:,.2f} USDT")
     else:
@@ -389,6 +390,22 @@ def get_all_spot_balances(user_id: int) -> list | None:
         logger.error(f"Unexpected error getting balances for user {user_id}: {e}")
         raise TradeError("An unexpected error occurred while fetching balances.")
 
+
+async def addcoins_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Adds a coin to the user's watchlist."""
+    user_id = update.effective_user.id
+    if not context.args:
+        await update.message.reply_text("Please provide the coin symbols to add.\nUsage: `/addcoins <SYMBOL1> <SYMBOL2>...`")
+        return
+
+    coins = [coin.upper() for coin in context.args]
+    
+    try:
+        db.add_coins_to_watchlist(user_id, coins)
+        await update.message.reply_text(f"Successfully added {', '.join(coins)} to your watchlist.")
+    except Exception as e:
+        logger.error(f"Error adding coins to watchlist for user {user_id}: {e}")
+        await update.message.reply_text("An error occurred while adding coins to your watchlist.")
 
 async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /quest command for premium users."""

@@ -96,7 +96,7 @@ Your ultimate guide to mastering the crypto markets.
 /close `ID` - Manually complete a quest (trade).
 /import `SYMBOL [PRICE]` - Log an existing trade.
 /papertrade - Toggle practice mode.
-/addcoins - Add specific coins to your watchlist for continuous monitoring.
+/addcoins `SYMBOL1 SYMBOL2...` - Add coins to your watchlist.
 
 *✨ Performance & Community*
 /review - See your personal performance stats.
@@ -371,22 +371,10 @@ def main() -> None:
     application.add_handler(CommandHandler("autotrade", autotrade_command))
     
     # --- Other command handlers from trade.py or this file ---
-    application.add_handler(CommandHandler("wallet", trade.wallet_command))
     application.add_handler(CommandHandler("balance", trade.balance_command))
     application.add_handler(CommandHandler("setapi", trade.set_api_keys_command))
     application.add_handler(CommandHandler("addcoins", trade.addcoins_command))
-    application.add_handler(CommandHandler("papertrade", trade.papertrade_command))
-    application.add_handler(CommandHandler("subscribe", trade.subscribe_command))
-    application.add_handler(CommandHandler("learn", trade.learn_command))
-    application.add_handler(CommandHandler("linkbinance", trade.linkbinance_command))
-    application.add_handler(CommandHandler("resonate", trade.resonate_command))
-    application.add_handler(CommandHandler("referral", trade.referral_command))
-    application.add_handler(CommandHandler("ask", trade.ask_command))
-    application.add_handler(CommandHandler("safety", trade.safety_command))
-    application.add_handler(CommandHandler("pay", trade.pay_command))
     application.add_handler(CommandHandler("binance_status", trade.binance_status_command))
-    application.add_handler(CommandHandler("diagnose_slips", trade.diagnose_slips_command))
-    application.add_handler(CommandHandler("settings", trade.settings_command))
 
 
     # --- Job Queue ---
