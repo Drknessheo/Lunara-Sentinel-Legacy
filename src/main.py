@@ -114,9 +114,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info(f"New user {user.id} ({user.username}) started the bot.")
         # Announce the new user to the admin for subscription management
         if ADMIN_ID and context.bot:
-            # Sanitize user inputs for MarkdownV2
-            full_name = user.full_name.replace("[", "\[").replace("`", "\`")
-            username = user.username.replace("_", "\_") if user.username else 'N/A'
+            # Correctly escape special characters for MarkdownV2
+            full_name = user.full_name.replace("[", "\\[").replace("`", "\\`")
+            username = user.username.replace("_", "\\_") if user.username else 'N/A'
 
             announcement = (
                 f"📣 New User Announcement 📣\n\n"
