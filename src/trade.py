@@ -23,6 +23,7 @@ from .core import binance_client
 from .core import trading_logic
 from .core.binance_client import TradeError
 from .modules import db_access as db
+from . import db as new_db
 from .utils import redis_utils
 from . import config
 from . import slip_manager
@@ -74,10 +75,79 @@ async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(ABOUT_MESSAGE, parse_mode="Markdown")
 
 async def wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("ðŸ🪙 Your wallet is currently empty. Use /setapi to begin trading.")
+    user_id = update.effective_user.id
+    mode, paper_balance = db.get_user_trading_mode_and_balance(user_id)
+    message = f"ðŸ’° **Wallet ({mode} Mode)** ðŸ’°\n\n"
+
+    if mode == "LIVE":
+        try:
+            wallet_balances = get_all_spot_balances(user_id)
+            if wallet_balances:
+                open_trades = new_db.get_open_trades_by_user(user_id)
+                open_trade_symbols = {trade['symbol'].replace("USDT", "") for trade in open_trades}
+
+                core_holdings_found = False
+                for bal in wallet_balances:
+                    asset = bal["asset"]
+                    free = float(bal["free"])
+                    locked = float(bal["locked"])
+                    total = free + locked
+
+                    if total > 0.00000001:
+                        if asset in open_trade_symbols:
+                            message += f"- **{asset}:** `{total:.4f}` (Open Trade)\n"
+                        else:
+                            message += f"- **{asset}:** `{total:.4f}` (Core Holding)\n"
+                            core_holdings_found = True
+                if not core_holdings_found and not open_trades:
+                    message += "  No significant core holdings found.\n"
+            else:
+                message += "  No assets found in your spot wallet.\n"
+        except TradeError as e:
+            message += f"  *Could not retrieve wallet balances: {str(e)}*\n"
+        except Exception as e:
+            logger.error(f"Unexpected error fetching wallet balances: {e}")
+            message += "  *An unexpected error occurred while fetching wallet balances.*\n"
+    elif mode == "PAPER":
+        message += f"**Paper Balance:** ${paper_balance:,.2f} USDT\n"
+
+    await update.message.reply_text(message, parse_mode="Markdown")
+
 
 async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("This command is not yet implemented. It will be used to customize global trading parameters.")
+    user_id = update.effective_user.id
+    
+    if not context.args:
+        # Display current settings
+        settings = db.get_user_effective_settings(user_id)
+        message = "**Your current settings:**\n"
+        for key, value in settings.items():
+            message += f"- `{key}`: `{value}`\n"
+        message += "\nTo change a setting, use `/settings <setting_name> <value>`."
+        await update.message.reply_text(message, parse_mode="Markdown")
+        return
+
+    try:
+        setting_name = context.args[0].lower()
+        value_str = context.args[1]
+        
+        # Validate setting name
+        if setting_name not in db.SETTING_TO_COLUMN_MAP:
+            await update.message.reply_text(f"Invalid setting: {setting_name}")
+            return
+
+        # Convert value to appropriate type
+        value = float(value_str)
+        
+        db.update_user_setting(user_id, setting_name, value)
+        await update.message.reply_text(f"Successfully updated {setting_name} to {value}.")
+
+    except (IndexError, ValueError):
+        await update.message.reply_text("Usage: `/settings <setting_name> <value>`")
+    except Exception as e:
+        logger.error(f"Error updating user settings: {e}")
+        await update.message.reply_text("An error occurred while updating your settings.")
+
 
 async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the /myprofile command, showing open trades, wallet holdings, and settings."""
@@ -87,11 +157,11 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = f"âœ¨ **Your Trading Profile ({mode} Mode)** âœ¨\n\n"
 
     # --- Display Open Trades ---
-    open_trades = db.get_open_trades(user_id)
+    open_trades = new_db.get_open_trades_by_user(user_id)
     if open_trades:
         message += "ðŸ“Š **Open Quests:**\n"
         for trade_item in open_trades:
-            symbol = trade_item["coin_symbol"]
+            symbol = trade_item["symbol"]
             buy_price = trade_item["buy_price"]
             quantity = trade_item["quantity"]
             trade_id = trade_item["id"]
@@ -119,10 +189,7 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             wallet_balances = get_all_spot_balances(user_id)
             if wallet_balances:
                 # Get symbols from open trades for differentiation
-                open_trade_symbols = {
-                    trade_item["coin_symbol"].replace("USDT", "")
-                    for trade_item in open_trades
-                }
+                open_trade_symbols = {trade_item["symbol"].replace("USDT", "") for trade_item in open_trades}
 
                 core_holdings_found = False
                 for bal in wallet_balances:
@@ -221,7 +288,7 @@ async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
 
-    trade_to_close = db.get_trade_by_id(trade_id=trade_id, user_id=user_id)
+    trade_to_close = new_db.find_open_trade(trade_id, user_id)
 
     if not trade_to_close:
         await update.message.reply_text(
@@ -230,7 +297,7 @@ async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
 
-    symbol = trade_to_close["coin_symbol"]
+    symbol = trade_to_close["symbol"]
     buy_price = trade_to_close["buy_price"]
     
     # Use a placeholder price for closing manually, as the actual sell happened on Binance
@@ -239,19 +306,8 @@ async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     pnl_percentage = ((manual_close_price - buy_price) / buy_price) * 100
     win_loss = "win" if pnl_percentage > 0 else "loss" if pnl_percentage < 0 else "breakeven"
     
-    success = db.close_trade(
-        trade_id=trade_id,
-        user_id=user_id,
-        sell_price=manual_close_price,
-        close_reason="manual",
-        win_loss=win_loss,
-        pnl_percentage=pnl_percentage,
-        closed_by=str(user_id)
-    )
+    new_db.mark_trade_closed(trade_id, reason="manual_close")
 
-    if not success:
-        await update.message.reply_text("Failed to close the trade in the database. Please contact support.")
-        return
 
     # Now, attempt to clean up the corresponding Redis slip
     try:
@@ -304,7 +360,7 @@ async def binance_status_command(update: Update, context: ContextTypes.DEFAULT_T
 
 async def usercount_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays the total number of users."""
-    user_count = db.get_user_count()
+    user_count = new_db.get_user_count()
     await update.message.reply_text(f"Total users: {user_count}")
 
 async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -415,7 +471,17 @@ async def addcoins_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /quest command for premium users."""
-    await update.message.reply_text("This is a placeholder for the premium quest command.")
+    if not context.args:
+        await update.message.reply_text("Please provide a symbol to quest.\nUsage: `/quest <SYMBOL>`")
+        return
+
+    symbol = context.args[0].upper()
+    price = get_current_price(symbol)
+
+    if price is not None:
+        await update.message.reply_text(f"The current price of {symbol} is ${price:,.2f}.")
+    else:
+        await update.message.reply_text(f"Could not retrieve the price for {symbol}. Please ensure it is a valid symbol.")
 
 async def toggle_paper_trading_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Toggles the user's trading mode between LIVE and PAPER."""

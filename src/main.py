@@ -102,6 +102,7 @@ Your ultimate guide to mastering the crypto markets.
 <code>/binance_status</code> - [Admin] Check Binance API connection.
 <code>/diagnose_slips</code> - [Admin] Check for corrupted trade slips.
 <code>/settings</code> - [Admin] Customize global trading parameters.
+<code>/usercount</code> - [Admin] See the number of users in the database.
 """
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -197,6 +198,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("close", close_command))
     application.add_handler(CommandHandler("pay", handlers.pay_command))
+    application.add_handler(CommandHandler("myprofile", trade.myprofile_command))
     
     application.add_handler(CommandHandler("quest", trade.quest_command))
     application.add_handler(CommandHandler("balance", trade.balance_command))
@@ -209,6 +211,7 @@ def main() -> None:
     application.add_handler(CommandHandler("binance_status", trade.binance_status_command, filters=filters.User(user_id=ADMIN_ID)))
     application.add_handler(CommandHandler("diagnose_slips", diagnose_slips_command, filters=filters.User(user_id=ADMIN_ID)))
     application.add_handler(CommandHandler("settings", trade.settings_command, filters=filters.User(user_id=ADMIN_ID)))
+    application.add_handler(CommandHandler("usercount", trade.usercount_command, filters=filters.User(user_id=ADMIN_ID)))
 
     # --- Job Queue for background tasks ---
     job_queue = application.job_queue
