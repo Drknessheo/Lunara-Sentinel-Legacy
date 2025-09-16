@@ -42,7 +42,8 @@ from telegram.ext import (
 if __package__:
     from . import autotrade_jobs, config, handlers, redis_validator, slip_manager
     from . import db as new_db # The new thread-safe db module
-    from .utils import redis_utils
+    # Corrected import: Directly import the function to avoid attribute errors
+    from .utils.redis_utils import delete_redis_slip, diagnose_slips_command
     from . import trade, trade_executor
     from .modules import db_access as db # Old db access
     from .redis_persistence import RedisPersistence
@@ -55,7 +56,7 @@ else:
     import redis_validator
     import slip_manager
     import db as new_db
-    from utils import redis_utils
+    from utils.redis_utils import delete_redis_slip, diagnose_slips_command
     import trade
     import trade_executor
     from modules import db_access as db
@@ -164,8 +165,8 @@ async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # Mark the trade as manually closed in the database
     new_db.mark_trade_closed(trade_id, reason="manual_close")
 
-    # Delete the trade slip from Redis
-    redis_utils.delete_redis_slip(trade_id)
+    # Corrected call: Use the directly imported function
+    delete_redis_slip(trade_id)
 
     await update.message.reply_text(f"Trade {symbol} (ID: {trade_id}) has been manually closed and reconciled.")
 
@@ -222,7 +223,7 @@ def main() -> None:
     # Admin commands
     application.add_handler(CommandHandler("autotrade", trade.autotrade_command, filters=filters.User(user_id=ADMIN_ID)))
     application.add_handler(CommandHandler("binance_status", trade.binance_status_command, filters=filters.User(user_id=ADMIN_ID)))
-    application.add_handler(CommandHandler("diagnose_slips", redis_utils.diagnose_slips_command, filters=filters.User(user_id=ADMIN_ID)))
+    application.add_handler(CommandHandler("diagnose_slips", diagnose_slips_command, filters=filters.User(user_id=ADMIN_ID)))
     application.add_handler(CommandHandler("settings", trade.settings_command, filters=filters.User(user_id=ADMIN_ID)))
 
     # --- Job Queue for background tasks ---
