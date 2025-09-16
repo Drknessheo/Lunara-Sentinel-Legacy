@@ -67,6 +67,7 @@ else:
 logger = logging.getLogger(__name__)
 
 # --- Constants ---
+# This ADMIN_ID is used for command filters, and it correctly gets the value from config
 ADMIN_ID = getattr(config, "ADMIN_USER_ID", None)
 
 HELP_MESSAGE = """🔮 <b>LunessaSignals Guide</b> 🔮
@@ -108,14 +109,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    # Use the new db function which tells us if the user is new
     user_record, created = new_db.get_or_create_user(user.id)
     
     if created:
         logger.info(f"New user {user.id} ({user.username}) started the bot.")
-        # Announce the new user to the admin for subscription management
         if ADMIN_ID and context.bot:
-            # Correctly escape special characters for MarkdownV2
             full_name = user.full_name.replace("[", "\\[").replace("`", "\\`")
             username = user.username.replace("_", "\\_") if user.username else 'N/A'
 
@@ -141,18 +139,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_html(welcome_message)
 
 async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    /close <symbol> or /close <trade_id>
-    Marks a trade as closed in DB/Redis without trying to sell again.
-    """
     if not context.args:
         await update.message.reply_text("Usage: /close <symbol|trade_id>")
         return
 
     arg = context.args[0]
     user_id = update.effective_user.id
-
-    # Use the new thread-safe DB functions
     trade_record = new_db.find_open_trade(arg, user_id)
 
     if not trade_record:
@@ -161,17 +153,10 @@ async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     trade_id = trade_record['id']
     symbol = trade_record['symbol']
-
-    # Mark the trade as manually closed in the database
     new_db.mark_trade_closed(trade_id, reason="manual_close")
-
-    # Corrected call: Use the directly imported function
     delete_redis_slip(trade_id)
 
     await update.message.reply_text(f"Trade {symbol} (ID: {trade_id}) has been manually closed and reconciled.")
-
-# Other command handlers (status, myprofile, etc.) would go here
-# and should also be updated to use `new_db` functions.
 
 async def post_init(application: Application) -> None:
     logger.info("Running post-initialization setup...")
@@ -188,9 +173,10 @@ def main() -> None:
     logger.info("🚀 Starting Lunara Bot...")
 
     # --- Assertions for core configuration ---
+    # CORRECTED: The assertion now correctly checks for ADMIN_USER_ID in the config module.
     assert config.TELEGRAM_BOT_TOKEN, "CRITICAL: TELEGRAM_BOT_TOKEN is not set!"
     assert config.REDIS_URL, "CRITICAL: REDIS_URL is not set!"
-    assert config.ADMIN_ID, "CRITICAL: ADMIN_ID is not set!"
+    assert config.ADMIN_USER_ID, "CRITICAL: ADMIN_USER_ID is not set!"
     assert config.SLIP_ENCRYPTION_KEY, "CRITICAL: SLIP_ENCRYPTION_KEY is not set!"
 
     # Initialize the new thread-safe database
@@ -210,17 +196,15 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("close", close_command))
-    application.add_handler(CommandHandler("pay", handlers.pay_command)) # From handlers.py
+    application.add_handler(CommandHandler("pay", handlers.pay_command))
     
-    # Other placeholder/existing commands from `trade.py` etc.
-    # These would need to be verified to use new_db over time
     application.add_handler(CommandHandler("quest", trade.quest_command))
     application.add_handler(CommandHandler("balance", trade.balance_command))
     application.add_handler(CommandHandler("wallet", trade.wallet_command))
     application.add_handler(CommandHandler("setapi", trade.set_api_keys_command))
     application.add_handler(CommandHandler("papertrade", trade.toggle_paper_trading_command))
 
-    # Admin commands
+    # Admin commands - These correctly use the ADMIN_ID variable defined at the top of the file.
     application.add_handler(CommandHandler("autotrade", trade.autotrade_command, filters=filters.User(user_id=ADMIN_ID)))
     application.add_handler(CommandHandler("binance_status", trade.binance_status_command, filters=filters.User(user_id=ADMIN_ID)))
     application.add_handler(CommandHandler("diagnose_slips", diagnose_slips_command, filters=filters.User(user_id=ADMIN_ID)))
