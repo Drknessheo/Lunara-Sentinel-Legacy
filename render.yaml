@@ -1,25 +1,6 @@
-# render.yaml - Infrastructure as Code for Lunara Bot on Render
-
 services:
-  # The main web service for the Lunara Bot
-  - type: web
+  - type: worker
     name: lunara-bot
-    env: docker
-    # You can choose a plan that fits your needs (e.g., starter, standard)
-    plan: free
-    # Health check to ensure the service is alive
-    healthCheckPath: /healthz
-    buildCommand: ""
-    startCommand: python -m src.main
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11
-      - key: DEBUGTEST
-        value: false # Ensures debug mode is off in production
-      # Link to a secret group in Render to store your API keys and tokens
-      - fromGroup: lunara-secrets
-
-  # The Redis instance for caching and job queues
-  - type: redis
-    name: lunara-cache
-    plan: free # Or a paid plan for more memory and persistence
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python -m src.main"

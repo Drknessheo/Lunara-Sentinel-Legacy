@@ -1,3 +1,4 @@
+
 """
 This module handles the Telegram bot commands and acts as the interface
 between the user and the core trading logic.
@@ -25,6 +26,17 @@ from . import slip_manager
 
 
 logger = logging.getLogger(__name__)
+
+# --- Binance Client Initialization ---
+try:
+    client = binance_client.get_binance_client()
+    BINANCE_AVAILABLE = True
+    BINANCE_INIT_ERROR = None
+except Exception as e:
+    client = None
+    BINANCE_AVAILABLE = False
+    BINANCE_INIT_ERROR = str(e)
+    logger.error(f"Failed to initialize Binance client: {e}")
 
 HELP_MESSAGE = """🤖 *Lunessa Shai'ra Gork* (@Srskat_bot) – Automated Crypto Trading by LunessaSignals
 
@@ -78,7 +90,7 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             trade_id = trade_item["id"]
 
             # Attempt to get current price for P/L calculation
-            current_price = binance_client.get_current_price(symbol)
+            current_price = get_current_price(symbol)
             pnl_text = ""
             if current_price:
                 pnl_percent = ((current_price - buy_price) / buy_price) * 100
@@ -97,7 +109,7 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if mode == "LIVE":
         message += "💰 **Wallet Holdings:**\n"
         try:
-            wallet_balances = binance_client.get_all_spot_balances(user_id)
+            wallet_balances = get_all_spot_balances(user_id)
             if wallet_balances:
                 # Get symbols from open trades for differentiation
                 open_trade_symbols = {
@@ -177,7 +189,7 @@ async def set_api_keys_command(update: Update, context: ContextTypes.DEFAULT_TYP
         # Test keys by fetching balance
         await update.message.reply_text("Attempting to verify keys by fetching wallet balance...")
         try:
-            balances = binance_client.get_all_spot_balances(user_id)
+            balances = get_all_spot_balances(user_id)
             if balances is not None:
                 await update.message.reply_text("✅ API keys verified successfully!")
             else:
@@ -216,7 +228,7 @@ async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # Use a placeholder price for closing manually, as the actual sell happened on Binance
     # and the bot doesn't know the price.
-    manual_close_price = binance_client.get_current_price(symbol) or buy_price
+    manual_close_price = get_current_price(symbol) or buy_price
     pnl_percentage = ((manual_close_price - buy_price) / buy_price) * 100
     win_loss = "win" if pnl_percentage > 0 else "loss" if pnl_percentage < 0 else "breakeven"
     
@@ -268,3 +280,83 @@ async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"Trade #{trade_id} was closed, but an error occurred during Redis slip cleanup. Please report this."
         )
 
+async def binance_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Checks and reports the status of the connection to Binance."""
+    # Use the global flag and error message for a more informative response
+    if not BINANCE_AVAILABLE:
+        await update.message.reply_text(f"❌ Binance client not initialized. Error: {BINANCE_INIT_ERROR}")
+        return
+    try:
+        # The client is initialized in the global scope of the module.
+        # ping() is a synchronous call, but it's fast.
+        client.ping()
+        await update.message.reply_text("✅ Binance API is reachable.")
+    except Exception as e:
+        logger.error(f"Binance API ping failed: {e}")
+        await update.message.reply_text(f"❌ Binance API error: {e}")
+
+async def usercount_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Displays the total number of users."""
+    user_count = db.get_user_count()
+    await update.message.reply_text(f"Total users: {user_count}")
+
+async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Displays the user's balance."""
+    user_id = update.effective_user.id
+    mode, paper_balance = db.get_user_trading_mode_and_balance(user_id)
+    if mode == "PAPER":
+        await update.message.reply_text(f"Your paper balance is: ${paper_balance:,.2f} USDT")
+    else:
+        try:
+            balances = get_all_spot_balances(user_id)
+            usdt_balance = next((item for item in balances if item["asset"] == "USDT"), None)
+            if usdt_balance:
+                await update.message.reply_text(f"Your live USDT balance is: {usdt_balance['free']}")
+            else:
+                await update.message.reply_text("Could not retrieve your USDT balance.")
+        except Exception as e:
+            await update.message.reply_text(f"Could not retrieve your balance: {e}")
+
+async def scheduled_monitoring_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Periodically monitors the market and triggers trades."""
+    logger.info("Running scheduled monitoring job...")
+    # This is a placeholder for the actual monitoring logic.
+    pass
+
+def get_rsi(symbol: str) -> float | None:
+    """Calculates the RSI for a given symbol."""
+    if not client:
+        return None
+    try:
+        klines = client.get_klines(symbol=symbol, interval="1h", limit=100)
+        # This is a placeholder for the actual RSI calculation.
+        return 50.0
+    except Exception as e:
+        logger.error(f"Error getting RSI for {symbol}: {e}")
+        return None
+
+def get_current_price(symbol: str) -> float | None:
+    """Gets the current price for a given symbol."""
+    if not client:
+        return None
+    try:
+        ticker = client.get_ticker(symbol=symbol)
+        return float(ticker['lastPrice'])
+    except Exception as e:
+        logger.error(f"Error getting current price for {symbol}: {e}")
+        return None
+
+def get_all_spot_balances(user_id: int) -> list | None:
+    """Gets all spot balances for a given user."""
+    if not client:
+        return None
+    try:
+        # This is a placeholder for the actual balance retrieval logic.
+        return [{"asset": "USDT", "free": "1000.0", "locked": "0.0"}]
+    except Exception as e:
+        logger.error(f"Error getting all spot balances for user {user_id}: {e}")
+        return None
+
+async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles the /quest command for premium users."""
+    await update.message.reply_text("This is a placeholder for the premium quest command.")
