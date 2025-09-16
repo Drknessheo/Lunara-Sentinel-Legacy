@@ -368,18 +368,14 @@ async def autotrade_buy_from_suggestions(
         # Try to use cached suggestions if available (gemini_cache) but import lazily
         suggestions = None
         try:
-            try:
-                from gemini_cache import get_suggestions_for, set_suggestions_for
-            except Exception:
-                get_suggestions_for = None
-                set_suggestions_for = None
+            from . import gemini_cache
 
-            if get_suggestions_for:
-                cached = get_suggestions_for(symbols)
+            if gemini_cache:
+                cached = gemini_cache.get_suggestions_for(symbols)
                 if cached:
                     logger.info("Using cached Gemini suggestions")
                     suggestions = cached
-        except Exception:
+        except (ImportError, AttributeError, Exception):
             # If cache lookup fails, continue to live fetch
             suggestions = None
 
@@ -387,19 +383,16 @@ async def autotrade_buy_from_suggestions(
             suggestions = await get_trade_suggestions_from_gemini(symbols)
             # store in cache if available
             try:
-                if (
-                    "set_suggestions_for" in locals()
-                    and set_suggestions_for
-                    and suggestions
-                ):
-                    set_suggestions_for(symbols, suggestions)
-            except Exception:
+                from . import gemini_cache
+                if gemini_cache and suggestions:
+                    gemini_cache.set_suggestions_for(symbols, suggestions)
+            except (ImportError, AttributeError, Exception):
                 pass
         # Use user effective settings for trade size
         try:
-            from autotrade_settings import get_effective_settings
+            from . import autotrade_settings
 
-            settings = get_effective_settings(user_id)
+            settings = autotrade_settings.get_effective_settings(user_id)
             trade_size = float(settings.get("TRADE_SIZE_USDT", 5.0))
         except Exception:
             trade_size = 5.0
@@ -535,10 +528,10 @@ async def monitor_autotrades(
 
             # Get per-user effective autotrade settings
             try:
-                from autotrade_settings import get_effective_settings
+                from . import autotrade_settings
 
                 admin_id = getattr(config, "ADMIN_USER_ID", None)
-                settings = get_effective_settings(admin_id)
+                settings = autotrade_settings.get_effective_settings(admin_id)
             except Exception:
                 settings = {"PROFIT_TARGET_PERCENTAGE": 1.0}
 
