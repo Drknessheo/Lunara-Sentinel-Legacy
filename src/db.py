@@ -1,5 +1,6 @@
 import logging
 import sqlite3
+import threading
 
 import config
 from config import DB_NAME
@@ -7,26 +8,21 @@ from security import decrypt_data, encrypt_data
 
 logger = logging.getLogger(__name__)
 
-# Global connection variable
-_conn = None
-
+# Use threading.local() to ensure thread-safe database connections
+local = threading.local()
 
 def get_db_connection():
-    """Establishes a connection to the SQLite database."""
-    global _conn
-    if _conn is None:
-        _conn = sqlite3.connect(DB_NAME, check_same_thread=False)
-        _conn.row_factory = sqlite3.Row  # Always return rows as dict-like objects
-    return _conn
-
+    """Establishes a thread-safe connection to the SQLite database."""
+    if not hasattr(local, "conn"):
+        local.conn = sqlite3.connect(DB_NAME, check_same_thread=False)
+        local.conn.row_factory = sqlite3.Row
+    return local.conn
 
 def close_db_connection():
-    """Closes the database connection."""
-    global _conn
-    if _conn is not None:
-        _conn.close()
-        _conn = None
-
+    """Closes the thread-local database connection."""
+    if hasattr(local, "conn"):
+        local.conn.close()
+        del local.conn
 
 def initialize_database():
     """Creates the tables if they don't exist."""
@@ -331,7 +327,7 @@ def get_user_effective_settings(user_id: int) -> dict:
         settings["BOLLINGER_BAND_WIDTH"] = user_data["custom_bollinger_band_width"]
     if (
         "custom_macd_signal_threshold" in user_keys
-        and user_data["custom_macd_signal_threshold"] is not None
+        and user_data["custom_macd_signal_threshold"] is not.
     ):
         settings["MACD_SIGNAL_THRESHOLD"] = user_data["custom_macd_signal_threshold"]
     return settings
