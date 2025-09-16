@@ -59,18 +59,14 @@ import functools
 @functools.lru_cache()
 def get_fernet() -> Optional[Fernet]:
     """Creates and caches the Fernet instance. Returns None if no key configured."""
-    # Read keys from environment only. Tests use monkeypatch.setenv / delenv
-    # and rely on this behavior; config module may have been imported earlier
-    # with stale values, so prefer the current process env for reproducibility.
     key = os.getenv("SLIP_ENCRYPTION_KEY") or os.getenv("BINANCE_ENCRYPTION_KEY")
 
     if not key:
-        logger.warning(
-            "No encryption key configured. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in env."
+        logger.critical(
+            "CRITICAL: No encryption key found. Set SLIP_ENCRYPTION_KEY or BINANCE_ENCRYPTION_KEY in the environment. Data security is compromised."
         )
         return None
 
-    # If key looks like a valid Fernet base64 key (43/44 bytes), try to use directly
     if isinstance(key, str):
         key_str = key.strip()
     else:
@@ -79,15 +75,12 @@ def get_fernet() -> Optional[Fernet]:
         except Exception:
             key_str = None
 
-    # If key_str decodes as a Fernet key, use it
     if key_str:
         try:
-            # Try direct Fernet usage
             return Fernet(key_str.encode())
         except Exception:
             pass
 
-    # Otherwise, derive a Fernet key from the provided passphrase using PBKDF2HMAC
     try:
         import base64
 
@@ -124,30 +117,15 @@ def get_fernet() -> Optional[Fernet]:
 
 
 def create_and_store_slip(symbol, side=None, amount=None, price=None):
-    """Create and store a slip.
-
-    Two calling conventions supported for tests/backwards compatibility:
-    - create_and_store_slip(symbol, side, amount, price)
-    - create_and_store_slip(trade_id, slip_dict)
-      where slip_dict contains keys: symbol, price (and optionally amount/side)
-    """
-    # Tests control environment variables directly; prefer an explicit
-    # runtime check so behavior is deterministic regardless of cached
-    # config values. If no key present in env, raise the expected ValueError.
     if not (os.getenv("SLIP_ENCRYPTION_KEY") or os.getenv("BINANCE_ENCRYPTION_KEY")):
         raise ValueError("Encryption key is not configured")
     fernet = get_fernet()
     if not fernet:
-        # If get_fernet failed despite env var being present, treat as mis-config
         raise ValueError("Encryption key is not configured")
 
-    # Backwards-compatible call: create_and_store_slip(trade_id, slip_dict)
     if isinstance(side, dict) and amount is None and price is None:
         trade_id = str(symbol)
-        slip_dict = side
-        # For backwards-compatibility with tests, store the slip dict exactly
-        # as provided (do not add extra fields that would break equality checks).
-        slip = dict(slip_dict)
+        slip = dict(side)
     else:
         trade_id = str(int(datetime.utcnow().timestamp() * 1000))
         slip = {
@@ -187,11 +165,9 @@ def create_and_store_slip(symbol, side=None, amount=None, price=None):
 def get_and_decrypt_slip(encrypted_slip_key):
     fernet = get_fernet()
     if not fernet:
-        logger.debug("get_and_decrypt_slip: no fernet available, returning None")
-        return None
+        logger.error("Decryption failed: Encryption key is not available. Please ensure SLIP_ENCRYPTION_KEY is set.")
+        raise ValueError("Encryption key is not configured, cannot decrypt data.")
 
-    # Normalize the passed key: tests pass a bare trade_id (e.g. "test_trade_123");
-    # stored keys are like "trade:<id>:data". Accept either form.
     try:
         if isinstance(encrypted_slip_key, (bytes, bytearray)):
             key_str = encrypted_slip_key.decode()
@@ -200,7 +176,6 @@ def get_and_decrypt_slip(encrypted_slip_key):
     except Exception:
         key_str = str(encrypted_slip_key)
 
-    # If caller provided a plain trade_id (no colon), look up the canonical data key.
     if ":" not in key_str:
         lookup_key = f"trade:{key_str}:data"
     else:
@@ -223,7 +198,6 @@ def get_and_decrypt_slip(encrypted_slip_key):
         return None
 
     try:
-        # If client returned strings, ensure bytes for Fernet
         if isinstance(encrypted_slip_value, str):
             encrypted_slip_value = encrypted_slip_value.encode()
         decrypted_slip = fernet.decrypt(encrypted_slip_value)

@@ -8,7 +8,6 @@ import sys
 import time
 
 # --- Setup logging and path ---
-# This should be the very first thing to run
 if __package__:
     from . import logging_config
 else:
@@ -18,7 +17,6 @@ logging_config.setup_logging()
 
 import redis
 
-# Ensure the src directory is on sys.path so imports work when running as a script
 if not __package__:
     sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 else:
@@ -40,7 +38,6 @@ from telegram.ext import (
     filters,
 )
 
-# Import config first
 if __package__:
     from . import autotrade_jobs, config, redis_validator, slip_manager
 else:
@@ -74,7 +71,6 @@ else:
 
 logger = logging.getLogger(__name__)
 
-# Transmuted to HTML for resilience and clarity
 HELP_MESSAGE = """🔮 <b>LunessaSignals Guide</b> 🔮
 
 Your ultimate guide to mastering the crypto markets.
@@ -120,11 +116,9 @@ Your ultimate guide to mastering the crypto markets.
 """
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays a help message with all available commands, using HTML formatting."""
     await update.message.reply_html(HELP_MESSAGE)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Sends a welcome message and registers the user if they are new."""
     user = update.effective_user
     db.get_or_create_user(user.id)
     logger.info(f"User {user.id} ({user.username}) started the bot.")
@@ -138,14 +132,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays the user's profile information, including tier and settings."""
     user_id = update.effective_user.id
     user_record = db.get_user(user_id)
     if not user_record:
         await update.message.reply_text("Could not find your profile. Please try /start.")
         return
 
-    # This correctly uses the existing logic without modification
     settings = db.get_user_effective_settings(user_id)
     trading_mode, paper_balance = db.get_user_trading_mode_and_balance(user_id)
     
@@ -177,7 +169,6 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handler for the /status command. Shows subscription status, open quests, and watched symbols."""
     user_id = update.effective_user.id
     user_record = db.get_user(user_id)
     if not user_record:
@@ -233,12 +224,9 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_html(subscription_message + message)
 
 async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handler for the /quest command. Calls the trade module."""
-    # Correctly call the main quest command in trade.py which handles all logic
     await trade.quest_command(update, context)
 
 async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays the global leaderboard of top trades."""
     top_trades = db.get_global_top_trades(limit=3)
 
     if not top_trades:
@@ -266,16 +254,12 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_html(message)
 
 async def import_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Placeholder for the /import command, as requested."""
     await update.message.reply_text("This command is not yet implemented. It will be used to log an existing trade.")
 
 async def close_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Closes an open trade by its ID by delegating to the trade module."""
-    # This now correctly calls the trade module's close command
     await trade.close_trade_command(update, context)
 
 async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Reviews the user's completed trade performance."""
     user_id = update.effective_user.id
     closed_trades = db.get_closed_trades(user_id)
 
@@ -301,7 +285,6 @@ async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def top_trades_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays the user's top 3 most profitable closed trades."""
     user_id = update.effective_user.id
     top_trades = db.get_user_top_trades(user_id, limit=3)
 
@@ -319,25 +302,35 @@ async def top_trades_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.message.reply_html(message)
 
 async def autotrade_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Admin command to control the AI autotrading feature."""
-    # This correctly delegates to the trade module
     await trade.autotrade_command(update, context)
 
+async def handle_encryption_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if isinstance(context.error, ValueError) and "Encryption key is not configured" in str(context.error):
+        error_message = (
+            "⚠️ **Critical Configuration Error** ⚠️\n\n"
+            "The bot is currently running in a degraded state because a mandatory encryption key (`SLIP_ENCRYPTION_KEY`) is missing from the server's environment.\n\n"
+            "**Why this is a problem:**\n"
+            "This key is essential for securing your trade data. Without it, the bot cannot safely store or retrieve any trade information, which will cause most commands to fail.\n\n"
+            "**How to fix it:**\n"
+            "The administrator of this bot must add the `SLIP_ENCRYPTION_KEY` to the environment variables of the hosting service (e.g., Render, Heroku, or a local `.env` file).\n\n"
+            "If you are the administrator, please generate a secure key and add it to your environment immediately. If you are a user, please notify the administrator."
+        )
+        if update.effective_message:
+            await update.effective_message.reply_text(error_message, parse_mode=ParseMode.MARKDOWN_V2)
+        logger.critical("ValueError: Encryption key not configured. Bot is in a degraded state.")
+
 async def post_init(application: Application) -> None:
-    """Runs once after the bot is initialized."""
     logger.info("Running post-initialization setup...")
     await application.bot.delete_webhook(drop_pending_updates=True)
     if isinstance(application.persistence, RedisPersistence):
         await application.persistence.initialize()
 
 async def post_shutdown(application: Application) -> None:
-    """Runs once before the bot shuts down."""
     logger.info("Running post-shutdown cleanup...")
     if isinstance(application.persistence, RedisPersistence):
         await application.persistence.shutdown()
 
 def main() -> None:
-    """Set up the bot and run it."""
     logger.info("🚀 Starting Lunara Bot...")
 
     assert config.TELEGRAM_BOT_TOKEN, "❌ TELEGRAM_BOT_TOKEN is not set!"
@@ -355,6 +348,9 @@ def main() -> None:
         .build()
     )
 
+    # --- Error Handler ---
+    application.add_error_handler(handle_encryption_error)
+
     # --- Command Handlers ---
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
@@ -368,7 +364,6 @@ def main() -> None:
     application.add_handler(CommandHandler("top_trades", top_trades_command))
     application.add_handler(CommandHandler("autotrade", autotrade_command))
     
-    # --- Other command handlers from trade.py or this file ---
     application.add_handler(CommandHandler("balance", trade.balance_command))
     application.add_handler(CommandHandler("wallet", trade.wallet_command))
     application.add_handler(CommandHandler("setapi", trade.set_api_keys_command))
