@@ -6,6 +6,8 @@ import logging
 import os
 import sys
 import time
+import threading
+from flask import Flask
 
 # --- Setup logging and path ---
 # This should be the very first thing to run
@@ -68,10 +70,21 @@ else:
     import trade
     import trade_executor
     from modules import db_access as db
+    from redis_persistence import RedisPersistence
     from Simulation import resonance_engine
     from slip_parser import SlipParseError, parse_slip
 
 logger = logging.getLogger(__name__)
+
+# --- Flask Health Check ---
+app = Flask(__name__)
+
+@app.route('/health')
+def health_check():
+    return 'OK', 200
+
+def run_flask_app():
+    app.run(host='0.0.0.0', port=8080)
 
 HELP_MESSAGE = """🔮 *LunessaSignals Guide* 🔮
 
@@ -336,7 +349,14 @@ async def post_init(application: Application) -> None:
     """Runs once after the bot is initialized."""
     logger.info("Running post-initialization setup...")
     await application.bot.delete_webhook(drop_pending_updates=True)
-    # ... any other post_init logic
+    if isinstance(application.persistence, RedisPersistence):
+        await application.persistence.initialize()
+
+async def post_shutdown(application: Application) -> None:
+    """Runs once before the bot shuts down."""
+    logger.info("Running post-shutdown cleanup...")
+    if isinstance(application.persistence, RedisPersistence):
+        await application.persistence.shutdown()
 
 def main() -> None:
     """Set up the bot and run it."""
@@ -353,6 +373,7 @@ def main() -> None:
         .token(config.TELEGRAM_BOT_TOKEN)
         .persistence(persistence)
         .post_init(post_init)
+        .post_shutdown(post_shutdown)
         .build()
     )
 
@@ -387,4 +408,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Start the Flask app in a separate thread
+    flask_thread = threading.Thread(target=run_flask_app)
+    flask_thread.daemon = True
+    flask_thread.start()
+
     main()

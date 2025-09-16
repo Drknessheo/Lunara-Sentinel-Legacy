@@ -1,10 +1,14 @@
 
+import asyncio
 import json
+import logging
 from typing import Any, Dict, Optional, Tuple, cast
 
 import redis.asyncio as redis
 from telegram.ext import BasePersistence
 from telegram.ext._utils.types import BD, CD, UD
+
+logger = logging.getLogger(__name__)
 
 
 class RedisPersistence(BasePersistence):
@@ -13,6 +17,38 @@ class RedisPersistence(BasePersistence):
     def __init__(self, redis_url: str):
         super().__init__()
         self.redis = redis.from_url(redis_url, decode_responses=True)
+        self._pubsub_task: Optional[asyncio.Task] = None
+
+    async def initialize(self) -> None:
+        """Initialize the pub/sub listener."""
+        self._pubsub_task = asyncio.create_task(self._redis_pubsub_listener())
+
+    async def shutdown(self) -> None:
+        """Gracefully shut down the pub/sub listener."""
+        if self._pubsub_task:
+            self._pubsub_task.cancel()
+            try:
+                await self._pubsub_task
+            except asyncio.CancelledError:
+                pass
+        await self.redis.close()
+
+    async def _redis_pubsub_listener(self):
+        """Listen for updates on a Redis pub/sub channel and update the bot's data."""
+        pubsub = self.redis.pubsub()
+        await pubsub.subscribe("telegram_bot_updates")
+        while True:
+            try:
+                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1)
+                if message and message["type"] == "message":
+                    data = json.loads(message["data"])
+                    await self.update_bot_data(data)
+            except asyncio.CancelledError:
+                logger.info("Redis pub/sub listener cancelled.")
+                break
+            except Exception as e:
+                logger.error(f"Error in Redis pub/sub listener: {e}")
+                await asyncio.sleep(5)
 
     def _get_key(self, key_type: str, key: Any) -> str:
         """Generate a redis key."""
