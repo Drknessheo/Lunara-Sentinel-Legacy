@@ -52,6 +52,7 @@ def db_connection(func):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         try:
+            # Pass the cursor as the first argument to the decorated function
             result = func(cursor, *args, **kwargs)
             conn.commit()
             return result
@@ -118,7 +119,7 @@ def update_user_subscription(
     cursor, user_id: int, tier: str = "PREMIUM", expires: str = None
 ):
     """Update a user's subscription tier and expiration."""
-    get_or_create_user(cursor, user_id)
+    _get_or_create_user(cursor, user_id)
     cursor.execute(
         "UPDATE users SET subscription_tier = ?, subscription_expires = ? WHERE user_id = ?",
         (tier, expires, user_id),
@@ -134,7 +135,7 @@ def store_user_api_keys(cursor, user_id: int, api_key: str, secret_key: str):
     fernet = Fernet(key)
     encrypted_api = fernet.encrypt(api_key.encode())
     encrypted_secret = fernet.encrypt(secret_key.encode())
-    get_or_create_user(cursor, user_id)
+    _get_or_create_user(cursor, user_id)
     cursor.execute(
         "UPDATE users SET api_key = ?, secret_key = ? WHERE user_id = ?",
         (encrypted_api, encrypted_secret, user_id),
@@ -148,12 +149,15 @@ def get_user_tier_db(cursor, user_id: int) -> str:
 
 
 @db_connection
-def get_or_create_user_db(cursor, user_id: int):
-    """Decorator-wrapped version for bot usage."""
-    return get_or_create_user(cursor, user_id)
-
-
 def get_or_create_user(cursor, user_id: int):
+    """
+    Public API: Creates or retrieves a user from the database.
+    Automatically manages DB connection.
+    """
+    return _get_or_create_user(cursor, user_id)
+
+
+def _get_or_create_user(cursor, user_id: int):
     """Gets a user from the DB or creates a new one with default settings."""
     user = cursor.execute(
         "SELECT * FROM users WHERE user_id = ?", (user_id,)
@@ -173,7 +177,7 @@ def get_user_tier(cursor, user_id: int) -> str:
     """
     if user_id == getattr(config, "ADMIN_USER_ID", None):
         return "PREMIUM"
-    user = get_or_create_user(cursor, user_id)
+    user = _get_or_create_user(cursor, user_id)
     return user["subscription_tier"]
 
 
@@ -184,7 +188,7 @@ def get_user_subscription(cursor, user_id: int) -> tuple[str, str | None]:
     """
     if user_id == getattr(config, "ADMIN_USER_ID", None):
         return "PREMIUM", None
-    user = get_or_create_user(cursor, user_id)
+    user = _get_or_create_user(cursor, user_id)
     return user["subscription_tier"], user["subscription_expires"]
 
 
@@ -416,7 +420,7 @@ def get_autotrade_status(cursor, user_id: int):
 @db_connection
 def set_autotrade_status(cursor, user_id: int, enabled: bool):
     """Set autotrade status for a user in the users table."""
-    get_or_create_user(cursor, user_id)  # Ensures user exists
+    _get_or_create_user(cursor, user_id)  # Ensures user exists
     cursor.execute(
         "UPDATE users SET autotrade_enabled = ? WHERE user_id = ?",
         (int(enabled), user_id),
@@ -436,7 +440,7 @@ def get_open_trades(cursor, user_id: int):
 @db_connection
 def get_user_trading_mode_and_balance(cursor, user_id: int):
     """Gets the user's trading mode and paper balance."""
-    user = get_or_create_user(cursor, user_id)
+    user = _get_or_create_user(cursor, user_id)
     return user["trading_mode"], user["paper_balance"]
 
 
@@ -573,7 +577,7 @@ def log_trade(
 
     logger.info(f"Processing trade for user {user_id}, symbol {coin_symbol}...")
     # Ensure user exists before logging a trade
-    get_or_create_user(cursor, user_id)
+    _get_or_create_user(cursor, user_id)
     cursor.execute(
         "INSERT INTO trades (user_id, coin_symbol, buy_price, status, stop_loss_price, take_profit_price, mode, trade_size_usdt, quantity, rsi_at_buy, peak_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
