@@ -28,15 +28,12 @@ from . import slip_manager
 logger = logging.getLogger(__name__)
 
 # --- Binance Client Initialization ---
-try:
-    client = binance_client.get_binance_client()
-    BINANCE_AVAILABLE = True
-    BINANCE_INIT_ERROR = None
-except Exception as e:
-    client = None
-    BINANCE_AVAILABLE = False
-    BINANCE_INIT_ERROR = str(e)
-    logger.error(f"Failed to initialize Binance client: {e}")
+binance_client.ensure_binance_client()
+client = binance_client.client
+BINANCE_AVAILABLE = binance_client.BINANCE_AVAILABLE
+BINANCE_INIT_ERROR = binance_client.BINANCE_INIT_ERROR
+if not BINANCE_AVAILABLE:
+    logger.error(f"Failed to initialize Binance client: {BINANCE_INIT_ERROR}")
 
 HELP_MESSAGE = """🤖 *Lunessa Shai'ra Gork* (@Srskat_bot) – Automated Crypto Trading by LunessaSignals
 
