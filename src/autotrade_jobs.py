@@ -32,66 +32,86 @@ mistral_api_key = os.getenv("MISTRAL_KEY")
 
 async def get_ai_suggestions(prompt):
     """Unified AI suggestion function with fallback logic from Gemini to Mistral."""
-    # ... (rest of the function is unchanged)
+    pass  # Placeholder
 
 
 async def get_trade_suggestions_from_gemini(symbols):
     """Gathers metrics for symbols and gets buy/hold suggestions from the AI."""
-    # ... (rest of the function is unchanged)
+    pass  # Placeholder
 
 async def monitor_autotrades(context: ContextTypes.DEFAULT_TYPE = None, dry_run: bool = False) -> None:
     """The main autotrade monitoring job. Checks for open trades and decides whether to sell."""
     logger.info("[MONITOR] Monitoring open autotrades...")
     try:
-        raw_keys = list(slip_manager.redis_client.scan_iter("trade:*"))
-    except Exception:
-        raw_keys = [k for k in slip_manager.fallback_cache.keys() if k.startswith("trade:")]
+        all_slips = slip_manager.list_all_slips()
+    except Exception as e:
+        logger.error(f"Could not retrieve slips for monitoring: {e}")
+        return
 
-    grouped = {}
-    for raw_key in raw_keys:
-        k = raw_key.decode() if isinstance(raw_key, bytes) else str(raw_key)
-        parts = k.split(":")
-        if len(parts) >= 2:
-            grouped.setdefault(parts[1], []).append(k)
-
-    for trade_id, keys in grouped.items():
+    for slip_item in all_slips:
         try:
-            slip = slip_manager.reconstruct_slip_from_keys(keys, trade_id)
-            if slip is None or not slip.get("sandpaper"):
+            slip_data = slip_item.get('data', {})
+            trade_id = slip_item.get('key', '').split(':")[1] # Extract trade_id from key like 'trade:12345'
+
+            if not slip_data or not slip_data.get("sandpaper"):
                 continue
 
-            settings = autotrade_settings.get_effective_settings(getattr(config, "ADMIN_USER_ID", None))
-            current_price = trade.get_current_price(slip["symbol"])
+            user_id = slip_data.get('user_id')
+            if not user_id:
+                logger.warning(f"Skipping trade {trade_id} because it has no user_id.")
+                continue
+
+            # Fetch user-specific settings
+            settings = autotrade_settings.get_effective_settings(user_id)
+
+            symbol = slip_data["symbol"]
+            buy_price = float(slip_data["price"])
+
+            current_price = trade.get_current_price(symbol)
             if not current_price:
+                logger.warning(f"Could not fetch current price for {symbol}. Skipping trade {trade_id}.")
                 continue
 
-            pnl_percent = ((current_price - float(slip["price"])) / float(slip["price"])) * 100
+            pnl_percent = ((current_price - buy_price) / buy_price) * 100
+            
+            # Use user's profit target, or global default
             target_pct = float(settings.get("PROFIT_TARGET_PERCENTAGE", 1.0))
 
             if pnl_percent >= target_pct:
+                amount_to_sell = slip_data.get('amount')
+                if not amount_to_sell:
+                    logger.error(f"Cannot sell trade {trade_id} for {symbol}: amount is missing from slip.")
+                    continue
+                    
                 if dry_run:
-                    logger.info(f"[MONITOR] DRY RUN - Would sell {slip['amount']} {slip['symbol']} for trade_id={trade_id} at P/L {pnl_percent:.2f}%")
+                    logger.info(f"[MONITOR] DRY RUN - Would sell {amount_to_sell} {symbol} for user {user_id} (Trade ID: {trade_id}) at P/L {pnl_percent:.2f}%")
                 else:
-                    admin_id = getattr(config, "ADMIN_USER_ID", None)
-                    # 1. Place the sell order
-                    trade.place_sell_order(admin_id, slip["symbol"], slip["amount"])
+                    logger.info(f"Attempting to place sell order for user {user_id}, trade {trade_id}")
+                    # 1. Place the sell order using user's credentials (via user_id)
+                    sell_success = trade.place_sell_order(user_id, symbol, float(amount_to_sell))
                     
-                    # 2. Mark the trade as closed in the main database
-                    new_db.mark_trade_closed(trade_id, reason="autotrade_sell")
-                    logger.info(f"[MONITOR] Marked trade_id={trade_id} as 'autotrade_sell' in the database.")
+                    if sell_success:
+                        # 2. Mark the trade as closed in the main database
+                        new_db.mark_trade_closed(trade_id, reason="autotrade_sell")
+                        logger.info(f"[MONITOR] Marked trade_id={trade_id} as 'autotrade_sell' in the database.")
 
-                    # 3. Purge the slips from Redis
-                    for kk in keys:
-                        slip_manager.delete_slip(kk)
-                    
-                    msg_text = f"🤖 Autotrade closed: Sold {slip['amount']:.4f} {slip['symbol']} @ ${current_price:.8f} for a {pnl_percent:.2f}% gain."
-                    if context and getattr(context, "bot", None) and admin_id:
-                        await context.bot.send_message(chat_id=admin_id, text=msg_text)
+                        # 3. Purge the slips from Redis
+                        slip_manager.delete_slip(f"trade:{trade_id}")
+                        
+                        msg_text = f"🤖 Autotrade closed: Sold {amount_to_sell} {symbol} @ ${current_price:.4f} for a {pnl_percent:.2f}% gain."
+                        if context and getattr(context, "bot", None):
+                            try:
+                                await context.bot.send_message(chat_id=user_id, text=msg_text)
+                            except Exception as e:
+                                logger.error(f"Failed to send autotrade notification to user {user_id}: {e}")
+                        else:
+                            logger.info(msg_text)
                     else:
-                        logger.info(msg_text)
+                         logger.error(f"Sell order failed for user {user_id}, trade {trade_id}. The trade remains open.")
 
         except Exception as e:
-            logger.error(f"Error in monitor_autotrades for trade_id={trade_id}: {e}\n{traceback.format_exc()}")
+            trade_id_for_error = slip_item.get('key', '[unknown_key]')
+            logger.error(f"Error processing slip {trade_id_for_error} in monitor_autotrades: {e}\n{traceback.format_exc()}")
 
 async def autotrade_buy_from_suggestions(
     user_id: int,
@@ -100,9 +120,9 @@ async def autotrade_buy_from_suggestions(
     dry_run: bool = False,
     max_create: int | None = None,
 ):
-    # ... (rest of the function is unchanged)
+    pass
 
 async def mock_autotrade_buy(
     user_id: int, symbol: str, amount: float, context: ContextTypes.DEFAULT_TYPE = None
 ):
-    # ... (rest of the function is unchanged)
+    pass
