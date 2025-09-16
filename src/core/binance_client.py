@@ -22,9 +22,9 @@ from tenacity import (
 from urllib3.util.retry import Retry
 from functools import lru_cache
 
-# CORRECTED: Using absolute imports
-import config
-from modules import db_access as db
+# CORRECTED: Using relative imports
+from .. import config
+from ..modules import db_access as db
 
 logger = logging.getLogger(__name__)
 

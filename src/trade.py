@@ -22,7 +22,7 @@ from binance.exceptions import BinanceAPIException
 from .core import binance_client
 from .core import trading_logic
 from .core.binance_client import TradeError
-from .modules import db_access as db
+from . import db_access as db
 from .utils import redis_utils
 from . import config
 from . import slip_manager
@@ -38,17 +38,17 @@ BINANCE_INIT_ERROR = binance_client.BINANCE_INIT_ERROR
 if not BINANCE_AVAILABLE:
     logger.error(f"Failed to initialize Binance client: {BINANCE_INIT_ERROR}")
 
-HELP_MESSAGE = """🤖 *Lunessa Shai'ra Gork* (@Srskat_bot) – Automated Crypto Trading by LunessaSignals
+HELP_MESSAGE = """ðŸ¤– *Lunessa Shai'ra Gork* (@Srskat_bot) â€“ Automated Crypto Trading by LunessaSignals
 
 *Core Commands:*
-/help – Show this help message
-/myprofile – View your open trades, balances, and settings
-/setapi `KEY SECRET` – Securely add your Binance API keys (in private chat)
-/close `ID` – Manually close an open trade by its ID
+/help â€“ Show this help message
+/myprofile â€“ View your open trades, balances, and settings
+/setapi `KEY SECRET` â€“ Securely add your Binance API keys (in private chat)
+/close `ID` â€“ Manually close an open trade by its ID
 
 *Utility Commands:*
-/clear_redis – Clear the bot's cache (for debugging)
-/about – Learn more about the LunessaSignals project
+/clear_redis â€“ Clear the bot's cache (for debugging)
+/about â€“ Learn more about the LunessaSignals project
 
 *How to Trade:*
 1. Use `/setapi` in a private message with me to add your keys.
@@ -77,12 +77,12 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     mode, paper_balance = db.get_user_trading_mode_and_balance(user_id)
 
-    message = f"✨ **Your Trading Profile ({mode} Mode)** ✨\n\n"
+    message = f"âœ¨ **Your Trading Profile ({mode} Mode)** âœ¨\n\n"
 
     # --- Display Open Trades ---
     open_trades = db.get_open_trades(user_id)
     if open_trades:
-        message += "📊 **Open Quests:**\n"
+        message += "ðŸ“Š **Open Quests:**\n"
         for trade_item in open_trades:
             symbol = trade_item["coin_symbol"]
             buy_price = trade_item["buy_price"]
@@ -103,11 +103,11 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         message += "\n"
     else:
-        message += "📊 **Open Quests:** None\n\n"
+        message += "ðŸ“Š **Open Quests:** None\n\n"
 
     # --- Display Wallet Holdings (Live Mode Only) ---
     if mode == "LIVE":
-        message += "💰 **Wallet Holdings:**\n"
+        message += "ðŸ’° **Wallet Holdings:**\n"
         try:
             wallet_balances = get_all_spot_balances(user_id)
             if wallet_balances:
@@ -145,11 +145,11 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "  *An unexpected error occurred while fetching wallet balances.*\n"
             )
     elif mode == "PAPER":
-        message += f"💰 **Paper Balance:** ${paper_balance:,.2f} USDT\n"
+        message += f"ðŸ’° **Paper Balance:** ${paper_balance:,.2f} USDT\n"
 
     # --- Display Autotrade Settings ---
     settings = db.get_user_effective_settings(user_id)
-    message += "\n⚙️ **Autotrade Settings:**\n"
+    message += "\nâš™ï¸  **Autotrade Settings:**\n"
     for key, value in settings.items():
         message += f"- `{key}`: `{value}`\n"
 
@@ -159,9 +159,9 @@ async def clear_redis_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Handles the /clear_redis command."""
     success, message = redis_utils.clear_redis_cache()
     if success:
-        await update.message.reply_text(f"✅ {message}")
+        await update.message.reply_text(f"âœ… {message}")
     else:
-        await update.message.reply_text(f"⚠️ {message}")
+        await update.message.reply_text(f"âš ï¸  {message}")
 
 
 async def set_api_keys_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -182,7 +182,7 @@ async def set_api_keys_command(update: Update, context: ContextTypes.DEFAULT_TYP
         # Use the db helper to encrypt and store keys
         db.store_user_api_keys(user_id, api_key, secret_key)
         await update.message.reply_text(
-            "✅ Your API keys have been stored securely. Live trading features are now available to you.",
+            "âœ… Your API keys have been stored securely. Live trading features are now available to you.",
             parse_mode=ParseMode.MARKDOWN,
         )
         logger.info(f"Successfully stored API keys for user {user_id}.")
@@ -191,11 +191,11 @@ async def set_api_keys_command(update: Update, context: ContextTypes.DEFAULT_TYP
         try:
             balances = get_all_spot_balances(user_id)
             if balances is not None:
-                await update.message.reply_text("✅ API keys verified successfully!")
+                await update.message.reply_text("âœ… API keys verified successfully!")
             else:
-                await update.message.reply_text("⚠️ Verification failed. Could not fetch balances. Please check your keys and permissions.")
+                await update.message.reply_text("âš ï¸  Verification failed. Could not fetch balances. Please check your keys and permissions.")
         except TradeError as e:
-            await update.message.reply_text(f"⚠️ Verification failed: {e}")
+            await update.message.reply_text(f"âš ï¸  Verification failed: {e}")
 
     except Exception as e:
         logger.exception("Failed to store API keys for user %s: %s", user_id, e)
@@ -263,13 +263,13 @@ async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         if slip_key_found:
             slip_manager.cleanup_slip(slip_key_found)
             message = (
-                f"✅ Trade #{trade_id} ({symbol}) has been manually closed.\n"
+                f"âœ… Trade #{trade_id} ({symbol}) has been manually closed.\n"
                 f"The monitoring slip for **{symbol}** has also been removed."
             )
             await update.message.reply_text(message, parse_mode="Markdown")
         else:
             message = (
-                f"✅ Trade #{trade_id} ({symbol}) was closed in the database, "
+                f"âœ… Trade #{trade_id} ({symbol}) was closed in the database, "
                 f"but no active monitoring slip was found for that symbol to remove."
             )
             await update.message.reply_text(message, parse_mode="Markdown")
@@ -284,16 +284,16 @@ async def binance_status_command(update: Update, context: ContextTypes.DEFAULT_T
     """Checks and reports the status of the connection to Binance."""
     # Use the global flag and error message for a more informative response
     if not BINANCE_AVAILABLE:
-        await update.message.reply_text(f"❌ Binance client not initialized. Error: {BINANCE_INIT_ERROR}")
+        await update.message.reply_text(f"âŒ Binance client not initialized. Error: {BINANCE_INIT_ERROR}")
         return
     try:
         # The client is initialized in the global scope of the module.
         # ping() is a synchronous call, but it's fast.
         client.ping()
-        await update.message.reply_text("✅ Binance API is reachable.")
+        await update.message.reply_text("âœ… Binance API is reachable.")
     except Exception as e:
         logger.error(f"Binance API ping failed: {e}")
-        await update.message.reply_text(f"❌ Binance API error: {e}")
+        await update.message.reply_text(f"âŒ Binance API error: {e}")
 
 async def usercount_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays the total number of users."""

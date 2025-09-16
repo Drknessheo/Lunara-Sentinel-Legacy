@@ -65,7 +65,7 @@ from telegram.ext import ContextTypes
 from . import config
 from . import slip_manager
 from . import trade
-from .modules import db_access as autotrade_db
+from . import db_access as autotrade_db
 
 logger = logging.getLogger(__name__)
 
@@ -306,7 +306,7 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE):
 
                 await context.bot.send_message(
                     chat_id=user_id,
-                    text=f"🤖 Autotrade executed: Bought {quantity:.4f} {symbol} at ${entry_price:.8f}",
+                    text=f"ðŸ¤– Autotrade executed: Bought {quantity:.4f} {symbol} at ${entry_price:.8f}",
                 )
             except trade.TradeError as e:
                 logger.error(f"Error executing autotrade for {symbol}: {e}")
@@ -578,7 +578,7 @@ async def monitor_autotrades(
                                 pass
 
                     # Send notification via bot if available, otherwise log
-                    msg_text = f"🤖 Autotrade closed: Sold {slip['amount']:.4f} {slip['symbol']} at ${current_price:.8f} for a {pnl_percent:.2f}% gain."
+                    msg_text = f"ðŸ¤– Autotrade closed: Sold {slip['amount']:.4f} {slip['symbol']} at ${current_price:.8f} for a {pnl_percent:.2f}% gain."
                     if context and getattr(context, "bot", None):
                         admin_id = getattr(config, "ADMIN_USER_ID", None)
                         if admin_id:
