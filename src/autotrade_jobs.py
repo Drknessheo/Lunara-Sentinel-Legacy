@@ -62,12 +62,10 @@ import logging
 import redis
 from telegram.ext import ContextTypes
 
-import config
-
-# CORRECTED: Using absolute imports
-import slip_manager
-import trade
-from modules import db_access as autotrade_db
+from . import config
+from . import slip_manager
+from . import trade
+from .modules import db_access as autotrade_db
 
 logger = logging.getLogger(__name__)
 
