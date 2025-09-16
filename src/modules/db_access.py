@@ -7,7 +7,6 @@ import sqlite3
 from .. import config
 
 # Restore the robust, multi-strategy import for decrypt_data to handle different execution contexts.
-# This was the cause of the TypeError: 'NoneType' object is not callable.
 decrypt_data = None
 try:
     from ..security import decrypt_data as _dd
@@ -55,7 +54,14 @@ def db_connection(func):
 
     return wrapper
 
-# (The rest of the file remains unchanged)
+@db_connection
+def get_user(cursor, user_id: int):
+    """Retrieves a user from the database by user_id, returns None if not found."""
+    user = cursor.execute(
+        "SELECT * FROM users WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    return user
+
 @db_connection
 def add_coins_to_watchlist(cursor, user_id: int, coins: list[str]):
     """Adds a list of coins to a user's watchlist."""
@@ -243,3 +249,17 @@ def get_user_effective_settings(cursor, user_id: int) -> dict:
         if db_key in user_data.keys() and user_data[db_key] is not None:
             settings[settings_key] = user_data[db_key]
     return settings
+
+__all__ = [
+    "add_coins_to_watchlist",
+    "get_or_create_user",
+    "get_user",
+    "get_user_api_keys",
+    "get_user_effective_settings",
+    "get_user_subscription_db",
+    "get_user_tier_db",
+    "initialize_database",
+    "store_user_api_keys",
+    "update_user_setting",
+    "update_user_subscription",
+]
