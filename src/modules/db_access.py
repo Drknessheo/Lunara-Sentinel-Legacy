@@ -2,35 +2,17 @@ import functools
 import logging
 import sqlite3
 
-from src import config
+# --- CORRECTED IMPORTS ---
+# Use relative imports to ensure a single, unified config object is used across the application.
+# This resolves the module-scoping issue that caused AttributeError.
+from .. import config
+from ..security import decrypt_data
+
 
 # Allow tests to override the database path by setting this module-level variable.
 # Default to the repository DB file for normal runs.
 DB_PATH = "lunara_bot.db"
-# Import `decrypt_data` from the project's `src.security` module.
-# Different execution contexts (script mode, package mode, tests) can cause
-# plain imports to fail, so try several strategies and fall back to None.
-decrypt_data = None
-try:
-    # Try the easy/legacy form first (when running from repo root/script mode)
-    from security import decrypt_data as _dd  # type: ignore
 
-    decrypt_data = _dd
-except Exception:
-    try:
-        # Try importing as a package module (when running `python -m src.main`)
-        from src import security as _sec  # type: ignore
-
-        decrypt_data = getattr(_sec, "decrypt_data", None)
-    except Exception:
-        try:
-            # As a last resort, use importlib to import by module name
-            import importlib
-
-            _m = importlib.import_module("src.security")
-            decrypt_data = getattr(_m, "decrypt_data", None)
-        except Exception:
-            decrypt_data = None
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +30,7 @@ def db_connection(func):
             db_uri = "file::memory:?cache=shared"
             conn = sqlite3.connect(db_uri, uri=True, check_same_thread=False)
         else:
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect(DB_PATH, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         try:
@@ -463,6 +445,11 @@ def get_user_api_keys(cursor, user_id: int):
     ).fetchone()
     if not row or not row["api_key"] or not row["secret_key"]:
         return None, None
+    
+    if decrypt_data is None:
+        logger.error("Decryption function not available. Cannot decrypt API keys.")
+        return None, None
+        
     api_key = decrypt_data(row["api_key"])
     secret_key = decrypt_data(row["secret_key"])
     return api_key, secret_key
