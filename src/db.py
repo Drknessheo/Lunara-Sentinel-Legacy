@@ -1,3 +1,4 @@
+
 # blueprint/lunessasignels/lunara-bot/src/db.py
 """
 Thread-safe SQLite access layer for Lunessa / Lunara Bot.
@@ -62,8 +63,7 @@ def init_db():
             rsi_at_buy REAL,
             closed_by TEXT
         );
-    """
-    )
+    """)
         conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -81,8 +81,7 @@ def init_db():
             paper_balance REAL DEFAULT 10000.0,
             autotrade_enabled INTEGER DEFAULT NULL
         );
-    """
-    )
+    """)
 
 def get_user_count():
     """Returns the total number of users in the database."""
@@ -155,3 +154,11 @@ def mark_trade_closed(trade_id, reason="closed"):
     conn = get_connection()
     with conn:
         conn.execute("UPDATE trades SET status=? WHERE id=?", (reason, trade_id))
+
+def get_user_trading_mode_and_balance(user_id):
+    """
+    Retrieves the trading mode and paper balance for a user, creating the user if they don't exist.
+    """
+    user, _ = get_or_create_user(user_id)
+    # Defaults are set in the table schema, so we can safely access them.
+    return user['trading_mode'], user['paper_balance']
