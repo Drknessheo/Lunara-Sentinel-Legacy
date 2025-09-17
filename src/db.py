@@ -1,4 +1,4 @@
-
+'''
 # blueprint/lunessasignels/lunara-bot/src/db.py
 """
 Thread-safe SQLite access layer for Lunessa / Lunara Bot.
@@ -8,9 +8,17 @@ Each thread gets its own connection; no more check_same_thread hacks.
 import sqlite3
 import threading
 from pathlib import Path
+from . import config
+from cryptography.fernet import Fernet
 
 # === Configuration ===
 DB_PATH = Path(__file__).parent / "lunessa.db"
+
+# --- Encryption setup ---
+# Ensure the key is in the correct format (bytes)
+ENCRYPTION_KEY = config.BINANCE_ENCRYPTION_KEY.encode()
+cipher_suite = Fernet(ENCRYPTION_KEY)
+
 
 # Thread-local storage for per-thread connection
 _thread_local = threading.local()
@@ -96,31 +104,24 @@ def get_or_create_user(telegram_id):
     Returns a tuple of (user_data, created_boolean).
     """
     conn = get_connection()
-    # Ensure telegram_id is a string for consistent lookups
     str_telegram_id = str(telegram_id)
     
     user = conn.execute("SELECT * FROM users WHERE user_id=?", (str_telegram_id,)).fetchone()
     if user:
-        return user, False  # User existed
+        return user, False
 
-    # User does not exist, create them with default empty settings
     try:
         with conn:
             cursor = conn.execute(
                 "INSERT INTO users (user_id) VALUES (?)",
                 (str_telegram_id,)
             )
-            # If we inserted a row, lastrowid will be the new user's primary key
             if cursor.rowcount > 0:
                 new_user = conn.execute("SELECT * FROM users WHERE user_id=?", (str_telegram_id,)).fetchone()
-                return new_user, True # User was created
+                return new_user, True
     except sqlite3.IntegrityError:
-        # This handles a rare race condition: if another thread created the user
-        # between our SELECT and INSERT, the INSERT will fail due to the UNIQUE constraint.
-        # In this case, we simply fetch the now-existing user.
         pass
 
-    # If the INSERT was ignored or failed due to a race condition, fetch the user that must now exist
     user = conn.execute("SELECT * FROM users WHERE user_id=?", (str_telegram_id,)).fetchone()
     return user, False
 
@@ -160,5 +161,87 @@ def get_user_trading_mode_and_balance(user_id):
     Retrieves the trading mode and paper balance for a user, creating the user if they don't exist.
     """
     user, _ = get_or_create_user(user_id)
-    # Defaults are set in the table schema, so we can safely access them.
     return user['trading_mode'], user['paper_balance']
+
+def store_user_api_keys(user_id, api_key, secret_key):
+    """Encrypts and stores user API keys."""
+    user, _ = get_or_create_user(user_id)
+    encrypted_api_key = cipher_suite.encrypt(api_key.encode())
+    encrypted_secret_key = cipher_suite.encrypt(secret_key.encode())
+    conn = get_connection()
+    with conn:
+        conn.execute(
+            "UPDATE users SET api_key=?, secret_key=? WHERE user_id=?",
+            (encrypted_api_key, encrypted_secret_key, user_id)
+        )
+
+def get_user_api_keys(user_id):
+    """Retrieves and decrypts user API keys."""
+    user, _ = get_or_create_user(user_id)
+    if not user['api_key'] or not user['secret_key']:
+        return None, None
+    
+    decrypted_api_key = cipher_suite.decrypt(user['api_key']).decode()
+    decrypted_secret_key = cipher_suite.decrypt(user['secret_key']).decode()
+    return decrypted_api_key, decrypted_secret_key
+
+
+SETTING_TO_COLUMN_MAP = {
+    'rsi_buy': 'custom_rsi_buy',
+    'rsi_sell': 'custom_rsi_sell',
+    'stop_loss': 'custom_stop_loss',
+    'trailing_activation': 'custom_trailing_activation',
+    'trailing_drop': 'custom_trailing_drop',
+    'profit_target': 'custom_profit_target',
+    'autotrade': 'autotrade_enabled'
+}
+
+def get_user_effective_settings(user_id: int) -> dict:
+    """
+    Retrieves all trade-related settings for a user, creating the user if they don't exist.
+    Returns a dictionary of settings with user-friendly keys.
+    """
+    user, _ = get_or_create_user(user_id)
+    
+    column_to_setting_map = {v: k for k, v in SETTING_TO_COLUMN_MAP.items()}
+    column_to_setting_map['trading_mode'] = 'trading_mode'
+
+    settings = {}
+    for column, setting_name in column_to_setting_map.items():
+        if column in user.keys():
+            value = user[column]
+            if column == 'autotrade_enabled':
+                if value is None:
+                    value = 'Disabled'
+                else:
+                    value = 'Enabled' if value == 1 else 'Disabled'
+            settings[setting_name] = value
+            
+    return settings
+
+def update_user_setting(user_id: int, setting_name: str, value):
+    """
+    Updates a specific setting for a user in the database.
+    """
+    if setting_name not in SETTING_TO_COLUMN_MAP:
+        raise ValueError(f"Invalid setting name: {setting_name}")
+
+    column_name = SETTING_TO_COLUMN_MAP[setting_name]
+    
+    get_or_create_user(user_id)
+
+    if setting_name == 'autotrade':
+        processed_value = 1 if str(value).lower() in ['on', 'true', '1', 'enabled'] else 0
+    else:
+        try:
+            processed_value = float(value)
+        except ValueError:
+            raise TypeError(f"Invalid value type for {setting_name}. Expected a number.")
+
+    conn = get_connection()
+    with conn:
+        conn.execute(
+            f"UPDATE users SET {column_name}=? WHERE user_id=?",
+            (processed_value, user_id)
+        )
+''

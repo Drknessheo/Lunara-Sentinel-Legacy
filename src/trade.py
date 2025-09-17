@@ -475,6 +475,10 @@ async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     symbol = context.args[0].upper()
+    # Ensure the symbol ends with USDT for the price check
+    if not symbol.endswith('USDT'):
+        symbol += 'USDT'
+    
     price = get_current_price(symbol)
 
     if price is not None:
