@@ -12,11 +12,10 @@ from cryptography.fernet import Fernet
 
 # === Configuration ===
 DB_PATH = Path(__file__).parent / "lunessa.db"
-ENCRYPTION_KEY = getattr(config, 'BINANCE_ENCRYPTION_KEY', None)
+ENCRYPTION_KEY = getattr(config, 'SLIP_ENCRYPTION_KEY', None)
 if not ENCRYPTION_KEY:
-    raise ValueError("BINANCE_ENCRYPTION_KEY is not set in the configuration.")
-# The key is already in bytes, no need to encode it again.
-fernet = Fernet(ENCRYPTION_KEY)
+    raise ValueError("SLIP_ENCRYPTION_KEY is not set in the configuration.")
+fernet = Fernet(ENCRYPTION_KEY.encode())
 
 # Thread-local storage for per-thread connection
 _thread_local = threading.local()
@@ -42,7 +41,6 @@ def close_connection():
 def init_db():
     conn = get_connection()
     with conn:
-        # User table with expanded settings
         conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -60,7 +58,6 @@ def init_db():
             watchlist TEXT
         );
         """)
-        # Trades table
         conn.execute("""
         CREATE TABLE IF NOT EXISTS trades (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,7 +71,6 @@ def init_db():
         """)
 
 def get_or_create_user(user_id):
-    """Retrieves a user, creating one if they don't exist."""
     conn = get_connection()
     user = conn.execute("SELECT * FROM users WHERE user_id=?", (user_id,)).fetchone()
     if user:
@@ -85,8 +81,7 @@ def get_or_create_user(user_id):
     return user, True
 
 def store_user_api_keys(user_id, api_key, secret_key):
-    """Encrypts and stores user's Binance API keys."""
-    get_or_create_user(user_id) # Ensure user exists
+    get_or_create_user(user_id)
     encrypted_api = fernet.encrypt(api_key.encode())
     encrypted_secret = fernet.encrypt(secret_key.encode())
     conn = get_connection()
@@ -97,7 +92,6 @@ def store_user_api_keys(user_id, api_key, secret_key):
         )
 
 def get_user_api_keys(user_id):
-    """Retrieves and decrypts user's Binance API keys."""
     user = get_or_create_user(user_id)[0]
     if not user['api_key'] or not user['secret_key']:
         return None, None
@@ -109,7 +103,7 @@ def get_open_trades_by_user(user_id):
     conn = get_connection()
     return conn.execute("SELECT * FROM trades WHERE user_id=? AND status='open'", (user_id,)).fetchall()
 
-def find_open_trade(trade_id, user_id):
+def find_open_trade_by_id(trade_id, user_id):
     conn = get_connection()
     return conn.execute("SELECT * FROM trades WHERE id=? AND user_id=? AND status='open'", (trade_id, user_id)).fetchone()
 
@@ -126,17 +120,18 @@ def get_user_count():
     conn = get_connection()
     return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
 
+def get_active_autotrade_count():
+    """Counts the number of users with autotrade enabled."""
+    conn = get_connection()
+    return conn.execute("SELECT COUNT(*) FROM users WHERE autotrade_enabled=1").fetchone()[0]
+
 def add_coins_to_watchlist(user_id, coins_to_add: list):
-    """Adds new coins to a user's watchlist, avoiding duplicates."""
     user, _ = get_or_create_user(user_id)
     current_watchlist_str = user['watchlist'] or ''
     current_watchlist = set(current_watchlist_str.split(',')) if current_watchlist_str else set()
-    
     for coin in coins_to_add:
         current_watchlist.add(coin.upper())
-        
     new_watchlist_str = ','.join(sorted(list(current_watchlist)))
-    
     conn = get_connection()
     with conn:
         conn.execute("UPDATE users SET watchlist=? WHERE user_id=?", (new_watchlist_str, user_id))
@@ -144,23 +139,24 @@ def add_coins_to_watchlist(user_id, coins_to_add: list):
 SETTING_TO_COLUMN_MAP = {
     'rsi_buy': 'custom_rsi_buy', 'rsi_sell': 'custom_rsi_sell', 'stop_loss': 'custom_stop_loss',
     'trailing_activation': 'custom_trailing_activation', 'trailing_drop': 'custom_trailing_drop',
-    'profit_target': 'custom_profit_target', 'autotrade': 'autotrade_enabled'
+    'profit_target': 'custom_profit_target', 'autotrade': 'autotrade_enabled',
+    'trading_mode': 'trading_mode', 'paper_balance': 'paper_balance'
 }
 
 def get_user_effective_settings(user_id: int) -> dict:
-    """Retrieves all trade-related settings for a user."""
     user, _ = get_or_create_user(user_id)
     settings = {}
     for setting_name, column_name in SETTING_TO_COLUMN_MAP.items():
         value = user[column_name]
         if column_name == 'autotrade_enabled':
-            settings[setting_name] = 'Enabled' if value == 1 else 'Disabled'
+            settings[setting_name] = 'on' if value == 1 else 'off'
+        elif column_name == 'watchlist':
+            settings[setting_name] = value if value else 'Not Set'
         else:
             settings[setting_name] = value if value is not None else 'Not Set'
     return settings
 
 def update_user_setting(user_id: int, setting_name: str, value):
-    """Updates a specific setting for a user."""
     if setting_name not in SETTING_TO_COLUMN_MAP:
         raise ValueError(f"Invalid setting name: {setting_name}")
     
@@ -168,7 +164,11 @@ def update_user_setting(user_id: int, setting_name: str, value):
     processed_value = value
     if setting_name == 'autotrade':
         processed_value = 1 if str(value).lower() in ['on', 'true', '1', 'enabled'] else 0
-    else:
+    elif setting_name == 'trading_mode':
+        processed_value = str(value).upper()
+        if processed_value not in ['LIVE', 'PAPER']:
+            raise ValueError("Trading mode must be LIVE or PAPER")
+    elif setting_name in ['paper_balance', 'rsi_buy', 'rsi_sell', 'stop_loss', 'trailing_activation', 'trailing_drop', 'profit_target']:
         processed_value = float(value)
 
     conn = get_connection()
