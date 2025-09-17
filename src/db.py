@@ -41,28 +41,54 @@ def init_db():
     conn = get_connection()
     with conn:
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY,
-                telegram_id TEXT UNIQUE,
-                api_key TEXT,
-                api_secret TEXT,
-                settings TEXT
-            )
-        """
-        )
+        CREATE TABLE IF NOT EXISTS trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            coin_symbol TEXT NOT NULL,
+            buy_price REAL NOT NULL,
+            buy_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            closed_at DATETIME,
+            status TEXT NOT NULL,
+            sell_price REAL,
+            stop_loss_price REAL,
+            take_profit_price REAL,
+            peak_price REAL,
+            mode TEXT DEFAULT 'LIVE',
+            trade_size_usdt REAL,
+            quantity REAL,
+            close_reason TEXT,
+            win_loss TEXT,
+            pnl_percentage REAL,
+            rsi_at_buy REAL,
+            closed_by TEXT
+        );
+    """
+    )
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS trades (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                symbol TEXT,
-                status TEXT,
-                buy_price REAL,
-                sell_price REAL,
-                quantity REAL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """
-        )
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            api_key BLOB,
+            secret_key BLOB,
+            subscription_tier TEXT DEFAULT 'FREE',
+            subscription_expires DATETIME,
+            custom_rsi_buy REAL,
+            custom_rsi_sell REAL,
+            custom_stop_loss REAL,
+            custom_trailing_activation REAL,
+            custom_trailing_drop REAL,
+            custom_profit_target REAL,
+            trading_mode TEXT DEFAULT 'LIVE',
+            paper_balance REAL DEFAULT 10000.0,
+            autotrade_enabled INTEGER DEFAULT NULL
+        );
+    """
+    )
+
+def get_user_count():
+    """Returns the total number of users in the database."""
+    conn = get_connection()
+    with conn:
+        return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
 
 def get_or_create_user(telegram_id):
     """
@@ -74,7 +100,7 @@ def get_or_create_user(telegram_id):
     # Ensure telegram_id is a string for consistent lookups
     str_telegram_id = str(telegram_id)
     
-    user = conn.execute("SELECT * FROM users WHERE telegram_id=?", (str_telegram_id,)).fetchone()
+    user = conn.execute("SELECT * FROM users WHERE user_id=?", (str_telegram_id,)).fetchone()
     if user:
         return user, False  # User existed
 
@@ -82,12 +108,12 @@ def get_or_create_user(telegram_id):
     try:
         with conn:
             cursor = conn.execute(
-                "INSERT INTO users (telegram_id, settings) VALUES (?, ?)",
-                (str_telegram_id, '{}')
+                "INSERT INTO users (user_id) VALUES (?)",
+                (str_telegram_id,)
             )
             # If we inserted a row, lastrowid will be the new user's primary key
             if cursor.rowcount > 0:
-                new_user = conn.execute("SELECT * FROM users WHERE telegram_id=?", (str_telegram_id,)).fetchone()
+                new_user = conn.execute("SELECT * FROM users WHERE user_id=?", (str_telegram_id,)).fetchone()
                 return new_user, True # User was created
     except sqlite3.IntegrityError:
         # This handles a rare race condition: if another thread created the user
@@ -96,22 +122,22 @@ def get_or_create_user(telegram_id):
         pass
 
     # If the INSERT was ignored or failed due to a race condition, fetch the user that must now exist
-    user = conn.execute("SELECT * FROM users WHERE telegram_id=?", (str_telegram_id,)).fetchone()
+    user = conn.execute("SELECT * FROM users WHERE user_id=?", (str_telegram_id,)).fetchone()
     return user, False
 
 def fetch_user(telegram_id):
     conn = get_connection()
-    return conn.execute("SELECT * FROM users WHERE telegram_id=?", (str(telegram_id),)).fetchone()
+    return conn.execute("SELECT * FROM users WHERE user_id=?", (str(telegram_id),)).fetchone()
 
 def insert_user(telegram_id, api_key, api_secret, settings):
     conn = get_connection()
     with conn:
         conn.execute(
-            "INSERT OR REPLACE INTO users (telegram_id, api_key, api_secret, settings) VALUES (?,?,?,?)",
+            "INSERT OR REPLACE INTO users (user_id, api_key, secret_key, settings) VALUES (?,?,?,?)",
             (str(telegram_id), api_key, api_secret, settings)
         )
 
-def fetch_open_trades(user_id):
+def get_open_trades_by_user(user_id):
     conn = get_connection()
     return conn.execute("SELECT * FROM trades WHERE user_id=? AND status='open'", (user_id,)).fetchall()
 
