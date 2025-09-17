@@ -184,6 +184,23 @@ async def addcoins_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_db.add_coins_to_watchlist(user_id, [coin.upper() for coin in context.args])
     await update.message.reply_text(f"Successfully added coins to your watchlist.")
 
+async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    mode, paper_balance = new_db.get_user_trading_mode_and_balance(user_id)
+
+    if mode == 'LIVE':
+        try:
+            balances = get_all_spot_balances(user_id)
+            usdt_balance = next((item for item in balances if item["asset"] == "USDT"), None)
+            balance_str = f"{float(usdt_balance['free']):.2f} USDT" if usdt_balance else "Not found"
+            message = f"ðŸ’° Your LIVE USDT balance: `{balance_str}`"
+        except TradeError as e:
+            message = f"Could not retrieve balances: {e}"
+    else:
+        message = f"ðŸ’° Your PAPER balance: `${paper_balance:,.2f} USDT`"
+    
+    await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+
 # --- Helper Functions ---
 
 def get_current_price(symbol: str) -> float | None:
