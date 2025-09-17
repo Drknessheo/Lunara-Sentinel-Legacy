@@ -15,7 +15,8 @@ DB_PATH = Path(__file__).parent / "lunessa.db"
 ENCRYPTION_KEY = getattr(config, 'BINANCE_ENCRYPTION_KEY', None)
 if not ENCRYPTION_KEY:
     raise ValueError("BINANCE_ENCRYPTION_KEY is not set in the configuration.")
-fernet = Fernet(ENCRYPTION_KEY.encode())
+# The key is already in bytes, no need to encode it again.
+fernet = Fernet(ENCRYPTION_KEY)
 
 # Thread-local storage for per-thread connection
 _thread_local = threading.local()
