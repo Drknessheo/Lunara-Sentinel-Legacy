@@ -180,6 +180,9 @@ def main() -> None:
     assert config.ADMIN_USER_ID, "CRITICAL: ADMIN_USER_ID is not set!"
     assert config.SLIP_ENCRYPTION_KEY, "CRITICAL: SLIP_ENCRYPTION_KEY is not set!"
 
+    # Initialize the database from the old db_access module
+    db.initialize_database()
+
     # Initialize the new thread-safe database
     new_db.init_db()
 
