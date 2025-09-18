@@ -7,34 +7,34 @@ from telegram.constants import ParseMode
 logger = logging.getLogger(__name__)
 
 PAYMENT_MESSAGE = """
-💰 **How to Support LunessaSignals** 💰
+<b>💰 How to Support LunessaSignals</b> 💰
 
 Your support helps keep the signals sharp and the empire growing. Here are the ways you can pay for your subscription:
 
 ---
-**Cryptocurrency (Preferred)**
+<b>Cryptocurrency (Preferred)</b>
 ---
-- **Asset:** ETH (Ethereum)
-- **Network:** Binance Smart Chain (BSC/BEP20)
-- **Address:** `0x2f45bfeb6e499622a774f444c6fe9801e7bd2901`
+- <b>Asset:</b> ETH (Ethereum)
+- <b>Network:</b> Binance Smart Chain (BSC/BEP20)
+- <b>Address:</b> <code>0x2f45bfeb6e499622a774f444c6fe9801e7bd2901</code>
 
-*Please be sure to send on the BSC/BEP20 network to avoid loss of funds.*
-
----
-**🇧🇩 Bangladesh (bKash / Nagad)**
----
-- **Name:** Shamim Reza Saikat
-- **Mobile:** `01717948095`
+<i>Please be sure to send on the BSC/BEP20 network to avoid loss of funds.</i>
 
 ---
-**🌍 International Bank Transfer**
+<b>🇧🇩 Bangladesh (bKash / Nagad)</b>
 ---
-- **Beneficiary Name:** Shamim Reza Saikat
-- **Bank:** BRAC Bank PLC
-- **Account Number:** `1534105036454001`
-- **Branch:** Badda Branch, Dhaka
-- **SWIFT/BIC Code:** `BRAKBDDHXXX`
-- **Bank Address:** The Pearl Trade Center, Holding No. Cha-90/3, Pragati Sarani, Badda, Dhaka
+- <b>Name:</b> Shamim Reza Saikat
+- <b>Mobile:</b> <code>01717948095</code>
+
+---
+<b>🌍 International Bank Transfer</b>
+---
+- <b>Beneficiary Name:</b> Shamim Reza Saikat
+- <b>Bank:</b> BRAC Bank PLC
+- <b>Account Number:</b> <code>1534105036454001</code>
+- <b>Branch:</b> Badda Branch, Dhaka
+- <b>SWIFT/BIC Code:</b> <code>BRAKBDDHXXX</code>
+- <b>Bank Address:</b> The Pearl Trade Center, Holding No. Cha-90/3, Pragati Sarani, Badda, Dhaka
 
 After making a payment, please contact the admin with a screenshot or transaction ID.
 """
@@ -50,4 +50,3 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     except Exception as e:
         logger.error(f"Failed to send payment info: {e}")
         await update.message.reply_text("Sorry, I couldn't retrieve the payment information at the moment. Please try again later.")
-

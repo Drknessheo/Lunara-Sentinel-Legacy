@@ -30,42 +30,42 @@ if not BINANCE_AVAILABLE:
 
 # --- Bot Command Handlers ---
 
-HELP_MESSAGE = """ðŸ¤– *Lunessa Shai'ra Gork* (@Srskat_bot) - Your AI Trading Companion
+HELP_MESSAGE = """<b>Lunessa Shai'ra Gork</b> (@Srskat_bot) - Your AI Trading Companion
 
-*Core Commands:*
+<b>Core Commands:</b>
 /myprofile - View your trades, balances, and settings.
-/settings `<name>` `<value>` - Change a setting (e.g., `/settings autotrade on`).
-/setapi `<KEY>` `<SECRET>` - Securely add Binance keys (in private chat).
-/close `<ID>` - Manually close an open trade.
-/addcoins `<SYMBOL1>` `...` - Add coins to your watchlist.
+/settings <code>&lt;name&gt;</code> <code>&lt;value&gt;</code> - Change a setting (e.g., <code>/settings autotrade on</code>).
+/setapi <code>&lt;KEY&gt;</code> <code>&lt;SECRET&gt;</code> - Securely add Binance keys (in private chat).
+/close <code>&lt;ID&gt;</code> - Manually close an open trade.
+/addcoins <code>&lt;SYMBOL1&gt;</code> ... - Add coins to your watchlist.
 
-*Utility Commands:*
+<b>Utility Commands:</b>
 /help - Show this help message.
 /about - Learn about the project.
 """
 
 ABOUT_MESSAGE = (
-    "*About Lunessa Shai'ra Gork* (@Srskat_bot)\n\n"
+    "<b>About Lunessa Shai'ra Gork</b> (@Srskat_bot)\n\n"
     "An AI-powered crypto trading companion from the LunessaSignals project."
     "\nProject: https://github.com/Drknessheo/lunara-bot"
 )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(HELP_MESSAGE, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_html(HELP_MESSAGE)
 
 async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(ABOUT_MESSAGE, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_html(ABOUT_MESSAGE)
 
 async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     if not context.args:
         settings = new_db.get_user_effective_settings(user_id)
-        message = "**Your current settings:**\n"
+        message = "<b>Your current settings:</b>\n"
         for key, value in settings.items():
-            message += f"- `{key}`: `{value}`\n"
-        message += "\nTo change a setting, use `/settings <setting_name> <value>`."
-        await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+            message += f"- <code>{key}</code>: <code>{value}</code>\n"
+        message += "\nTo change a setting, use <code>/settings &lt;setting_name&gt; &lt;value&gt;</code>."
+        await update.message.reply_html(message)
         return
 
     try:
@@ -76,12 +76,12 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         updated_settings = new_db.get_user_effective_settings(user_id)
         new_value = updated_settings.get(setting_name, value_str)
 
-        await update.message.reply_text(f"âœ… Successfully updated `{setting_name}` to `{new_value}`.", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_html(f"✅ Successfully updated <code>{setting_name}</code> to <code>{new_value}</code>.")
 
     except (IndexError, ValueError):
-        await update.message.reply_text("Usage: `/settings <setting_name> <value>`")
+        await update.message.reply_text("Usage: <code>/settings &lt;setting_name&gt; &lt;value&gt;</code>")
     except (TypeError, ValueError) as e:
-        await update.message.reply_text(f"âŒ Invalid value for `{setting_name}`: {e}")
+        await update.message.reply_html(f"❌ Invalid value for <code>{setting_name}</code>: {e}")
     except Exception as e:
         logger.error(f"Error updating user settings: {e}")
         await update.message.reply_text("An error occurred while updating your settings.")
@@ -89,41 +89,41 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     mode, paper_balance = new_db.get_user_trading_mode_and_balance(user_id)
-    message = f"âœ¨ **Your Trading Profile ({mode} Mode)** âœ¨\n\n"
+    message = f"✨ <b>Your Trading Profile ({mode} Mode)</b> ✨\n\n"
 
     open_trades = new_db.get_open_trades_by_user(user_id)
     if open_trades:
-        message += "ðŸ“Š **Open Trades:**\n"
+        message += "📊 <b>Open Trades:</b>\n"
         for trade in open_trades:
             pnl_text = ""
             current_price = get_current_price(trade['symbol'])
             if current_price:
                 pnl_percent = ((current_price - trade['buy_price']) / trade['buy_price']) * 100
-                pnl_text = f" (P/L: `{pnl_percent:+.2f}%`)"
-            message += f"- **{trade['symbol']}** (ID: {trade['id']}){pnl_text}\n"
+                pnl_text = f" (P/L: <code>{pnl_percent:+.2f}%</code>)"
+            message += f"- <b>{trade['symbol']}</b> (ID: {trade['id']}){pnl_text}\n"
     else:
-        message += "ðŸ“Š **Open Trades:** None\n"
+        message += "📊 <b>Open Trades:</b> None\n"
 
     if mode == "LIVE":
-        message += "\nðŸ’° **Wallet Holdings:**\n"
+        message += "\n💰 <b>Wallet Holdings:</b>\n"
         try:
             balances = get_all_spot_balances(user_id)
             if balances:
                 for bal in balances:
-                    message += f"- **{bal['asset']}:** `{float(bal['free']):.4f}`\n"
+                    message += f"- <b>{bal['asset']}:</b> <code>{float(bal['free']):.4f}</code>\n"
             else:
                 message += "  No assets found.\n"
         except TradeError as e:
-            message += f"  *Could not retrieve balances: {e}*\n"
+            message += f"  <i>Could not retrieve balances: {e}</i>\n"
     else:
-        message += f"\nðŸ’° **Paper Balance:** ${paper_balance:,.2f} USDT\n"
+        message += f"\n💰 <b>Paper Balance:</b> ${paper_balance:,.2f} USDT\n"
     
     settings = new_db.get_user_effective_settings(user_id)
-    message += "\nâš™ï¸  **Autotrade Settings:**\n"
+    message += "\n⚙️ <b>Autotrade Settings:</b>\n"
     for key, value in settings.items():
-        message += f"- `{key}`: `{value}`\n"
+        message += f"- <code>{key}</code>: <code>{value}</code>\n"
 
-    await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_html(message)
 
 async def set_api_keys_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
@@ -134,12 +134,12 @@ async def set_api_keys_command(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         api_key, secret_key = context.args[0], context.args[1]
         new_db.store_user_api_keys(user_id, api_key, secret_key)
-        await update.message.reply_text("âœ… API keys stored. Verifying...")
+        await update.message.reply_text("✅ API keys stored. Verifying...")
         try:
             balances = get_all_spot_balances(user_id)
-            await update.message.reply_text("âœ… API keys verified successfully!")
+            await update.message.reply_text("✅ API keys verified successfully!")
         except TradeError as e:
-            await update.message.reply_text(f"âš ï¸  Verification failed: {e}")
+            await update.message.reply_html(f"⚠️ Verification failed: {e}")
     except (IndexError, ValueError):
         await update.message.reply_text("Usage: /setapi <KEY> <SECRET>")
     except Exception as e:
@@ -155,14 +155,14 @@ async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             return
         new_db.mark_trade_closed(trade_id)
         slip_manager.cleanup_slip_for_symbol(trade['symbol'])
-        await update.message.reply_text(f"âœ… Trade #{trade_id} ({trade['symbol']}) manually closed.")
+        await update.message.reply_html(f"✅ Trade #{trade_id} ({trade['symbol']}) manually closed.")
     except (IndexError, ValueError):
-        await update.message.reply_text("Usage: `/close <trade_id>`")
+        await update.message.reply_text("Usage: <code>/close &lt;trade_id&gt;</code>")
 
 async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the /quest command, ensuring symbol is formatted correctly."""
     if not context.args:
-        await update.message.reply_text("Usage: `/quest <SYMBOL>`")
+        await update.message.reply_text("Usage: <code>/quest &lt;SYMBOL&gt;</code>")
         return
 
     symbol = context.args[0].upper()
@@ -171,14 +171,14 @@ async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     price = get_current_price(symbol)
     if price is not None:
-        await update.message.reply_text(f"The current price of {symbol} is ${price:,.2f}.")
+        await update.message.reply_html(f"The current price of {symbol} is ${price:,.2f}.")
     else:
-        await update.message.reply_text(f"Could not get price for {symbol}.")
+        await update.message.reply_html(f"Could not get price for {symbol}.")
 
 async def addcoins_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not context.args:
-        await update.message.reply_text("Usage: `/addcoins <SYMBOL1> <SYMBOL2>...`")
+        await update.message.reply_text("Usage: <code>/addcoins &lt;SYMBOL1&gt; &lt;SYMBOL2&gt;...</code>")
         return
     
     new_db.add_coins_to_watchlist(user_id, [coin.upper() for coin in context.args])
@@ -193,13 +193,13 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             balances = get_all_spot_balances(user_id)
             usdt_balance = next((item for item in balances if item["asset"] == "USDT"), None)
             balance_str = f"{float(usdt_balance['free']):.2f} USDT" if usdt_balance else "Not found"
-            message = f"ðŸ’° Your LIVE USDT balance: `{balance_str}`"
+            message = f"💰 Your LIVE USDT balance: <code>{balance_str}</code>"
         except TradeError as e:
             message = f"Could not retrieve balances: {e}"
     else:
-        message = f"ðŸ’° Your PAPER balance: `${paper_balance:,.2f} USDT`"
+        message = f"💰 Your PAPER balance: ${paper_balance:,.2f} USDT"
     
-    await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_html(message)
 
 # --- Helper Functions ---
 
