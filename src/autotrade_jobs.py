@@ -28,12 +28,7 @@ logger = logging.getLogger(__name__)
 async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE) -> None:
     """The grand orchestrator of the autotrade army."""
     logger.info("====== Starting Autotrade Cycle ======")
-
-    # --- Diagnostic Scrying --- 
-    all_statuses = new_db.get_all_autotrade_statuses()
-    logger.info(f"[DIAGNOSTIC] Autotrade statuses: {all_statuses}")
-    # --- End Diagnostic --- 
-
+    
     users = new_db.get_all_users_with_autotrade_enabled()
     for user_id in users:
         logger.info(f"--- Running autotrade for user {user_id} ---")

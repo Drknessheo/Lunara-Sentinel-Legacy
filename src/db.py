@@ -172,12 +172,6 @@ def get_all_users_with_autotrade_enabled():
     users = conn.execute("SELECT user_id FROM users WHERE autotrade_enabled=1").fetchall()
     return [user['user_id'] for user in users]
 
-def get_all_autotrade_statuses():
-    """Diagnostic function to see all users' autotrade status."""
-    conn = get_connection()
-    users = conn.execute("SELECT user_id, autotrade_enabled FROM users").fetchall()
-    return [{ 'user_id': user['user_id'], 'autotrade_enabled': user['autotrade_enabled'] } for user in users]
-
 def add_coins_to_watchlist(user_id, coins_to_add: list):
     user, _ = get_or_create_user(user_id)
     # This check is important to avoid errors on first creation before the column exists pre-migration

@@ -11,6 +11,10 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6379/1")
 # Set a sensible default before importing the module so its module-level
 # MODE constant is initialized correctly.
 os.environ.setdefault("MODE", "fail")
+
+# Set a dummy encryption key for the test environment so config validation passes.
+os.environ.setdefault("SLIP_ENCRYPTION_KEY", "dummy-key-for-testing-purposes-only")
+
 from tests.mock_server import start_mock_server
 
 
