@@ -20,7 +20,7 @@ def analyze_symbol(kline_data: list) -> dict:
         A dictionary containing the calculated indicators for the latest candle,
         or an empty dictionary if analysis fails.
     """
-    if not kline_data or len(kline_data) < 20: # Need enough data for indicators
+    if not kline_data or len(kline_data) < 30: # Increased data requirement
         return {}
 
     try:
@@ -40,6 +40,13 @@ def analyze_symbol(kline_data: list) -> dict:
         df.ta.macd(fast=12, slow=26, signal=9, append=True)
         df.ta.bbands(length=20, std=2, append=True)
 
+        # --- Defensive check for indicator columns ---
+        required_cols = ['RSI_14', 'MACD_12_26_9', 'MACDs_12_26_9', 'BBU_20_2.0', 'BBL_20_2.0']
+        if not all(col in df.columns for col in required_cols):
+            logger.warning(f"Could not calculate all required indicators. Columns missing in DataFrame.")
+            return {}
+        # --------------------------------------------
+
         # Get the latest indicator values
         latest_indicators = {
             'rsi': round(df['RSI_14'].iloc[-1], 2),
@@ -53,6 +60,9 @@ def analyze_symbol(kline_data: list) -> dict:
 
         return latest_indicators
 
+    except KeyError as e:
+        logger.error(f"KeyError during indicator analysis: {e}. This likely means an indicator column was not generated.")
+        return {}
     except Exception as e:
-        logger.error(f"Failed to analyze symbol data: {e}")
+        logger.error(f"Failed to analyze symbol data: {e}", exc_info=True)
         return {}
