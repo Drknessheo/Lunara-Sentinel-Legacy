@@ -62,6 +62,22 @@ def _migrate_db(conn: sqlite3.Connection):
     else:
         logger.info("'watchlist' column already exists. No migration needed.")
 
+    # Migration 2: Add 'stop_loss' column to 'trades' table
+    cursor.execute("PRAGMA table_info(trades)")
+    columns = [row['name'] for row in cursor.fetchall()]
+    if 'stop_loss' not in columns:
+        try:
+            logger.info("Applying migration: Adding 'stop_loss' column to 'trades' table.")
+            cursor.execute("ALTER TABLE trades ADD COLUMN stop_loss REAL")
+            logger.info("Migration successful.")
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" in str(e):
+                logger.warning("Migration for 'stop_loss' column already applied by another process.")
+            else:
+                logger.error(f"Failed to apply 'stop_loss' migration: {e}")
+                raise
+    else:
+        logger.info("'stop_loss' column already exists. No migration needed.")
 
 # === Main DB Functions ===
 
@@ -93,7 +109,8 @@ def init_db():
             buy_price REAL NOT NULL,
             quantity REAL NOT NULL,
             buy_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            status TEXT NOT NULL DEFAULT 'open'
+            status TEXT NOT NULL DEFAULT 'open',
+            stop_loss REAL
         );
         """)
         # Apply migrations to ensure older databases are up-to-date
@@ -115,6 +132,20 @@ def get_or_create_user(user_id):
         add_coins_to_watchlist(user_id, ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'])
 
     return user, created
+
+def update_trade(trade: dict):
+    """Updates a trade in the database, specifically the stop_loss."""
+    if 'id' not in trade or 'stop_loss' not in trade:
+        logger.error("Attempted to update a trade without 'id' or 'stop_loss'.")
+        return
+
+    conn = get_connection()
+    with conn:
+        conn.execute(
+            "UPDATE trades SET stop_loss = ? WHERE id = ?",
+            (trade['stop_loss'], trade['id'])
+        )
+    logger.info(f"Updated trade {trade['id']} with new stop_loss: {trade['stop_loss']}")
 
 def store_user_api_keys(user_id, api_key, secret_key):
     get_or_create_user(user_id)

@@ -22,6 +22,7 @@ from . import autotrade_settings
 from . import db as new_db
 from .modules import auto_coin_selector
 from . import technical_analyzer
+from . import risk_management
 
 # --- Globals & Configuration ---
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE) -> None:
     """The grand orchestrator of the autotrade army."""
     logger.info("====== Starting Autotrade Cycle ======")
     try:
-        top_coins = await auto_coin_selector.get_top_coins(limit=100)
+        top_coins = auto_coin_selector.fetch_top_binance_coins(limit=100)
         if not top_coins:
             logger.warning("Could not fetch top coins. Autotrade cycle cannot proceed.")
             return
@@ -63,7 +64,8 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE) -> None:
                 await autotrade_buy_from_suggestions(user_id, suggestions, context)
 
     except Exception as e:
-        logger.error(f"CRITICAL ERROR in autotrade_cycle: {e}\n{traceback.format_exc()}")
+        logger.error(f"CRITICAL ERROR in autotrade_cycle: {e}\
+{traceback.format_exc()}")
 
     logger.info("====== Autotrade Cycle Finished ======")
 
@@ -85,6 +87,11 @@ async def monitor_autotrades(context: ContextTypes.DEFAULT_TYPE, user_id: int, d
                 logger.warning(f"Could not fetch price for {symbol}. Skipping trade {trade['id']}.")
                 continue
 
+            # --- The Ministry's Wisdom: Dynamic Stop-Loss ---
+            trade = risk_management.manage_open_trade(trade, current_price)
+            new_db.update_trade(trade) # Persist the updated trade
+            # ---------------------------------------------------
+
             pnl_percent = ((current_price - trade['buy_price']) / trade['buy_price']) * 100
 
             # Consult the Ministry for sell advice
@@ -102,7 +109,8 @@ async def monitor_autotrades(context: ContextTypes.DEFAULT_TYPE, user_id: int, d
                 logger.info(f"Ministry advises to HOLD {symbol} (PnL: {pnl_percent:.2f}%). No action taken.")
 
         except Exception as e:
-            logger.error(f"Error processing trade {trade['id']} for {symbol}: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error processing trade {trade['id']} for {symbol}: {e}\
+{traceback.format_exc()}")
 
 async def get_gemini_sell_advice(symbol: str, pnl_percent: float, buy_price: float) -> str:
     """Consults Gemini to get a 'SELL' or 'HOLD' recommendation for an open trade."""
@@ -178,7 +186,8 @@ async def execute_sell(trade: dict, current_price: float, pnl_percent: float, re
     except trading_logic.TradeError as e:
         logger.error(f"TradeError on sell for {symbol}: {e}")
     except Exception as e:
-        logger.error(f"Critical error during sell execution for {symbol}: {e}\n{traceback.format_exc()}")
+        logger.error(f"Critical error during sell execution for {symbol}: {e}\
+{traceback.format_exc()}")
 
 
 # --- Buy-side Logic ---
@@ -247,7 +256,7 @@ async def get_gemini_suggestions(watchlist: list) -> list:
     Your response MUST be a valid JSON array containing a single object for the chosen symbol, or an empty array if no symbol meets the criteria.
 
     Example Response:
-    [{"symbol": "BTCUSDT", "reason": "RSI is oversold on the 4h chart and the price is bouncing off the lower Bollinger Band, suggesting a potential reversal."}]
+    [{{"symbol": "BTCUSDT", "reason": "RSI is oversold on the 4h chart and the price is bouncing off the lower Bollinger Band, suggesting a potential reversal."}}]
 
     Market Data:
     {json.dumps(market_analysis, indent=2)}
@@ -259,12 +268,12 @@ async def get_gemini_suggestions(watchlist: list) -> list:
         response = await model.generate_content_async(
             prompt,
             generation_config=genai.types.GenerationConfig(temperature=0.1),
-            safety_settings={
+            safety_settings={{
                 'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE',
                 'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE',
                 'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_NONE',
                 'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE'
-            }
+            }}
         )
         
         # 5. Parse the Ministry's Decree
