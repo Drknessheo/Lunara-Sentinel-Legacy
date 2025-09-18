@@ -6,6 +6,7 @@ python-binance
 tenacity
 python-dotenv
 pandas
+pandas-ta
 aiohappyeyeballs==2.6.1
 aiohttp==3.12.15
 aiosignal==1.4.0
@@ -19,7 +20,7 @@ charset-normalizer==3.4.3
 click==8.2.1
 colorama==0.4.6
 contourpy==1.3.3
-cycler==0.12.1
+cycler==0.12.2
 dateparser==1.2.2
 fakeredis==2.31.1
 filelock
