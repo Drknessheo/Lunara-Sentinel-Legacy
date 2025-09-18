@@ -15,6 +15,7 @@ from .core.binance_client import TradeError
 from . import db as new_db
 from . import config
 from . import slip_manager
+from . import autotrade_settings
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     if not context.args:
-        settings = new_db.get_user_effective_settings(user_id)
+        settings = autotrade_settings.get_effective_settings(user_id)
         message = "<b>Your current settings:</b>\n"
         for key, value in settings.items():
             message += f"- <code>{key}</code>: <code>{value}</code>\n"
@@ -64,16 +65,15 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         setting_name = context.args[0].lower()
         value_str = " ".join(context.args[1:])
         
-        new_db.update_user_setting(user_id, setting_name, value_str)
-        updated_settings = new_db.get_user_effective_settings(user_id)
-        new_value = updated_settings.get(setting_name, value_str)
+        success, message = autotrade_settings.validate_and_set(user_id, setting_name, value_str)
 
-        await update.message.reply_html(f"✅ Successfully updated <code>{setting_name}</code> to <code>{new_value}</code>.")
+        if success:
+            await update.message.reply_html(f"✅ {message}")
+        else:
+            await update.message.reply_html(f"❌ {message}")
 
     except (IndexError, ValueError):
         await update.message.reply_text("Usage: <code>/settings &lt;setting_name&gt; &lt;value&gt;</code>")
-    except (TypeError, ValueError) as e:
-        await update.message.reply_html(f"❌ Invalid value for <code>{setting_name}</code>: {e}")
     except Exception as e:
         logger.error(f"Error updating user settings: {e}")
         await update.message.reply_text("An error occurred while updating your settings.")
@@ -110,7 +110,7 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         message += f"\n💰 <b>Paper Balance:</b> ${paper_balance:,.2f} USDT\n"
     
-    settings = new_db.get_user_effective_settings(user_id)
+    settings = autotrade_settings.get_effective_settings(user_id)
     message += "\n⚙️ <b>Autotrade Settings:</b>\n"
     for key, value in settings.items():
         message += f"- <code>{key}</code>: <code>{value}</code>\n"
@@ -201,7 +201,7 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_html(message)
 
-async def clear_redis_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def clear_redis_command(update: Update, context: ContextTypes.DEFAULT_TPE):
     # Basic security: Only allow the admin to clear Redis.
     if update.effective_user.id != config.ADMIN_USER_ID:
         await update.message.reply_text("You are not authorized to use this command.")
