@@ -27,6 +27,9 @@ from . import gemini_cacher
 
 logger = logging.getLogger(__name__)
 
+# Emperor's Decree: A platoon must have a minimum strength.
+MIN_TRADE_USDT = 11.0  # 10 USDT base + 10% buffer for dust and fees.
+
 def get_monitored_coins():
     """Returns the configured list of monitored coins."""
     return getattr(config, "AI_MONITOR_COINS", [])
@@ -37,7 +40,7 @@ def get_monitored_coins():
 # --- Trade Execution Logic ---
 
 async def place_buy_order_logic(user_id: int, symbol: str, usdt_amount: float):
-    """Handles the logic for placing a buy order."""
+    """Handles the logic for placing a buy order, enforcing minimum trade size."""
     user_client = binance_client.get_user_client(user_id)
     if not user_client:
         raise TradeError("Binance client is not available for this user.")
@@ -46,12 +49,19 @@ async def place_buy_order_logic(user_id: int, symbol: str, usdt_amount: float):
     if not info:
         raise TradeError(f"Could not retrieve trading rules for {symbol}.")
 
-    # Simplified validation (can be expanded)
-    min_notional = float([f["minNotional"] for f in info["filters"] if f["filterType"] == "NOTIONAL"][0])
-    if usdt_amount < min_notional:
-        raise TradeError(f"Order value is below the minimum of ${min_notional:.2f} for {symbol}.")
+    # Determine the effective minimum trade size
+    binance_min_notional = float([f["minNotional"] for f in info["filters"] if f["filterType"] == "NOTIONAL"][0])
+    effective_min = max(MIN_TRADE_USDT, binance_min_notional)
+
+    # Enforce the platoon strategy
+    if usdt_amount < effective_min:
+        raise TradeError(
+            f"Order value of {usdt_amount:.2f} USDT is below the required minimum of "
+            f"${effective_min:.2f} for {symbol}."
+        )
 
     try:
+        logger.info(f"Placing MARKET BUY for {usdt_amount:.2f} USDT of {symbol} for user {user_id}")
         # Use the async client's method
         order = await user_client.create_order(
             symbol=symbol,

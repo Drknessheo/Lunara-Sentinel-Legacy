@@ -29,6 +29,7 @@ HELP_MESSAGE = """<b>Lunessa Shai'ra Gork</b> (@Srskat_bot) - Your AI Trading Co
 /setapi <code>&lt;KEY&gt;</code> <code>&lt;SECRET&gt;</code> - Securely add Binance keys (in private chat).
 /close <code>&lt;ID&gt;</code> - Manually close an open trade.
 /addcoins <code>&lt;SYMBOL1&gt;</code> ... - Add coins to your watchlist.
+/removecoins <code>&lt;SYMBOL1&gt;</code> ... - Remove coins from your watchlist.
 
 <b>Utility Commands:</b>
 /help - Show this help message.
@@ -173,6 +174,15 @@ async def addcoins_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     new_db.add_coins_to_watchlist(user_id, [coin.upper() for coin in context.args])
     await update.message.reply_text(f"Successfully added coins to your watchlist.")
+
+async def removecoins_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if not context.args:
+        await update.message.reply_text("Usage: <code>/removecoins &lt;SYMBOL1&gt; &lt;SYMBOL2&gt;...</code>")
+        return
+    
+    new_db.remove_coins_from_watchlist(user_id, [coin.upper() for coin in context.args])
+    await update.message.reply_text(f"Successfully removed coins from your watchlist.")
 
 async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id

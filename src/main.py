@@ -86,6 +86,7 @@ Your ultimate guide to mastering the crypto markets.
 <code>/quest SYMBOL</code> - Scan a crypto pair for opportunities.
 <code>/close ID</code> - Manually close a trade by its ID.
 <code>/addcoins SYMBOL...</code> - Add coins to your watchlist.
+<code>/removecoins SYMBOL...</code> - Remove coins from your watchlist.
 
 <b>⚙️ Settings</b>
 <code>/settings</code> - View your current settings.
@@ -176,6 +177,7 @@ def main() -> None:
     application.add_handler(CommandHandler("setapi", trade.set_api_keys_command))
     application.add_handler(CommandHandler("close", trade.close_trade_command))
     application.add_handler(CommandHandler("addcoins", trade.addcoins_command))
+    application.add_handler(CommandHandler("removecoins", trade.removecoins_command))
     application.add_handler(CommandHandler("pay", handlers.pay_command))
     application.add_handler(CommandHandler("settings", trade.settings_command))
 

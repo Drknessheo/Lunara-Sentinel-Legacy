@@ -185,6 +185,21 @@ def add_coins_to_watchlist(user_id, coins_to_add: list):
     with conn:
         conn.execute("UPDATE users SET watchlist=? WHERE user_id=?", (new_watchlist_str, user_id))
 
+def remove_coins_from_watchlist(user_id, coins_to_remove: list):
+    user, _ = get_or_create_user(user_id)
+    current_watchlist_str = user['watchlist'] if 'watchlist' in user.keys() else ''
+    current_watchlist_str = current_watchlist_str or ''
+    current_watchlist = set(current_watchlist_str.split(',')) if current_watchlist_str else set()
+    
+    # Remove the specified coins
+    for coin in coins_to_remove:
+        current_watchlist.discard(coin.upper()) # Use discard to avoid errors if coin not in set
+        
+    new_watchlist_str = ','.join(sorted(list(current_watchlist)))
+    conn = get_connection()
+    with conn:
+        conn.execute("UPDATE users SET watchlist=? WHERE user_id=?", (new_watchlist_str, user_id))
+
 SETTING_TO_COLUMN_MAP = {
     'rsi_buy': 'custom_rsi_buy', 'rsi_sell': 'custom_rsi_sell', 'stop_loss': 'custom_stop_loss',
     'trailing_activation': 'custom_trailing_activation', 'trailing_drop': 'custom_trailing_drop',
