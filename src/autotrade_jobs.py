@@ -40,13 +40,23 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE) -> None:
             logger.warning("Could not fetch top coins. Autotrade cycle cannot proceed.")
             return
 
-        users = new_db.get_all_users_with_autotrade_enabled()
-        if not users:
+        all_users = new_db.get_all_users()
+        if not all_users:
+            logger.info("No users found in the database. Cycle finished.")
+            return
+        
+        autotrade_enabled_users = []
+        for user_id in all_users:
+            settings = autotrade_settings.get_user_settings(user_id)
+            if settings and settings.get('autotrade') == 'on':
+                autotrade_enabled_users.append(user_id)
+
+        if not autotrade_enabled_users:
             logger.info("No users with autotrade enabled. Cycle finished.")
             return
         
         # Process selling decisions for all users first
-        for user_id in users:
+        for user_id in autotrade_enabled_users:
             logger.info(f"--- Monitoring trades for user {user_id} ---")
             await monitor_autotrades(context, user_id)
 
@@ -59,7 +69,7 @@ async def autotrade_cycle(context: ContextTypes.DEFAULT_TYPE) -> None:
             # Hunger Protocol Logic would go here
 
         if suggestions:
-            for user_id in users:
+            for user_id in autotrade_enabled_users:
                 logger.info(f"--- Processing buy suggestions for user {user_id} ---")
                 await autotrade_buy_from_suggestions(user_id, suggestions, context)
 

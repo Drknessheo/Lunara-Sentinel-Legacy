@@ -198,9 +198,9 @@ def get_active_autotrade_count():
     conn = get_connection()
     return conn.execute("SELECT COUNT(*) FROM users WHERE autotrade_enabled=1").fetchone()[0]
 
-def get_all_users_with_autotrade_enabled():
+def get_all_users():
     conn = get_connection()
-    users = conn.execute("SELECT user_id FROM users WHERE autotrade_enabled=1").fetchall()
+    users = conn.execute("SELECT user_id FROM users").fetchall()
     return [user['user_id'] for user in users]
 
 def add_coins_to_watchlist(user_id, coins_to_add: list):
@@ -265,6 +265,7 @@ def update_user_setting(user_id: int, setting_name: str, value):
     processed_value = value
     if setting_name == 'autotrade':
         processed_value = 1 if str(value).lower() in ['on', 'true', '1', 'enabled'] else 0
+        logger.info(f"Updating autotrade for user {user_id} to {processed_value}") # Added logging
     elif setting_name == 'trading_mode':
         processed_value = str(value).upper()
         if processed_value not in ['LIVE', 'PAPER']:
