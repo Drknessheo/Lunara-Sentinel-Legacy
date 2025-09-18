@@ -160,7 +160,8 @@ SETTING_TO_COLUMN_MAP = {
     'rsi_buy': 'custom_rsi_buy', 'rsi_sell': 'custom_rsi_sell', 'stop_loss': 'custom_stop_loss',
     'trailing_activation': 'custom_trailing_activation', 'trailing_drop': 'custom_trailing_drop',
     'profit_target': 'custom_profit_target', 'autotrade': 'autotrade_enabled',
-    'trading_mode': 'trading_mode', 'paper_balance': 'paper_balance'
+    'trading_mode': 'trading_mode', 'paper_balance': 'paper_balance',
+    'watchlist': 'watchlist'
 }
 
 def get_user_effective_settings(user_id: int) -> dict:
@@ -170,10 +171,10 @@ def get_user_effective_settings(user_id: int) -> dict:
         value = user[column_name]
         if column_name == 'autotrade_enabled':
             settings[setting_name] = 'on' if value == 1 else 'off'
+        elif column_name == 'watchlist':
+            settings[setting_name] = value if value else ""
         else:
             settings[setting_name] = value if value is not None else 'Not Set'
-    watchlist = user['watchlist']
-    settings['watchlist'] = watchlist if watchlist else ''
     return settings
 
 def update_user_setting(user_id: int, setting_name: str, value):

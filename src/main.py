@@ -184,7 +184,7 @@ def main() -> None:
 
     # --- Job Queue for background tasks ---
     job_queue = application.job_queue
-    job_queue.run_repeating(autotrade_jobs.monitor_autotrades, interval=60, first=10)
+    job_queue.run_repeating(autotrade_jobs.autotrade_cycle, interval=60, first=10)
 
     logger.info("Starting bot polling...")
     application.run_polling()

@@ -24,7 +24,7 @@ from functools import lru_cache
 
 # CORRECTED: Using relative imports
 from .. import config
-from ..modules import db_access as db
+from .. import db as new_db # Use the new thread-safe db module
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +140,7 @@ def get_current_price(symbol: str):
     return float(ticker["price"])
 
 def get_all_spot_balances(user_id: int) -> list | None:
-    api_key, secret_key = db.get_user_api_keys(user_id)
+    api_key, secret_key = new_db.get_user_api_keys(user_id)
     if not api_key or not secret_key:
         raise TradeError("API keys not set. Use /setapi.")
     try:

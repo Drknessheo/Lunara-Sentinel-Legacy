@@ -87,7 +87,7 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message += "📊 <b>Open Trades:</b>\n"
         for trade in open_trades:
             pnl_text = ""
-            current_price = await binance_client.get_current_price(trade['symbol'])
+            current_price = binance_client.get_current_price(trade['symbol'])
             if current_price:
                 pnl_percent = ((current_price - trade['buy_price']) / trade['buy_price']) * 100
                 pnl_text = f" (P/L: <code>{pnl_percent:+.2f}%</code>)"
@@ -98,7 +98,7 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if mode == "LIVE":
         message += "\n💰 <b>Wallet Holdings:</b>\n"
         try:
-            balances = await binance_client.get_all_spot_balances(user_id)
+            balances = binance_client.get_all_spot_balances(user_id)
             if balances:
                 for bal in balances:
                     message += f"- <b>{bal['asset']}:</b> <code>{float(bal['free']):.4f}</code>\n"
@@ -127,7 +127,7 @@ async def set_api_keys_command(update: Update, context: ContextTypes.DEFAULT_TYP
         new_db.store_user_api_keys(user_id, api_key, secret_key)
         await update.message.reply_text("✅ API keys stored. Verifying...")
         try:
-            balances = await binance_client.get_all_spot_balances(user_id)
+            balances = binance_client.get_all_spot_balances(user_id)
             await update.message.reply_text("✅ API keys verified successfully!")
         except TradeError as e:
             await update.message.reply_html(f"⚠️ Verification failed: {e}")
@@ -159,7 +159,7 @@ async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not symbol.endswith('USDT'):
         symbol += 'USDT'
     
-    price = await binance_client.get_current_price(symbol)
+    price = binance_client.get_current_price(symbol)
     if price is not None:
         await update.message.reply_html(f"The current price of {symbol} is ${price:,.2f}.")
     else:
@@ -180,7 +180,7 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if mode == 'LIVE':
         try:
-            balances = await binance_client.get_all_spot_balances(user_id)
+            balances = binance_client.get_all_spot_balances(user_id)
             usdt_balance = next((item for item in balances if item["asset"] == "USDT"), None)
             balance_str = f"{float(usdt_balance['free']):.2f} USDT" if usdt_balance else "Not found"
             message = f"💰 Your LIVE USDT balance: <code>{balance_str}</code>"
