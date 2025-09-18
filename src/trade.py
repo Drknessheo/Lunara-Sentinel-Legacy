@@ -201,7 +201,7 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_html(message)
 
-async def clear_redis_command(update: Update, context: ContextTypes.DEFAULT_TPE):
+async def clear_redis_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Basic security: Only allow the admin to clear Redis.
     if update.effective_user.id != config.ADMIN_USER_ID:
         await update.message.reply_text("You are not authorized to use this command.")
