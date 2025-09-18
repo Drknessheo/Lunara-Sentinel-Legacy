@@ -139,6 +139,12 @@ def get_active_autotrade_count():
     conn = get_connection()
     return conn.execute("SELECT COUNT(*) FROM users WHERE autotrade_enabled=1").fetchone()[0]
 
+def get_all_users_with_autotrade_enabled():
+    """Returns a list of user_ids for all users with autotrade enabled."""
+    conn = get_connection()
+    users = conn.execute("SELECT user_id FROM users WHERE autotrade_enabled=1").fetchall()
+    return [user['user_id'] for user in users]
+
 def add_coins_to_watchlist(user_id, coins_to_add: list):
     user, _ = get_or_create_user(user_id)
     current_watchlist_str = user['watchlist'] or ''
@@ -164,10 +170,10 @@ def get_user_effective_settings(user_id: int) -> dict:
         value = user[column_name]
         if column_name == 'autotrade_enabled':
             settings[setting_name] = 'on' if value == 1 else 'off'
-        elif column_name == 'watchlist':
-            settings[setting_name] = value if value else 'Not Set'
         else:
             settings[setting_name] = value if value is not None else 'Not Set'
+    watchlist = user['watchlist']
+    settings['watchlist'] = watchlist if watchlist else ''
     return settings
 
 def update_user_setting(user_id: int, setting_name: str, value):
