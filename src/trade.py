@@ -8,25 +8,15 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
-from binance.client import Client as BinanceClient
-from binance.exceptions import BinanceAPIException
 
+# Local Imports
 from .core import binance_client
 from .core.binance_client import TradeError
 from . import db as new_db
-from .utils import redis_utils
 from . import config
 from . import slip_manager
 
 logger = logging.getLogger(__name__)
-
-# --- Binance Client Initialization ---
-binance_client.ensure_binance_client()
-client = binance_client.client
-BINANCE_AVAILABLE = binance_client.BINANCE_AVAILABLE
-BINANCE_INIT_ERROR = binance_client.BINANCE_INIT_ERROR
-if not BINANCE_AVAILABLE:
-    logger.error(f"Failed to initialize Binance client: {BINANCE_INIT_ERROR}")
 
 # --- Bot Command Handlers ---
 
@@ -34,6 +24,7 @@ HELP_MESSAGE = """<b>Lunessa Shai'ra Gork</b> (@Srskat_bot) - Your AI Trading Co
 
 <b>Core Commands:</b>
 /myprofile - View your trades, balances, and settings.
+/balance - Check your current account balance.
 /settings <code>&lt;name&gt;</code> <code>&lt;value&gt;</code> - Change a setting (e.g., <code>/settings autotrade on</code>).
 /setapi <code>&lt;KEY&gt;</code> <code>&lt;SECRET&gt;</code> - Securely add Binance keys (in private chat).
 /close <code>&lt;ID&gt;</code> - Manually close an open trade.
@@ -96,7 +87,7 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message += "📊 <b>Open Trades:</b>\n"
         for trade in open_trades:
             pnl_text = ""
-            current_price = get_current_price(trade['symbol'])
+            current_price = await binance_client.get_current_price(trade['symbol'])
             if current_price:
                 pnl_percent = ((current_price - trade['buy_price']) / trade['buy_price']) * 100
                 pnl_text = f" (P/L: <code>{pnl_percent:+.2f}%</code>)"
@@ -107,7 +98,7 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if mode == "LIVE":
         message += "\n💰 <b>Wallet Holdings:</b>\n"
         try:
-            balances = get_all_spot_balances(user_id)
+            balances = await binance_client.get_all_spot_balances(user_id)
             if balances:
                 for bal in balances:
                     message += f"- <b>{bal['asset']}:</b> <code>{float(bal['free']):.4f}</code>\n"
@@ -136,7 +127,7 @@ async def set_api_keys_command(update: Update, context: ContextTypes.DEFAULT_TYP
         new_db.store_user_api_keys(user_id, api_key, secret_key)
         await update.message.reply_text("✅ API keys stored. Verifying...")
         try:
-            balances = get_all_spot_balances(user_id)
+            balances = await binance_client.get_all_spot_balances(user_id)
             await update.message.reply_text("✅ API keys verified successfully!")
         except TradeError as e:
             await update.message.reply_html(f"⚠️ Verification failed: {e}")
@@ -149,7 +140,7 @@ async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id = update.effective_user.id
     try:
         trade_id = int(context.args[0])
-        trade = new_db.find_open_trade(trade_id, user_id)
+        trade = new_db.find_open_trade_by_id(trade_id, user_id)
         if not trade:
             await update.message.reply_text("Trade not found.")
             return
@@ -160,7 +151,6 @@ async def close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("Usage: <code>/close &lt;trade_id&gt;</code>")
 
 async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the /quest command, ensuring symbol is formatted correctly."""
     if not context.args:
         await update.message.reply_text("Usage: <code>/quest &lt;SYMBOL&gt;</code>")
         return
@@ -169,7 +159,7 @@ async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not symbol.endswith('USDT'):
         symbol += 'USDT'
     
-    price = get_current_price(symbol)
+    price = await binance_client.get_current_price(symbol)
     if price is not None:
         await update.message.reply_html(f"The current price of {symbol} is ${price:,.2f}.")
     else:
@@ -190,7 +180,7 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if mode == 'LIVE':
         try:
-            balances = get_all_spot_balances(user_id)
+            balances = await binance_client.get_all_spot_balances(user_id)
             usdt_balance = next((item for item in balances if item["asset"] == "USDT"), None)
             balance_str = f"{float(usdt_balance['free']):.2f} USDT" if usdt_balance else "Not found"
             message = f"💰 Your LIVE USDT balance: <code>{balance_str}</code>"
@@ -201,33 +191,12 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_html(message)
 
-# --- Helper Functions ---
-
-def get_current_price(symbol: str) -> float | None:
-    if not client:
-        return None
-    try:
-        ticker = client.get_ticker(symbol=symbol)
-        return float(ticker['lastPrice'])
-    except BinanceAPIException as e:
-        if e.code == -1121: # Invalid symbol
-            logger.warning(f"Invalid symbol for price check: {symbol}")
-        else:
-            logger.error(f"Binance error getting price for {symbol}: {e}")
-        return None
-    except Exception as e:
-        logger.error(f"Error getting current price for {symbol}: {e}")
-        return None
-
-def get_all_spot_balances(user_id: int) -> list | None:
-    api_key, secret_key = new_db.get_user_api_keys(user_id)
-    if not api_key or not secret_key:
-        raise TradeError("API keys not set. Use /setapi.")
-    try:
-        user_client = BinanceClient(api_key, secret_key)
-        account_info = user_client.get_account()
-        return [bal for bal in account_info["balances"] if float(bal["free"]) > 0 or float(bal["locked"]) > 0]
-    except BinanceAPIException as e:
-        raise TradeError(f"Binance API error: {e.message}")
-    except Exception as e:
-        raise TradeError(f"Unexpected error fetching balances: {e}")
+async def clear_redis_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Basic security: Only allow the admin to clear Redis.
+    if update.effective_user.id != config.ADMIN_USER_ID:
+        await update.message.reply_text("You are not authorized to use this command.")
+        return
+    # In a real-world scenario, you'd want more robust authorization.
+    from .utils import redis_utils
+    redis_utils.clear_all_redis_data()
+    await update.message.reply_text("All Redis data has been cleared.")

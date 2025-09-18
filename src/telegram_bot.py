@@ -36,6 +36,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", trade.help_command))
     application.add_handler(CommandHandler("about", trade.about_command))
     application.add_handler(CommandHandler("myprofile", trade.myprofile_command))
+    application.add_handler(CommandHandler("balance", trade.balance_command))
     application.add_handler(CommandHandler("setapi", trade.set_api_keys_command))
     application.add_handler(CommandHandler("close", trade.close_trade_command))
     application.add_handler(CommandHandler("clear_redis", trade.clear_redis_command))

@@ -92,12 +92,26 @@ def store_user_api_keys(user_id, api_key, secret_key):
         )
 
 def get_user_api_keys(user_id):
+    """
+    Retrieves API keys for a user.
+    For the ADMIN_USER_ID, it reads directly from the environment config.
+    For other users, it fetches the encrypted keys from the database.
+    """
+    if user_id == config.ADMIN_USER_ID:
+        # The Emperor's keys are sourced directly from the sacred scrolls (.env)
+        return config.BINANCE_API_KEY, config.BINANCE_SECRET_KEY
+
     user = get_or_create_user(user_id)[0]
     if not user['api_key'] or not user['secret_key']:
         return None, None
-    api_key = fernet.decrypt(user['api_key']).decode()
-    secret_key = fernet.decrypt(user['secret_key']).decode()
-    return api_key, secret_key
+    
+    try:
+        api_key = fernet.decrypt(user['api_key']).decode()
+        secret_key = fernet.decrypt(user['secret_key']).decode()
+        return api_key, secret_key
+    except Exception:
+        # This can happen if the key is invalid or not correctly stored
+        return None, None
 
 def get_open_trades_by_user(user_id):
     conn = get_connection()

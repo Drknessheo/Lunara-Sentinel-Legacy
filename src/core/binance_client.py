@@ -138,3 +138,16 @@ def get_current_price(symbol: str):
         raise TradeError("Binance client not available for fetching price.")
     ticker = client.get_symbol_ticker(symbol=symbol)
     return float(ticker["price"])
+
+def get_all_spot_balances(user_id: int) -> list | None:
+    api_key, secret_key = db.get_user_api_keys(user_id)
+    if not api_key or not secret_key:
+        raise TradeError("API keys not set. Use /setapi.")
+    try:
+        user_client = Client(api_key, secret_key)
+        account_info = user_client.get_account()
+        return [bal for bal in account_info["balances"] if float(bal["free"]) > 0 or float(bal["locked"]) > 0]
+    except BinanceAPIException as e:
+        raise TradeError(f"Binance API error: {e.message}")
+    except Exception as e:
+        raise TradeError(f"Unexpected error fetching balances: {e}")
