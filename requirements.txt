@@ -5,8 +5,8 @@ cryptography
 python-binance
 tenacity
 python-dotenv
-pandas
-pandas-ta
+pandas==2.3.2
+pandas-ta==0.4.71b0
 aiohappyeyeballs==2.6.1
 aiohttp==3.12.15
 aiosignal==1.4.0
