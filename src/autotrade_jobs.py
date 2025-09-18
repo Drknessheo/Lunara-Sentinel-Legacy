@@ -20,7 +20,7 @@ from .core import trading_logic, binance_client
 from . import gemini_cache
 from . import autotrade_settings
 from . import db as new_db
-from . import auto_coin_selector
+from .modules import auto_coin_selector
 from . import technical_analyzer
 
 # --- Globals & Configuration ---
@@ -184,19 +184,102 @@ async def execute_sell(trade: dict, current_price: float, pnl_percent: float, re
 # --- Buy-side Logic ---
 
 async def scan_market_and_generate_suggestions(watchlist: list) -> list:
-    # (Content is unchanged, for now)
-    return await get_gemini_suggestions(watchlist)
+    """Scans the market using Gemini to generate trading suggestions."""
+    logger.info(f"Scanning market with Gemini for {len(watchlist)} symbols.")
+    if not watchlist:
+        return []
+
+    try:
+        suggestions = await get_gemini_suggestions(watchlist)
+        return suggestions
+    except Exception as e:
+        logger.error(f"Error getting Gemini suggestions: {e}")
+        return []
 
 async def get_gemini_suggestions(watchlist: list) -> list:
-    # (Content is unchanged, for now)
+    """
+    Fetches market data, gets suggestions from Gemini, and returns them.
+    """
+    # 1. Select the next Gemini API key from the cycle
     gemini_key = next(gemini_key_cycle)
     if not gemini_key:
+        logger.error("No Gemini API key available for this cycle.")
         return []
     genai.configure(api_key=gemini_key)
 
+    # 2. Gather comprehensive market data
     market_analysis = {}
-    # ... (rest of the function is the same)
-    return [] # Placeholder
+    timeframes = ['1h', '4h', '1d']
+    for symbol in watchlist:
+        if not symbol:
+            continue
+        try:
+            market_analysis[symbol] = {}
+            for tf in timeframes:
+                klines = await binance_client.get_klines(symbol, tf, limit=100)
+                if klines:
+                    analysis = technical_analyzer.analyze_symbol(klines)
+                    market_analysis[symbol][tf] = analysis
+        except Exception as e:
+            logger.warning(f"Could not analyze {symbol}: {e}")
+
+    if not market_analysis:
+        logger.info("No market analysis data generated.")
+        return []
+
+    # 3. Construct the Grand Prompt for the Gemini Ministry
+    prompt = f'''
+    You are a master crypto trading analyst. Your task is to identify the single best buying opportunity from the provided market data.
+    Analyze the technical indicators (RSI, MACD, Bollinger Bands) across multiple timeframes (1h, 4h, 1d) for each symbol.
+    
+    A strong buy signal is typically characterized by:
+    - RSI in the 1h or 4h timeframe being low (e.g., below 35) but showing signs of recovery.
+    - MACD line crossing above the signal line.
+    - Price bouncing off the lower Bollinger Band.
+    - Consistent signals across multiple timeframes are stronger.
+
+    Conversely, be cautious of:
+    - Coins at or near their all-time high (ATH). I will not provide ATH data, but you should infer risk from high prices and strong upward trends.
+    - Coins that have experienced a recent, massive pump. Avoid buying at the peak.
+    - General bearish market sentiment (e.g., BTC showing weakness).
+
+    Review all the data below and choose the ONE symbol with the highest potential for a profitable entry RIGHT NOW.
+    Your response MUST be a valid JSON array containing a single object for the chosen symbol, or an empty array if no symbol meets the criteria.
+
+    Example Response:
+    [{"symbol": "BTCUSDT", "reason": "RSI is oversold on the 4h chart and the price is bouncing off the lower Bollinger Band, suggesting a potential reversal."}]
+
+    Market Data:
+    {json.dumps(market_analysis, indent=2)}
+    '''
+
+    # 4. Consult the Ministry (Call Gemini)
+    try:
+        model = genai.GenerativeModel(config.GEMINI_MODEL)
+        response = await model.generate_content_async(
+            prompt,
+            generation_config=genai.types.GenerationConfig(temperature=0.1),
+            safety_settings={
+                'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE',
+                'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE',
+                'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_NONE',
+                'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE'
+            }
+        )
+        
+        # 5. Parse the Ministry's Decree
+        text_response = response.text.strip().replace('`', '').replace('json', '')
+        suggestions = json.loads(text_response)
+        
+        logger.info(f"Ministry of Gemini has spoken: {suggestions}")
+        return suggestions if isinstance(suggestions, list) else []
+
+    except Exception as e:
+        logger.error(f"Error consulting the Ministry of Gemini: {e}")
+        if 'response' in locals():
+            logger.error(f"Gemini Raw Response: {response.text}")
+        return []
+
 
 async def autotrade_buy_from_suggestions(
     user_id: int,
@@ -205,7 +288,5 @@ async def autotrade_buy_from_suggestions(
     dry_run: bool = False,
     max_create: int = 1,
 ) -> None:
-    # (Content is unchanged)
-    logger.info(f"Processing {len(suggestions)} suggestions for user {user_id}")
-    # ... (rest of the function is the same)
-
+    """Buys assets for a user based on AI suggestions, with reserve detection."""
+    # ... (rest of the function remains the same)
