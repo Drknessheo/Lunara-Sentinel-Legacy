@@ -125,7 +125,7 @@ async def get_gemini_sell_advice(symbol: str, pnl_percent: float, buy_price: flo
         for tf in ['15m', '1h', '4h']:
             klines = binance_client.get_historical_klines(symbol=symbol, interval=tf, limit=100)
             if klines:
-                market_analysis[tf] = technical_analyzer.analyze_symbol(klines)
+                market_analysis[tf] = technical_analyzer.analyze_symbol(symbol, klines)
 
         if not market_analysis:
             return "HOLD" # Not enough data to make a decision
@@ -227,7 +227,7 @@ async def get_gemini_suggestions(watchlist: list) -> list:
             for tf in timeframes:
                 klines = binance_client.get_historical_klines(symbol=symbol, interval=tf, limit=100)
                 if klines:
-                    analysis = technical_analyzer.analyze_symbol(klines)
+                    analysis = technical_analyzer.analyze_symbol(symbol, klines)
                     market_analysis[symbol][tf] = analysis
         except Exception as e:
             logger.warning(f"Could not analyze {symbol}: {e}")

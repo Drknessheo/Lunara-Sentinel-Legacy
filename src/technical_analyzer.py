@@ -9,11 +9,12 @@ import pandas_ta as ta
 
 logger = logging.getLogger(__name__)
 
-def analyze_symbol(kline_data: list) -> dict:
+def analyze_symbol(symbol: str, kline_data: list) -> dict:
     """
     Calculates multiple technical indicators for a given set of k-line data.
 
     Args:
+        symbol: The symbol being analyzed (for logging purposes).
         kline_data: A list of k-lines from the Binance API.
 
     Returns:
@@ -21,6 +22,7 @@ def analyze_symbol(kline_data: list) -> dict:
         or an empty dictionary if analysis fails.
     """
     if not kline_data or len(kline_data) < 30: # Increased data requirement
+        logger.warning(f"Not enough data to analyze {symbol}. Have {len(kline_data) if kline_data else 0} candles, need 30.")
         return {}
 
     try:
@@ -43,7 +45,7 @@ def analyze_symbol(kline_data: list) -> dict:
         # --- Defensive check for indicator columns ---
         required_cols = ['RSI_14', 'MACD_12_26_9', 'MACDs_12_26_9', 'BBU_20_2.0', 'BBL_20_2.0']
         if not all(col in df.columns for col in required_cols):
-            logger.warning(f"Could not calculate all required indicators. Columns missing in DataFrame.")
+            logger.warning(f"Could not calculate all required indicators for {symbol}. Columns missing in DataFrame.")
             return {}
         # --------------------------------------------
 
@@ -61,8 +63,8 @@ def analyze_symbol(kline_data: list) -> dict:
         return latest_indicators
 
     except KeyError as e:
-        logger.error(f"KeyError during indicator analysis: {e}. This likely means an indicator column was not generated.")
+        logger.error(f"KeyError during indicator analysis for {symbol}: {e}. This likely means an indicator column was not generated.")
         return {}
     except Exception as e:
-        logger.error(f"Failed to analyze symbol data: {e}", exc_info=True)
+        logger.error(f"Failed to analyze symbol data for {symbol}: {e}", exc_info=True)
         return {}
