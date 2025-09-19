@@ -37,7 +37,8 @@ SETTING_TO_COLUMN_MAP = {
 # === Core Connection ===
 async def get_connection() -> aiosqlite.Connection:
     """Return an asynchronous SQLite connection."""
-    conn = await aiosqlite.connect(DB_PATH, detect_types=aiosqlite.PARSE_DECLTYPES)
+    # Use integer `1` for `PARSE_DECLTYPES` for backward compatibility with aiosqlite 0.17.0
+    conn = await aiosqlite.connect(DB_PATH, detect_types=1)
     conn.row_factory = aiosqlite.Row
     return conn
 
