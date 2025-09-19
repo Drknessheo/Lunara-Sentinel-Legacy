@@ -23,7 +23,6 @@ fernet = Fernet(ENCRYPTION_KEY.encode())
 # Thread-local storage for per-thread connection
 _thread_local = threading.local()
 
-
 def get_connection() -> sqlite3.Connection:
     """Return a SQLite connection for the current thread."""
     conn = getattr(_thread_local, "connection", None)
@@ -33,14 +32,12 @@ def get_connection() -> sqlite3.Connection:
         _thread_local.connection = conn
     return conn
 
-
 def close_connection():
     """Close the connection for the current thread."""
     conn = getattr(_thread_local, "connection", None)
     if conn:
         conn.close()
         _thread_local.connection = None
-
 
 def _migrate_db(conn: sqlite3.Connection):
     """Applies database schema migrations to ensure compatibility."""
@@ -165,7 +162,6 @@ def store_user_api_keys(user_id, api_key, secret_key):
             (encrypted_api, encrypted_secret, user_id)
         )
 
-
 def get_user_api_keys(user_id):
     if user_id == config.ADMIN_USER_ID:
         return config.BINANCE_API_KEY, config.BINANCE_SECRET_KEY
@@ -181,38 +177,31 @@ def get_user_api_keys(user_id):
     except Exception:
         return None, None
 
-
 def get_open_trades_by_user(user_id):
     conn = get_connection()
     return conn.execute("SELECT * FROM trades WHERE user_id=? AND status='open'", (user_id,)).fetchall()
-
 
 def find_open_trade_by_id(trade_id, user_id):
     conn = get_connection()
     return conn.execute("SELECT * FROM trades WHERE id=? AND user_id=? AND status='open'",
                         (trade_id, user_id)).fetchone()
 
-
 def mark_trade_closed(trade_id, reason="closed"):
     conn = get_connection()
     with conn:
         conn.execute("UPDATE trades SET status=? WHERE id=?", (reason, trade_id))
 
-
 def get_user_trading_mode_and_balance(user_id):
     user, _ = get_or_create_user(user_id)
     return user['trading_mode'], user['paper_balance']
-
 
 def get_user_count():
     conn = get_connection()
     return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
 
-
 def get_active_autotrade_count():
     conn = get_connection()
     return conn.execute("SELECT COUNT(*) FROM users WHERE autotrade_enabled=1").fetchone()[0]
-
 
 def get_users_with_autotrade_enabled():
     # This function is essential for the TradeExecutor's main loop.
@@ -220,12 +209,10 @@ def get_users_with_autotrade_enabled():
     users = conn.execute("SELECT user_id FROM users WHERE autotrade_enabled=1").fetchall()
     return [user['user_id'] for user in users]
 
-
 def get_all_users():
     conn = get_connection()
     users = conn.execute("SELECT user_id FROM users").fetchall()
     return [user['user_id'] for user in users]
-
 
 def add_coins_to_watchlist(user_id, coins_to_add: list):
     user, _ = get_or_create_user(user_id)
@@ -239,7 +226,6 @@ def add_coins_to_watchlist(user_id, coins_to_add: list):
     conn = get_connection()
     with conn:
         conn.execute("UPDATE users SET watchlist=? WHERE user_id=?", (new_watchlist_str, user_id))
-
 
 def remove_coins_from_watchlist(user_id, coins_to_remove: list):
     user, _ = get_or_create_user(user_id)
@@ -265,7 +251,6 @@ SETTING_TO_COLUMN_MAP = {
     'watchlist': 'watchlist'
 }
 
-
 def get_user_effective_settings(user_id: int) -> dict:
     user, _ = get_or_create_user(user_id)
     settings = {}
@@ -285,7 +270,6 @@ def get_user_effective_settings(user_id: int) -> dict:
             settings[setting_name] = value if value is not None else 'Not Set'
     return settings
 
-
 def update_user_setting(user_id: int, setting_name: str, value):
     if setting_name not in SETTING_TO_COLUMN_MAP:
         raise ValueError(f"Invalid setting name: {setting_name}")
@@ -301,7 +285,7 @@ def update_user_setting(user_id: int, setting_name: str, value):
             raise ValueError("Trading mode must be LIVE or PAPER")
     elif setting_name in ['paper_balance', 'rsi_buy', 'rsi_sell', 'stop_loss', 'trailing_activation',
                           'trailing_drop', 'profit_target']:
-        processed_value = float(.value)
+        processed_value = float(value)
     elif setting_name == 'watchlist':
         # No special processing needed for watchlist, it's a string
         processed_value = str(value)
@@ -309,4 +293,3 @@ def update_user_setting(user_id: int, setting_name: str, value):
     conn = get_connection()
     with conn:
         conn.execute(f"UPDATE users SET {column_name}=? WHERE user_id=?", (processed_value, user_id))
-
