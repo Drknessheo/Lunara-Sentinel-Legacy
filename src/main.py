@@ -27,7 +27,7 @@ from telegram.ext import (
     ContextTypes,
 )
 
-# Ensure all local modules are imported correctly based on execution context
+# Ensure all local modules are imported correctly
 if __package__:
     from . import config, trade, trade_executor, web_server, handlers
     from . import db as new_db
@@ -88,33 +88,59 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
     await update.message.reply_html(welcome_message)
 
-async def main() -> None:
-    logger.info("🚀 Starting Lunara Bot in its new, unified asynchronous architecture...")
+async def post_init(application: Application) -> None:
+    """Sacred handler to run after the bot is initialized but before polling starts."""
+    logger.info("Running post-initialization setup...")
+    await application.bot.delete_webhook(drop_pending_updates=True)
     
-    # --- Assertions for core configuration ---
-    assert config.TELEGRAM_BOT_TOKEN, "CRITICAL: TELEGRAM_BOT_TOKEN is not set!"
-    assert config.REDIS_URL, "CRITICAL: REDIS_URL is not set!"
-    assert config.ADMIN_USER_ID, "CRITICAL: ADMIN_USER_ID is not set!"
+    logger.info("Initializing and starting the TradeExecutor as a background task...")
+    executor = trade_executor.TradeExecutor(application.bot)
+    # Store the task in bot_data for graceful shutdown
+    application.bot_data['executor_task'] = asyncio.create_task(executor.run())
+    logger.info("TradeExecutor is now running in the background.")
 
+async def post_shutdown(application: Application) -> None:
+    """Sacred handler for graceful shutdown."""
+    logger.info("Running post-shutdown cleanup...")
+    if 'executor_task' in application.bot_data:
+        task = application.bot_data['executor_task']
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            logger.info("Trade executor task successfully cancelled.")
+
+def main() -> None:
+    """The synchronous main function to rule them all."""
+    logger.info("🚀 Starting Lunara Bot...")
+    
     # --- Start the health-check web server in a background thread ---
     logger.info("Starting health-check web server in background...")
     web_server_thread = threading.Thread(target=web_server.run_web_server, daemon=True)
     web_server_thread.start()
     logger.info("Health-check web server is running.")
 
-    # Initialize the new thread-safe database
+    # --- Assertions for core configuration ---
+    assert config.TELEGRAM_BOT_TOKEN, "CRITICAL: TELEGRAM_BOT_TOKEN is not set!"
+    assert config.REDIS_URL, "CRITICAL: REDIS_URL is not set!"
+    assert config.ADMIN_USER_ID, "CRITICAL: ADMIN_USER_ID is not set!"
+
+    # Initialize the database
     new_db.init_db()
 
     persistence = RedisPersistence(redis_url=config.REDIS_URL)
     
+    # Build the application with the sacred handlers
     application = (
         Application.builder()
         .token(config.TELEGRAM_BOT_TOKEN)
         .persistence(persistence)
+        .post_init(post_init)
+        .post_shutdown(post_shutdown)
         .build()
     )
 
-    # --- Command Handlers ---
+    # --- Register Command Handlers ---
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("myprofile", trade.myprofile_command))
@@ -128,26 +154,9 @@ async def main() -> None:
     application.add_handler(CommandHandler("pay", handlers.pay_command))
     application.add_handler(CommandHandler("settings", trade.settings_command))
 
-    # The new way: Run Application and TradeExecutor concurrently
-    try:
-        logger.info("Initializing application and persistence...")
-        await application.initialize()
-        await application.persistence.initialize()
-        await application.bot.delete_webhook(drop_pending_updates=True)
-
-        logger.info("Initializing and starting the TradeExecutor...")
-        executor = trade_executor.TradeExecutor(application.bot)
-        
-        logger.info("Running bot polling and trade executor concurrently...")
-        await asyncio.gather(
-            application.run_polling(poll_interval=1.0),
-            executor.run()
-        )
-
-    finally:
-        logger.info("Shutting down application and trade executor...")
-        await application.persistence.shutdown()
-        await application.shutdown()
+    logger.info("Starting bot polling... The empire is listening.")
+    # This is a blocking call that runs the bot until it's stopped.
+    application.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
