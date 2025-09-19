@@ -18,9 +18,11 @@ BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY")
 REDIS_URL = os.getenv("REDIS_URL")
 ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", 0))
 
-# Gemini Ministry Keys
+# Gemini Ministry Keys - Dual Key System for API Limits
 GEMINI_KEY_1 = os.getenv("GEMINI_KEY_1")
 GEMINI_KEY_2 = os.getenv("GEMINI_KEY_2")
+# The TradeExecutor specifically looks for GEMINI_API_KEY. We will provide it.
+GEMINI_API_KEY = GEMINI_KEY_1
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
 # Unify encryption keys
@@ -46,8 +48,8 @@ if not REDIS_URL:
     print("Warning: REDIS_URL is not set.")
 if not ADMIN_USER_ID:
     print("Warning: ADMIN_USER_ID is not set.")
-if not GEMINI_KEY_1 or not GEMINI_KEY_2:
-    print("Warning: One or both Gemini API keys are not set. Autotrade intelligence will be limited.")
+if not GEMINI_API_KEY:
+    print("Warning: GEMINI_API_KEY is not set. Autotrade intelligence will be limited.")
 
 def safe_print_config():
     """
@@ -91,7 +93,6 @@ PAPER_TRADE_SIZE_USDT = 1000.0
 PAPER_STARTING_BALANCE = 10000.0
 
 # 5. --- Subscription Tier Configuration ---
-# (Content collapsed for brevity)
 SUBSCRIPTION_TIERS = {}
 DEFAULT_SETTINGS = {"PROFIT_TARGET_PERCENTAGE": 1.0}
 def get_active_settings(tier: str):

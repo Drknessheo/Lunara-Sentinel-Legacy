@@ -53,7 +53,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     if not context.args:
-        settings = autotrade_settings.get_effective_settings(user_id)
+        settings = await autotrade_settings.get_effective_settings(user_id)
         message = "<b>Your current settings:</b>\n"
         for key, value in settings.items():
             message += f"- <code>{key}</code>: <code>{value}</code>\n"
@@ -65,7 +65,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         setting_name = context.args[0].lower()
         value_str = " ".join(context.args[1:])
         
-        success, message = autotrade_settings.validate_and_set(user_id, setting_name, value_str)
+        success, message = await autotrade_settings.validate_and_set(user_id, setting_name, value_str)
 
         if success:
             await update.message.reply_html(f"✅ {message}")
@@ -88,7 +88,7 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message += "📊 <b>Open Trades:</b>\n"
         for trade in open_trades:
             pnl_text = ""
-            current_price = binance_client.get_current_price(trade['symbol'])
+            current_price = await binance_client.get_current_price(trade['symbol'])
             if current_price:
                 pnl_percent = ((current_price - trade['buy_price']) / trade['buy_price']) * 100
                 pnl_text = f" (P/L: <code>{pnl_percent:+.2f}%</code>)"
@@ -99,7 +99,7 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if mode == "LIVE":
         message += "\n💰 <b>Wallet Holdings:</b>\n"
         try:
-            balances = binance_client.get_all_spot_balances(user_id)
+            balances = await binance_client.get_all_spot_balances(user_id)
             if balances:
                 for bal in balances:
                     message += f"- <b>{bal['asset']}:</b> <code>{float(bal['free']):.4f}</code>\n"
@@ -110,7 +110,7 @@ async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         message += f"\n💰 <b>Paper Balance:</b> ${paper_balance:,.2f} USDT\n"
     
-    settings = autotrade_settings.get_effective_settings(user_id)
+    settings = await autotrade_settings.get_effective_settings(user_id)
     message += "\n⚙️ <b>Autotrade Settings:</b>\n"
     for key, value in settings.items():
         message += f"- <code>{key}</code>: <code>{value}</code>\n"
@@ -128,7 +128,7 @@ async def set_api_keys_command(update: Update, context: ContextTypes.DEFAULT_TYP
         new_db.store_user_api_keys(user_id, api_key, secret_key)
         await update.message.reply_text("✅ API keys stored. Verifying...")
         try:
-            balances = binance_client.get_all_spot_balances(user_id)
+            balances = await binance_client.get_all_spot_balances(user_id)
             await update.message.reply_text("✅ API keys verified successfully!")
         except TradeError as e:
             await update.message.reply_html(f"⚠️ Verification failed: {e}")
@@ -160,7 +160,7 @@ async def quest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not symbol.endswith('USDT'):
         symbol += 'USDT'
     
-    price = binance_client.get_current_price(symbol)
+    price = await binance_client.get_current_price(symbol)
     if price is not None:
         await update.message.reply_html(f"The current price of {symbol} is ${price:,.2f}.")
     else:
@@ -190,7 +190,7 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if mode == 'LIVE':
         try:
-            balances = binance_client.get_all_spot_balances(user_id)
+            balances = await binance_client.get_all_spot_balances(user_id)
             usdt_balance = next((item for item in balances if item["asset"] == "USDT"), None)
             balance_str = f"{float(usdt_balance['free']):.2f} USDT" if usdt_balance else "Not found"
             message = f"💰 Your LIVE USDT balance: <code>{balance_str}</code>"
@@ -208,5 +208,5 @@ async def clear_redis_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     # In a real-world scenario, you'd want more robust authorization.
     from .utils import redis_utils
-    redis_utils.clear_all_redis_data()
+    await redis_utils.clear_all_redis_data()
     await update.message.reply_text("All Redis data has been cleared.")
