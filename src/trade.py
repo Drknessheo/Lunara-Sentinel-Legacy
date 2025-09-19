@@ -5,6 +5,7 @@ between the user and the core trading logic.
 """
 
 import logging
+import json
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
@@ -20,34 +21,6 @@ from . import autotrade_settings
 logger = logging.getLogger(__name__)
 
 # --- Bot Command Handlers ---
-
-HELP_MESSAGE = """<b>Lunessa Shai'ra Gork</b> (@Srskat_bot) - Your AI Trading Companion
-
-<b>Core Commands:</b>
-/myprofile - View your trades, balances, and settings.
-/balance - Check your current account balance.
-/settings <code>&lt;name&gt;</code> <code>&lt;value&gt;</code> - Change a setting (e.g., <code>/settings autotrade on</code>).
-/setapi <code>&lt;KEY&gt;</code> <code>&lt;SECRET&gt;</code> - Securely add Binance keys (in private chat).
-/close <code>&lt;ID&gt;</code> - Manually close an open trade.
-/addcoins <code>&lt;SYMBOL1&gt;</code> ... - Add coins to your watchlist.
-/removecoins <code>&lt;SYMBOL1&gt;</code> ... - Remove coins from your watchlist.
-
-<b>Utility Commands:</b>
-/help - Show this help message.
-/about - Learn about the project.
-"""
-
-ABOUT_MESSAGE = (
-    "<b>About Lunessa Shai'ra Gork</b> (@Srskat_bot)\n\n"
-    "An AI-powered crypto trading companion from the LunessaSignals project."
-    "\nProject: https://github.com/Drknessheo/lunara-bot"
-)
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_html(HELP_MESSAGE)
-
-async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_html(ABOUT_MESSAGE)
 
 async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -201,12 +174,54 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_html(message)
 
-async def clear_redis_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Basic security: Only allow the admin to clear Redis.
-    if update.effective_user.id != config.ADMIN_USER_ID:
-        await update.message.reply_text("You are not authorized to use this command.")
+async def diagnose_slip_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Diagnoses a trade slip by retrieving its raw encrypted data from Redis."""
+    user_id = update.effective_user.id
+    if user_id != config.ADMIN_USER_ID:
+        await update.message.reply_text("You are not authorized for this command.")
         return
-    # In a real-world scenario, you'd want more robust authorization.
-    from .utils import redis_utils
-    await redis_utils.clear_all_redis_data()
-    await update.message.reply_text("All Redis data has been cleared.")
+
+    if not context.args:
+        await update.message.reply_html("Usage: <code>/diagnose_slip &lt;trade_id&gt;</code>")
+        return
+
+    trade_id = context.args[0]
+    redis_key = f"trade:{trade_id}:data"
+
+    try:
+        redis_client = slip_manager.get_redis_client()
+        if not redis_client:
+            await update.message.reply_text("Redis client is not available.")
+            return
+
+        raw_data = redis_client.get(redis_key)
+
+        if not raw_data:
+            await update.message.reply_text(f"No data found for Redis key: <code>{redis_key}</code>")
+            return
+
+        if isinstance(raw_data, bytes):
+            raw_data_str = raw_data.decode('utf-8', 'ignore')
+        else:
+            raw_data_str = str(raw_data)
+
+        decryption_result = ""
+        try:
+            decrypted_slip = slip_manager.get_and_decrypt_slip(trade_id)
+            decryption_result = f"<b>Decryption Attempt:</b>\n<pre>{json.dumps(decrypted_slip, indent=2)}</pre>"
+        except Exception as e:
+            decryption_result = f"<b>Decryption Failed:</b>\n<pre>{e}</pre>"
+
+        message = (
+            f"<b>Diagnosis for Trade ID:</b> <code>{trade_id}</code>\n"
+            f"<b>Redis Key:</b> <code>{redis_key}</code>\n\n"
+            f"<b>Raw Encrypted Data:</b>\n<pre>{raw_data_str}</pre>\n\n"
+            f"{decryption_result}"
+        )
+
+        await update.message.reply_html(message)
+
+    except Exception as e:
+        logger.error(f"Error diagnosing slip {trade_id}: {e}", exc_info=True)
+        await update.message.reply_text(f"An error occurred: {e}")
+
