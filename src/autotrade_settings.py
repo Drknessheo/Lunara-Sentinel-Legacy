@@ -1,73 +1,56 @@
-import json
-from typing import Optional
-from .core.redis_client import get_redis_client
 
-# --- Key Definitions for Autotrade Settings ---
-KEY_DEFINITIONS = {
-    # (Content is unchanged, collapsed for brevity)
-}
+import logging
+from . import db as new_db
 
-async def get_user_settings(user_id: int) -> dict:
-    """Fetches a user's settings from Redis asynchronously."""
-    client = get_redis_client()
-    if not client:
-        return {}
-    key = f"autotrade:settings:{user_id}"
-    stored_settings = await client.get(key)
-    if stored_settings:
-        try:
-            return json.loads(stored_settings)
-        except json.JSONDecodeError:
-            return {}
-    return {}
+logger = logging.getLogger(__name__)
 
 async def get_effective_settings(user_id: int) -> dict:
-    """Merges user-specific settings with system defaults asynchronously."""
-    defaults = {key: details['default'] for key, details in KEY_DEFINITIONS.items()}
-    user_specific = await get_user_settings(user_id)
-    return {**defaults, **user_specific}
+    """
+    Fetches the user's effective settings directly from the main database.
+    This acts as an async wrapper for the synchronous DB call.
+    """
+    try:
+        settings = new_db.get_user_effective_settings(user_id)
+        return settings
+    except Exception as e:
+        logger.error(f"Error fetching effective settings for user {user_id} from DB: {e}")
+        return {}
 
 async def validate_and_set(user_id: int, key: str, value_str: str) -> tuple[bool, str]:
-    """Validates a new setting and, if valid, saves it for the user asynchronously."""
+    """
+    Validates a new setting and saves it to the main SQLite database by calling
+    the centralized logic in the `db` module.
+    """
     key = key.lower()
-    if key not in KEY_DEFINITIONS:
-        return False, f"Unknown setting '{key}'."
-
-    spec = KEY_DEFINITIONS[key]
-    try:
-        if spec['type'] is float:
-            coerced_value = float(value_str)
-        elif spec['type'] is int:
-            coerced_value = int(value_str)
-        else:
-            coerced_value = value_str
-    except ValueError:
-        return False, f"Invalid value for {spec['name']}. Expected a {spec['type'].__name__}."
-
-    if 'min' in spec and coerced_value < spec['min']:
-        return False, f"{spec['name']} cannot be less than {spec['min']}."
-    if 'max' in spec and coerced_value > spec['max']:
-        return False, f"{spec['name']} cannot be more than {spec['max']}."
-
-    client = get_redis_client()
-    if not client:
-        return False, "Error: Could not connect to settings database."
-
-    redis_key = f"autotrade:settings:{user_id}"
-    current_settings = await get_user_settings(user_id)
-    current_settings[key] = coerced_value
-
-    # Inter-field validation for the trailing stop
-    # Must use .get() with defaults because user_settings might be partial
-    effective_settings = {**{k: v['default'] for k, v in KEY_DEFINITIONS.items()}, **current_settings}
-    trailing_activation = effective_settings['trailing_activation_percentage']
-    trailing_drop = effective_settings['trailing_stop_drop_percentage']
-
-    if trailing_drop >= trailing_activation:
-        return False, "Validation Error: Trailing Stop Drop must be less than the Trailing Activation percentage."
+    
+    # Mapping from the command-line key to a more user-friendly name for messages.
+    setting_name_map = {
+        'rsi_buy': 'RSI Buy Threshold', 'rsi_sell': 'RSI Sell Threshold', 'stop_loss': 'Stop Loss %',
+        'trailing_activation': 'Trailing Activation %', 'trailing_drop': 'Trailing Drop %',
+        'profit_target': 'Profit Target %', 'autotrade': 'Autotrade',
+        'trading_mode': 'Trading Mode', 'paper_balance': 'Paper Balance',
+        'watchlist': 'Watchlist'
+    }
 
     try:
-        await client.set(redis_key, json.dumps(current_settings))
-        return True, f"✅ {spec['name']} has been set to {coerced_value}."
+        # The update_user_setting function in db.py handles all validation and conversion.
+        # It will raise ValueError for invalid inputs.
+        new_db.update_user_setting(user_id, key, value_str)
+        
+        display_name = setting_name_map.get(key, key)
+        
+        # For autotrade, provide a more descriptive message
+        if key == 'autotrade':
+            status = "enabled" if value_str.lower() in ['on', 'true', '1', 'enabled'] else "disabled"
+            return True, f"✅ Autotrade has been {status}."
+
+        return True, f"✅ {display_name} has been updated to {value_str}."
+
+    except ValueError as e:
+        # Catches validation errors from the db.py module (e.g., invalid trading_mode)
+        logger.warning(f"Validation failed for user {user_id} setting '{key}': {e}")
+        return False, str(e)
     except Exception as e:
-        return False, f"Error saving setting: {e}"
+        logger.error(f"Unexpected error updating setting '{key}' for user {user_id}: {e}")
+        return False, "An unexpected error occurred while saving your setting."
+
