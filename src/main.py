@@ -65,6 +65,7 @@ Your ultimate guide to mastering the crypto markets.
 <code>/close ID</code> - Manually close a trade by its ID.
 <code>/addcoins SYMBOL...</code> - Add coins to your watchlist.
 <code>/removecoins SYMBOL...</code> - Remove coins from your watchlist.
+<code>/diagnose_slip ID</code> - Diagnose a trade slip from Redis.
 
 <b>⚙️ Autotrade Settings</b>
 <code>/settings</code> - View all your autotrade settings.
@@ -102,11 +103,22 @@ async def post_init(application: Application) -> None:
     # --- LAUNCH THE NEW TRADE EXECUTOR ---
     logger.info("Initializing and starting the new TradeExecutor...")
     executor = trade_executor.TradeExecutor(application.bot)
-    asyncio.create_task(executor.run())
+    # Store the task in bot_data for graceful shutdown
+    application.bot_data['executor_task'] = asyncio.create_task(executor.run())
     logger.info("TradeExecutor is now running in the background.")
 
 async def post_shutdown(application: Application) -> None:
     logger.info("Running post-shutdown cleanup...")
+    
+    # Cancel the trade executor task
+    if 'executor_task' in application.bot_data:
+        task = application.bot_data['executor_task']
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            logger.info("Trade executor task successfully cancelled.")
+
     if isinstance(application.persistence, RedisPersistence):
         await application.persistence.shutdown()
 
@@ -147,6 +159,7 @@ def main() -> None:
     application.add_handler(CommandHandler("close", trade.close_trade_command))
     application.add_handler(CommandHandler("addcoins", trade.addcoins_command))
     application.add_handler(CommandHandler("removecoins", trade.removecoins_command))
+    application.add_handler(CommandHandler("diagnose_slip", trade.diagnose_slip_command))
     application.add_handler(CommandHandler("pay", handlers.pay_command))
     application.add_handler(CommandHandler("settings", trade.settings_command))
 

@@ -43,7 +43,7 @@ def analyze_symbol(symbol: str, kline_data: list) -> dict:
         df.ta.bbands(length=20, std=2, append=True)
 
         # --- Defensive check for indicator columns ---
-        required_cols = ['RSI_14', 'MACD_12_26_9', 'MACDs_12_26_9', 'BBU_20_2.0', 'BBL_20_2.0']
+        required_cols = ['RSI_14', 'MACD_12_26_9', 'MACDs_12_26_9', 'BBU_20_2', 'BBL_20_2']
         if not all(col in df.columns for col in required_cols):
             logger.warning(f"Could not calculate all required indicators for {symbol}. Columns missing in DataFrame.")
             return {}
@@ -54,10 +54,10 @@ def analyze_symbol(symbol: str, kline_data: list) -> dict:
             'rsi': round(df['RSI_14'].iloc[-1], 2),
             'macd': round(df['MACD_12_26_9'].iloc[-1], 2),
             'macd_signal': round(df['MACDs_12_26_9'].iloc[-1], 2),
-            'bollinger_upper': round(df['BBU_20_2.0'].iloc[-1], 2),
-            'bollinger_lower': round(df['BBL_20_2.0'].iloc[-1], 2),
-            'is_breaking_bollinger_upper': df['close'].iloc[-1] > df['BBU_20_2.0'].iloc[-1],
-            'is_breaking_bollinger_lower': df['close'].iloc[-1] < df['BBL_20_2.0'].iloc[-1],
+            'bollinger_upper': round(df['BBU_20_2'].iloc[-1], 2),
+            'bollinger_lower': round(df['BBL_20_2'].iloc[-1], 2),
+            'is_breaking_bollinger_upper': df['close'].iloc[-1] > df['BBU_20_2'].iloc[-1],
+            'is_breaking_bollinger_lower': df['close'].iloc[-1] < df['BBL_20_2'].iloc[-1],
         }
 
         return latest_indicators
