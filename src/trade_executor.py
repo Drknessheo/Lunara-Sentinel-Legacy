@@ -121,26 +121,32 @@ class TradeExecutor:
 
         if not symbols_to_evaluate: return
 
-        decisions = await self._get_batch_gemini_decisions(symbols_to_evaluate)
+        decisions = await self._get_batch_gemini_decisions(user_id, symbols_to_evaluate, settings)
         for symbol, decision in decisions.items():
             if decision == "BUY":
                 await self._buy_trade(user_id, symbol, settings)
 
-    async def _get_batch_gemini_decisions(self, symbols: list[str]) -> dict:
+    async def _get_batch_gemini_decisions(self, user_id: int, symbols: list[str], settings: dict) -> dict:
         batch_analysis = {}
-        tasks = [technical_analyzer.analyze_symbol(s, await binance_client.get_historical_klines(s, '15m', 100)) for s in symbols]
+        tasks = [self._analyze_and_prepare(s, settings) for s in symbols]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for i, result in enumerate(results):
-            if isinstance(result, dict) and result: batch_analysis[symbols[i]] = result
+            if isinstance(result, dict) and result:
+                batch_analysis[symbols[i]] = result
         
         if not batch_analysis: return {}
 
         prompt = (
-            f'''You are an expert crypto trading analyst. Analyze the following batch of market data. For EACH symbol, decide if it is a strong BUY or HOLD. Your response MUST be a valid JSON object with each symbol as a key and its decision ("BUY" or "HOLD") as the value.
-Example: {"BTCUSDT": "BUY", "ETHUSDT": "HOLD"}
+            f'''You are an expert crypto trading analyst. The user (ID: {user_id}) has the following risk profile and preferences: {json.dumps(settings, indent=2)}
 
-Market Data:
+Analyze the following batch of market data, which includes raw indicators and pre-analyzed "symptoms" based on the user's settings. Your primary goal is to identify strong BUY opportunities that align with the user's settings.
+
+For EACH symbol, decide if it is a strong BUY or HOLD. A "BUY" decision should only be made if there is a compelling, evidence-based reason. Your response MUST be a valid JSON object with each symbol as a key and its decision ("BUY" or "HOLD") as the value.
+
+Example: {{"BTCUSDT": "BUY", "ETHUSDT": "HOLD"}}
+
+Market Data with Symptoms:
 {json.dumps(batch_analysis, indent=2)}'''
         )
 
@@ -151,6 +157,15 @@ Market Data:
         except Exception as e:
             logger.error(f"[GEMINI_BATCH] Error: {e}")
             return {s: "HOLD" for s in symbols}
+
+    async def _analyze_and_prepare(self, symbol: str, settings: dict) -> dict:
+        """Helper to run analysis for a single symbol and handle potential errors."""
+        try:
+            klines = await binance_client.get_historical_klines(symbol, '15m', 100)
+            return technical_analyzer.analyze_symbol(symbol, klines, settings)
+        except Exception as e:
+            logger.error(f"Error analyzing {symbol} for batch decisions: {e}")
+            return {}
 
     async def _buy_trade(self, user_id: int, symbol: str, settings: dict):
         price = await binance_client.get_current_price(symbol)
