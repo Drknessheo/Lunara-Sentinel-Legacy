@@ -61,7 +61,7 @@ def _migrate_db(conn: sqlite3.Connection):
     # --- MIGRATION REGISTRY ---
     # A list of tuples: (table_name, column_name, column_definition)
     migrations = [
-        ('trades', 'symbol', 'TEXT NOT NULL DEFAULT 'UNKNOWN''),
+        ('trades', 'symbol', 'TEXT NOT NULL DEFAULT \'UNKNOWN\''),
         ('users', 'watchlist', 'TEXT'),
         ('trades', 'stop_loss', 'REAL'),
     ]
@@ -120,6 +120,7 @@ def init_db():
             trade_size_usdt REAL
         );
         """)
+        # Apply migrations to ensure older databases are up-to-date
         _migrate_db(conn)
 
 def get_or_create_user(user_id):
@@ -132,6 +133,7 @@ def get_or_create_user(user_id):
         user = conn.execute("SELECT * FROM users WHERE user_id=?", (user_id,)).fetchone()
         created = True
 
+    # Emperor's Decree: Pre-populate the admin's watchlist on first creation
     if created and user_id == config.ADMIN_USER_ID:
         logger.info(f"First-time setup for Admin user {user_id}. Adding default watchlist.")
         add_coins_to_watchlist(user_id, DEFAULT_SETTINGS['watchlist'].split(','))
@@ -147,6 +149,7 @@ def create_trade(user_id, symbol, buy_price, quantity, trade_size_usdt):
         )
 
 def update_trade(trade: dict):
+    """Updates a trade in the database, specifically the stop_loss."""
     if 'id' not in trade or 'stop_loss' not in trade:
         logger.error("Attempted to update a trade without 'id' or 'stop_loss'.")
         return
@@ -171,6 +174,7 @@ def store_user_api_keys(user_id, api_key, secret_key):
         )
 
 def get_user_api_keys(user_id):
+    # This logic should be revisited; direct config access is not ideal for multi-user.
     if user_id == config.ADMIN_USER_ID and config.BINANCE_API_KEY and config.BINANCE_SECRET_KEY:
         return config.BINANCE_API_KEY, config.BINANCE_SECRET_KEY
 
@@ -266,6 +270,7 @@ def get_user_effective_settings(user_id: int) -> dict:
         else:
             value = user_value
 
+        # Format for display
         if setting_name == 'autotrade':
             settings[setting_name] = 'on' if value == 1 else 'off'
         else:
@@ -276,6 +281,7 @@ def update_user_setting(user_id: int, setting_name: str, value):
     logger.info(f"[DB_WRITE] Attempting to update setting '{setting_name}' for user {user_id} with value '{value}'.")
     
     if setting_name not in SETTING_TO_COLUMN_MAP:
+        logger.error(f"[DB_WRITE] Invalid setting name '{setting_name}' provided.")
         raise ValueError(f"Invalid setting name: {setting_name}")
 
     column_name = SETTING_TO_COLUMN_MAP[setting_name]
@@ -297,6 +303,8 @@ def update_user_setting(user_id: int, setting_name: str, value):
         logger.error(f"[DB_WRITE] Failed to process value '{value}' for setting '{setting_name}': {e}")
         raise
 
+    logger.debug(f"[DB_WRITE] Processed value for column '{column_name}' is '{processed_value}'.")
+
     try:
         conn = get_connection()
         with conn:
@@ -306,4 +314,6 @@ def update_user_setting(user_id: int, setting_name: str, value):
             logger.info(f"[DB_WRITE] SUCCESS: Setting '{setting_name}' for user {user_id} was updated in the database.")
     except sqlite3.Error as e:
         logger.critical(f"[DB_WRITE] FAILED to update database for user {user_id}, setting '{setting_name}': {e}", exc_info=True)
+        # Depending on the desired behavior, we might want to raise the exception
+        # to let the calling function know the transaction failed.
         raise
