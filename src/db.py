@@ -20,6 +20,20 @@ if not ENCRYPTION_KEY:
     raise ValueError("SLIP_ENCRYPTION_KEY is not set in the configuration.")
 fernet = Fernet(ENCRYPTION_KEY.encode())
 
+# === Default Settings ===
+DEFAULT_SETTINGS = {
+    'rsi_buy': 28.0,
+    'rsi_sell': 75.0,
+    'stop_loss': 3.5,
+    'trailing_activation': 2.0,
+    'trailing_drop': 0.5,
+    'profit_target': 5.0,
+    'autotrade': 0,  # 0 for 'off'
+    'trading_mode': 'PAPER',
+    'paper_balance': 10000.0,
+    'watchlist': 'ADAUSDT,ARBUSDT,AVAXUSDT,BNBUSDT,BTCUSDT,DOGEUSDT,DOTUSDT,ETHUSDT,HBARUSDT,LINKUSDT,LTCUSDT,LUNCUSDT,MATICUSDT,SHIBUSDT,VETUSDT,XRPUSDT'
+}
+
 # Thread-local storage for per-thread connection
 _thread_local = threading.local()
 
@@ -131,10 +145,9 @@ def get_or_create_user(user_id):
     # Emperor's Decree: Pre-populate the admin's watchlist on first creation
     if created and user_id == config.ADMIN_USER_ID:
         logger.info(f"First-time setup for Admin user {user_id}. Adding default watchlist.")
-        add_coins_to_watchlist(user_id, ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'])
+        add_coins_to_watchlist(user_id, DEFAULT_SETTINGS['watchlist'].split(','))
 
     return user, created
-
 
 def update_trade(trade: dict):
     """Updates a trade in the database, specifically the stop_loss."""
@@ -216,7 +229,6 @@ def get_all_users():
 
 def add_coins_to_watchlist(user_id, coins_to_add: list):
     user, _ = get_or_create_user(user_id)
-    # This check is important to avoid errors on first creation before the column exists pre-migration
     current_watchlist_str = user['watchlist'] if 'watchlist' in user.keys() else ''
     current_watchlist_str = current_watchlist_str or ''
     current_watchlist = set(current_watchlist_str.split(',')) if current_watchlist_str else set()
@@ -233,9 +245,8 @@ def remove_coins_from_watchlist(user_id, coins_to_remove: list):
     current_watchlist_str = current_watchlist_str or ''
     current_watchlist = set(current_watchlist_str.split(',')) if current_watchlist_str else set()
 
-    # Remove the specified coins
     for coin in coins_to_remove:
-        current_watchlist.discard(coin.upper())  # Use discard to avoid errors if coin not in set
+        current_watchlist.discard(coin.upper())
 
     new_watchlist_str = ','.join(sorted(list(current_watchlist)))
     conn = get_connection()
@@ -255,19 +266,18 @@ def get_user_effective_settings(user_id: int) -> dict:
     user, _ = get_or_create_user(user_id)
     settings = {}
     for setting_name, column_name in SETTING_TO_COLUMN_MAP.items():
-        if column_name not in user.keys():
-            logger.warning(
-                f"Column '{column_name}' not found for user {user_id}. Returning empty string. DB might be migrating.")
-            value = ""
-        else:
-            value = user[column_name]
+        user_value = user[column_name] if column_name in user.keys() and user[column_name] is not None else None
 
-        if column_name == 'autotrade_enabled':
-            settings[setting_name] = 'on' if value == 1 else 'off'
-        elif column_name == 'watchlist':
-            settings[setting_name] = value if value else ""
+        if user_value is None:
+            value = DEFAULT_SETTINGS.get(setting_name)
         else:
-            settings[setting_name] = value if value is not None else 'Not Set'
+            value = user_value
+
+        # Format for display
+        if setting_name == 'autotrade':
+            settings[setting_name] = 'on' if value == 1 else 'off'
+        else:
+            settings[setting_name] = value
     return settings
 
 def update_user_setting(user_id: int, setting_name: str, value):
@@ -278,7 +288,6 @@ def update_user_setting(user_id: int, setting_name: str, value):
     processed_value = value
     if setting_name == 'autotrade':
         processed_value = 1 if str(value).lower() in ['on', 'true', '1', 'enabled'] else 0
-        logger.info(f"Updating autotrade for user {user_id} to {processed_value}")  # Added logging
     elif setting_name == 'trading_mode':
         processed_value = str(value).upper()
         if processed_value not in ['LIVE', 'PAPER']:
@@ -287,7 +296,6 @@ def update_user_setting(user_id: int, setting_name: str, value):
                           'trailing_drop', 'profit_target']:
         processed_value = float(value)
     elif setting_name == 'watchlist':
-        # No special processing needed for watchlist, it's a string
         processed_value = str(value)
 
     conn = get_connection()
