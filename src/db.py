@@ -7,6 +7,7 @@ Powered by aiosqlite.
 import aiosqlite
 import logging
 from pathlib import Path
+from contextlib import asynccontextmanager
 from . import config
 from cryptography.fernet import Fernet
 
@@ -34,13 +35,21 @@ SETTING_TO_COLUMN_MAP = {
     'trading_mode': 'trading_mode', 'paper_balance': 'paper_balance', 'watchlist': 'watchlist'
 }
 
-# === Core Connection ===
+# === Core Connection (Corrected with Context Manager) ===
+@asynccontextmanager
 async def get_connection() -> aiosqlite.Connection:
-    """Return an asynchronous SQLite connection."""
-    # Use integer `1` for `PARSE_DECLTYPES` for backward compatibility with aiosqlite 0.17.0
-    conn = await aiosqlite.connect(DB_PATH, detect_types=1)
-    conn.row_factory = aiosqlite.Row
-    return conn
+    """
+    Provides an asynchronous SQLite connection as a context manager,
+    ensuring it's properly closed.
+    """
+    conn = None
+    try:
+        conn = await aiosqlite.connect(DB_PATH, detect_types=1) # Using integer 1 for compatibility
+        conn.row_factory = aiosqlite.Row
+        yield conn
+    finally:
+        if conn:
+            await conn.close()
 
 # === Initialization & Migration ===
 async def _migrate_db(conn: aiosqlite.Connection):
@@ -71,7 +80,7 @@ async def _migrate_db(conn: aiosqlite.Connection):
 
 async def init_db():
     """Initializes the database, creates tables, and runs migrations asynchronously."""
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         await conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY, api_key BLOB, secret_key BLOB,
@@ -94,7 +103,7 @@ async def init_db():
 
 # === User Management ===
 async def get_or_create_user(user_id):
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         async with conn.execute("SELECT * FROM users WHERE user_id=?", (user_id,)) as cursor:
             user = await cursor.fetchone()
         created = False
@@ -113,7 +122,7 @@ async def store_user_api_keys(user_id, api_key, secret_key):
     await get_or_create_user(user_id)
     encrypted_api = fernet.encrypt(api_key.encode())
     encrypted_secret = fernet.encrypt(secret_key.encode())
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         await conn.execute(
             "UPDATE users SET api_key=?, secret_key=? WHERE user_id=?",
             (encrypted_api, encrypted_secret, user_id)
@@ -136,7 +145,7 @@ async def get_user_api_keys(user_id):
 
 # === Trade Management ===
 async def create_trade(user_id, symbol, buy_price, quantity, trade_size_usdt):
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         await conn.execute(
             "INSERT INTO trades (user_id, symbol, buy_price, quantity, trade_size_usdt) VALUES (?, ?, ?, ?, ?)",
             (user_id, symbol, buy_price, quantity, trade_size_usdt)
@@ -147,23 +156,23 @@ async def update_trade(trade: dict):
     if 'id' not in trade or 'stop_loss' not in trade:
         logger.error("Attempted to update a trade without 'id' or 'stop_loss'.")
         return
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         await conn.execute("UPDATE trades SET stop_loss = ? WHERE id = ?", (trade['stop_loss'], trade['id']))
         await conn.commit()
     logger.info(f"Updated trade {trade['id']} with new stop_loss: {trade['stop_loss']}")
 
 async def get_open_trades_by_user(user_id):
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         async with conn.execute("SELECT * FROM trades WHERE user_id=? AND status='open'", (user_id,)) as cursor:
             return await cursor.fetchall()
 
 async def find_open_trade_by_id(trade_id, user_id):
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         async with conn.execute("SELECT * FROM trades WHERE id=? AND user_id=? AND status='open'", (trade_id, user_id)) as cursor:
             return await cursor.fetchone()
 
 async def mark_trade_closed(trade_id, reason="closed"):
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         await conn.execute("UPDATE trades SET status=? WHERE id=?", (reason, trade_id))
         await conn.commit()
 
@@ -188,46 +197,44 @@ async def update_user_setting(user_id: int, setting_name: str, value):
     column_name = SETTING_TO_COLUMN_MAP[setting_name]
     # ... (value processing logic remains the same)
     processed_value = value # Placeholder for the processing logic from your synchronous version
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         await conn.execute(f"UPDATE users SET {column_name}=? WHERE user_id=?", (processed_value, user_id))
         await conn.commit()
     logger.info(f"[DB_WRITE] SUCCESS: Setting '{setting_name}' for user {user_id} was updated.")
 
 async def add_coins_to_watchlist(user_id, coins_to_add: list):
     user, _ = await get_or_create_user(user_id)
-    # ... (logic remains the same)
     new_watchlist_str = ','.join(sorted(list(set((user['watchlist'] or '').split(',')) | set(c.upper() for c in coins_to_add))))
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         await conn.execute("UPDATE users SET watchlist=? WHERE user_id=?", (new_watchlist_str, user_id))
         await conn.commit()
 
 async def remove_coins_from_watchlist(user_id, coins_to_remove: list):
     user, _ = await get_or_create_user(user_id)
-    # ... (logic remains the same)
     new_watchlist_str = ','.join(sorted(list(set((user['watchlist'] or '').split(',')) - set(c.upper() for c in coins_to_remove))))
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         await conn.execute("UPDATE users SET watchlist=? WHERE user_id=?", (new_watchlist_str, user_id))
         await conn.commit()
 
 # === Global Stats ===
 async def get_user_count():
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         async with conn.execute("SELECT COUNT(*) FROM users") as cursor:
             return (await cursor.fetchone())[0]
 
 async def get_active_autotrade_count():
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         async with conn.execute("SELECT COUNT(*) FROM users WHERE autotrade_enabled=1") as cursor:
             return (await cursor.fetchone())[0]
 
 async def get_users_with_autotrade_enabled():
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         async with conn.execute("SELECT user_id FROM users WHERE autotrade_enabled=1") as cursor:
             rows = await cursor.fetchall()
             return [row['user_id'] for row in rows]
 
 async def get_all_users():
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         async with conn.execute("SELECT user_id FROM users") as cursor:
             rows = await cursor.fetchall()
             return [row['user_id'] for row in rows]
