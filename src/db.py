@@ -187,20 +187,38 @@ async def get_user_effective_settings(user_id: int) -> dict:
     for setting_name, column_name in SETTING_TO_COLUMN_MAP.items():
         user_value = user[column_name] if column_name in user.keys() and user[column_name] is not None else None
         value = user_value if user_value is not None else DEFAULT_SETTINGS.get(setting_name)
-        settings[setting_name] = 'on' if setting_name == 'autotrade' and value == 1 else ('off' if setting_name == 'autotrade' else value)
+        
+        if setting_name == 'autotrade':
+            settings[setting_name] = 'on' if value == 1 else 'off'
+        else:
+            settings[setting_name] = value
     return settings
 
 async def update_user_setting(user_id: int, setting_name: str, value):
     logger.info(f"[DB_WRITE] Attempting to update setting '{setting_name}' for user {user_id} with value '{value}'.")
     if setting_name not in SETTING_TO_COLUMN_MAP:
         raise ValueError(f"Invalid setting name: {setting_name}")
+
     column_name = SETTING_TO_COLUMN_MAP[setting_name]
-    # ... (value processing logic remains the same)
-    processed_value = value # Placeholder for the processing logic from your synchronous version
+    processed_value = value
+
+    try:
+        if setting_name == 'autotrade':
+            processed_value = 1 if str(value).lower() == 'on' else 0
+        elif setting_name in ['rsi_buy', 'rsi_sell', 'stop_loss', 'trailing_activation', 'trailing_drop', 'profit_target', 'paper_balance']:
+            processed_value = float(value)
+        elif setting_name in ['trading_mode', 'watchlist']:
+            # Uppercase for consistency in trading_mode
+            processed_value = str(value).upper() if setting_name == 'trading_mode' else str(value)
+    except (ValueError, TypeError) as e:
+        logger.error(f"Could not process value '{value}' for setting '{setting_name}'. Error: {e}")
+        raise ValueError(f"Invalid value '{value}' for setting '{setting_name}'.")
+
     async with get_connection() as conn:
         await conn.execute(f"UPDATE users SET {column_name}=? WHERE user_id=?", (processed_value, user_id))
         await conn.commit()
     logger.info(f"[DB_WRITE] SUCCESS: Setting '{setting_name}' for user {user_id} was updated.")
+
 
 async def add_coins_to_watchlist(user_id, coins_to_add: list):
     user, _ = await get_or_create_user(user_id)
