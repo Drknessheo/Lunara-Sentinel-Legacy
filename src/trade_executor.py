@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class TradeExecutor:
-    """The main engine for the autotrader, redesigned for Redis-based state management."""
+    """The main engine for the autotrader, designed for Redis-based state management."""
 
     def __init__(self, bot):
         self.bot = bot
@@ -23,10 +23,6 @@ class TradeExecutor:
 
     async def run(self):
         logger.info("[EXECUTOR] Starting TradeExecutor run loop...")
-        # Initial configuration is handled by config.py, we just need to use the keys.
-        # The presence of keys is checked on startup in config.py
-        
-        # On startup, sync the state for all known users from DB to Redis
         await self._initial_state_sync()
 
         while True:
@@ -40,7 +36,7 @@ class TradeExecutor:
             except Exception as e:
                 logger.error(f"[EXECUTOR] Unhandled error in main run loop: {e}", exc_info=True)
             
-            await asyncio.sleep(60)
+            await asyncio.sleep(config.AI_TRADE_INTERVAL_MINUTES * 60)
 
     async def _initial_state_sync(self):
         logger.info("[EXECUTOR_INIT] Performing initial state synchronization from DB to Redis...")
@@ -67,7 +63,7 @@ class TradeExecutor:
             logger.error(f"[EXECUTOR] Error processing user {user_id}: {e}", exc_info=True)
 
     async def _check_and_sell_open_trades(self, user_id: int, settings: dict):
-        open_trades = db.get_open_trades_by_user(user_id) # Still need details from DB
+        open_trades = db.get_open_trades_by_user(user_id)
         if open_trades:
             await asyncio.gather(*[self._evaluate_and_execute_sell(dict(trade), settings) for trade in open_trades])
 
@@ -116,20 +112,26 @@ class TradeExecutor:
         if not watchlist: return
 
         active_trade_symbols = redis_client.get_active_trades(user_id)
-        symbols_to_evaluate = [s.strip() for s in watchlist if s.strip() and s.strip() not in active_trade_symbols]
+        symbols_to_evaluate = sorted([s.strip() for s in watchlist if s.strip() and s.strip() not in active_trade_symbols])
 
         if not symbols_to_evaluate: return
 
-        decisions = await self._get_batch_gemini_decisions(user_id, symbols_to_evaluate, settings)
+        # --- Imperial Scribe & Strategic Retreat Consultation ---
+        decisions = redis_client.get_gemini_decision_cache(user_id, symbols_to_evaluate)
+        if decisions is None:
+            # If the Scribe is silent, consult the Oracle
+            decisions = await self._get_batch_gemini_decisions(user_id, symbols_to_evaluate, settings)
+
         for symbol, decision in decisions.items():
             if decision == "BUY":
                 await self._buy_trade(user_id, symbol, settings)
 
     async def _get_batch_gemini_decisions(self, user_id: int, symbols: list[str], settings: dict) -> dict:
+        logger.info(f"[ORACLE] Consulting the Gemini Headmaster for user {user_id} on {symbols}.")
         api_key = config.get_next_gemini_key()
         if not api_key:
-            logger.error(f"[GEMINI_BATCH] No API key available for user {user_id}. Skipping Gemini call.")
-            return {s: "HOLD" for s in symbols}
+            logger.error(f"[ORACLE] No API key available for user {user_id}. Skipping Gemini call.")
+            return redis_client.cache_gemini_failure(user_id, symbols)
 
         genai.configure(api_key=api_key)
 
@@ -141,31 +143,33 @@ class TradeExecutor:
             if isinstance(result, dict) and result:
                 batch_analysis[symbols[i]] = result
         
-        if not batch_analysis: return {}
+        if not batch_analysis: 
+             return redis_client.cache_gemini_failure(user_id, symbols)
 
         prompt = (
             f'''You are an expert crypto trading analyst. The user (ID: {user_id}) has the following risk profile and preferences: {json.dumps(settings, indent=2)}
 
-Analyze the following batch of market data, which includes raw indicators and pre-analyzed "symptoms" based on the user's settings. Your primary goal is to identify strong BUY opportunities that align with the user's settings.
-
-For EACH symbol, decide if it is a strong BUY or HOLD. A "BUY" decision should only be made if there is a compelling, evidence-based reason. Your response MUST be a valid JSON object with each symbol as a key and its decision ("BUY" or "HOLD") as the value.
+Analyze the following batch of market data. For EACH symbol, decide if it is a strong BUY or HOLD. Your response MUST be a valid JSON object with each symbol as a key and its decision ("BUY" or "HOLD") as the value.
 
 Example: {{"BTCUSDT": "BUY", "ETHUSDT": "HOLD"}}
 
-Market Data with Symptoms:
+Market Data:
 {json.dumps(batch_analysis, indent=2)}'''
         )
 
         try:
             model = genai.GenerativeModel(config.GEMINI_MODEL)
             response = await model.generate_content_async(prompt, generation_config=genai.types.GenerationConfig(temperature=0.0, response_mime_type="application/json"))
-            return json.loads(response.text)
+            decisions = json.loads(response.text)
+            # On success, command the Scribe to record the pronouncement
+            redis_client.set_gemini_decision_cache(user_id, symbols, decisions)
+            return decisions
         except Exception as e:
-            logger.error(f"[GEMINI_BATCH] Error: {e}")
-            return {s: "HOLD" for s in symbols}
+            logger.error(f"[ORACLE] Error during Gemini consultation: {e}")
+            # On failure, command the Scribe to initiate Strategic Retreat
+            return redis_client.cache_gemini_failure(user_id, symbols)
 
     async def _analyze_and_prepare(self, symbol: str, settings: dict) -> dict:
-        """Helper to run analysis for a single symbol and handle potential errors."""
         try:
             klines = await binance_client.get_historical_klines(symbol, '15m', 100)
             return technical_analyzer.analyze_symbol(symbol, klines, settings)
