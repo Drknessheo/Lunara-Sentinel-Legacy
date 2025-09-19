@@ -198,6 +198,12 @@ def get_active_autotrade_count():
     conn = get_connection()
     return conn.execute("SELECT COUNT(*) FROM users WHERE autotrade_enabled=1").fetchone()[0]
 
+def get_users_with_autotrade_enabled():
+    """Returns a list of user_ids for all users with autotrade enabled."""
+    conn = get_connection()
+    users = conn.execute("SELECT user_id FROM users WHERE autotrade_enabled=1").fetchall()
+    return [user['user_id'] for user in users]
+
 def get_all_users():
     conn = get_connection()
     users = conn.execute("SELECT user_id FROM users").fetchall()
