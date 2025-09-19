@@ -3,6 +3,7 @@ Asynchronous command handlers for the Telegram bot.
 All handlers must be `async` and use the async `db` module.
 """
 import logging
+import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
@@ -13,6 +14,11 @@ from . import db
 logger = logging.getLogger(__name__)
 
 # === Utility Functions ===
+
+def escape_markdown_v2(text: str) -> str:
+    """Escapes string for Telegram's MarkdownV2 parse mode."""
+    # Use re.escape to escape all special characters.
+    return re.sub(r'([_\*\~\`\|\{\}\[\]\(\)\>\#\+\-\=\.!])', r'\\\1', str(text))
 
 async def get_user_id(update: Update) -> int | None:
     """Extracts user ID from an update."""
@@ -30,7 +36,6 @@ def build_settings_keyboard(settings: dict) -> InlineKeyboardMarkup:
 
     for key in setting_order:
         value = settings.get(key)
-        # Truncate long watchlist for display
         if key == 'watchlist':
             display_value = f": {value[:30]}..." if value and len(value) > 30 else f": {value}"
         else:
@@ -81,20 +86,18 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     status_text = "*Your Imperial Command Center*\n\n"
     status_text += "*Strategic Settings:*\n"
     for key, value in settings.items():
-        key_name = key.replace('_', ' ').title()
-        # Escape characters for MarkdownV2.
-        value_str = str(value)
-        for char in ['.', '-', '!', '(', ')', '[', ']', '{', '}', '+', '#']:
-             value_str = value_str.replace(char, f'\{char}')
+        key_name = escape_markdown_v2(key.replace('_', ' ').title())
+        value_str = escape_markdown_v2(str(value))
         status_text += f"- *{key_name}*: `{value_str}`\n"
 
-
     if open_trades:
-        status_text += "\n*Active Campaigns (Open Trades):*\n"
+        status_text += "\n*Active Campaigns \(Open Trades\):*\n"
         for trade in open_trades:
-             status_text += f"- `{trade['symbol']}` @ ${trade['buy_price']:,.4f}\n"
+            symbol = escape_markdown_v2(trade['symbol'])
+            buy_price = escape_markdown_v2(f"${trade['buy_price']:,.4f}")
+            status_text += f"- `{symbol}` @ {buy_price}\n"
     else:
-        status_text += "\n*No active campaigns at this time.*\n"
+        status_text += "\n*No active campaigns at this time\.*\n"
 
     await update.message.reply_text(status_text, parse_mode=ParseMode.MARKDOWN_V2)
 
@@ -122,7 +125,7 @@ async def settings_callback_handler(update: Update, context: ContextTypes.DEFAUL
     action = parts[0]
 
     if action == 'settings_done':
-        await query.edit_message_text("Settings saved. The empire adapts to your command.")
+        await query.edit_message_text("Settings saved\. The empire adapts to your command\.")
         return
 
     setting_key = parts[1]
@@ -143,8 +146,8 @@ async def settings_callback_handler(update: Update, context: ContextTypes.DEFAUL
                 raise
 
     elif action == 'prompt':
-        context.user_data['awaiting_setting'] = setting_key
-        await query.message.reply_text(f"Please enter the new value for *{setting_key.replace('_', ' ').title()}*\.", parse_mode=ParseMode.MARKDOWN_V2)
+        setting_name = escape_markdown_v2(setting_key.replace('_', ' ').title())
+        await query.message.reply_text(f"Please enter the new value for *{setting_name}*\.", parse_mode=ParseMode.MARKDOWN_V2)
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles text messages, specifically for updating settings."""
@@ -157,17 +160,18 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     try:
         await db.update_user_setting(user_id, setting_key, new_value)
+        setting_name = escape_markdown_v2(setting_key.replace('_', ' ').title())
         logger.info(f"User {user_id} set '{setting_key}' to '{new_value}'.")
-        await update.message.reply_text(f"✅ *{setting_key.replace('_', ' ').title()}* has been updated\.", parse_mode=ParseMode.MARKDOWN_V2)
+        await update.message.reply_text(f"✅ *{setting_name}* has been updated\.", parse_mode=ParseMode.MARKDOWN_V2)
 
         settings = await db.get_user_effective_settings(user_id)
         keyboard = build_settings_keyboard(settings)
-        await update.message.reply_text("Settings updated. Choose another setting or select Done:", reply_markup=keyboard)
+        await update.message.reply_text("Settings updated\. Choose another setting or select Done:", reply_markup=keyboard)
     except ValueError as e:
-        await update.message.reply_text(str(e))
+        await update.message.reply_text(escape_markdown_v2(str(e)))
     except Exception as e:
         logger.error(f"Failed to update setting {setting_key} for user {user_id}: {e}")
-        await update.message.reply_text("An error occurred. The Imperial Guard has been notified.")
+        await update.message.reply_text("An error occurred\. The Imperial Guard has been notified\.")
 
 PAYMENT_MESSAGE = '''
 <b>💳 Subscription & Payment Information</b>
@@ -199,6 +203,6 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
     if isinstance(update, Update) and update.effective_message:
         try:
-            await update.effective_message.reply_text("An internal error occurred. The Imperial Guard has been notified.")
+            await update.effective_message.reply_text("An internal error occurred\. The Imperial Guard has been notified\.")
         except Exception as e:
             logger.error(f"Failed to send error message to user: {e}")
