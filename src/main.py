@@ -1,11 +1,7 @@
 import asyncio
-import csv
-import io
-import json
 import logging
 import os
 import sys
-import time
 
 # --- Setup logging and path ---
 if __package__:
@@ -15,8 +11,6 @@ else:
 
 logging_config.setup_logging()
 
-import redis
-
 if not __package__:
     sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 else:
@@ -24,12 +18,7 @@ else:
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
-from datetime import datetime, timedelta, timezone
-
-import requests
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.constants import ParseMode
-from telegram.error import Conflict as TelegramConflict
+from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -40,35 +29,22 @@ from telegram.ext import (
 
 # Ensure all local modules are imported correctly based on execution context
 if __package__:
-    from . import autotrade_jobs, config, handlers, redis_validator, slip_manager
+    from . import config, handlers, trade, trade_executor
     from . import db as new_db # The new thread-safe db module
-    from .utils.redis_utils import delete_redis_slip, diagnose_slips_command
-    from . import trade, trade_executor
-    from .modules import db_access as db # Old db access
     from .redis_persistence import RedisPersistence
-    from .Simulation import resonance_engine
-    from .slip_parser import SlipParseError, parse_slip
 else:
-    import autotrade_jobs
     import config
     import handlers
-    import redis_validator
-    import slip_manager
-    import db as new_db
-    from utils.redis_utils import delete_redis_slip, diagnose_slips_command
     import trade
     import trade_executor
-    from modules import db_access as db
+    import db as new_db
     from redis_persistence import RedisPersistence
-    from Simulation import resonance_engine
-    from slip_parser import SlipParseError, parse_slip
 
 logger = logging.getLogger(__name__)
 
 # --- Constants ---
 ADMIN_ID = getattr(config, "ADMIN_USER_ID", None)
 
-# This HELP_MESSAGE is now updated to reflect the actual, consolidated commands.
 HELP_MESSAGE = """🔮 <b>LunessaSignals Guide</b> 🔮
 
 Your ultimate guide to mastering the crypto markets.
@@ -88,14 +64,11 @@ Your ultimate guide to mastering the crypto markets.
 <code>/addcoins SYMBOL...</code> - Add coins to your watchlist.
 <code>/removecoins SYMBOL...</code> - Remove coins from your watchlist.
 
-<b>⚙️ Settings</b>
-<code>/settings</code> - View your current settings.
-<code>/settings NAME VALUE</code> - Change a setting. Examples:
-  <code>/settings autotrade on</code>
-  <code>/settings trading_mode LIVE</code>
-
-<b>🛡️ Admin Commands</b>
-<code>/diagnose_slips</code> - [Admin] Check for corrupted trade slips.
+<b>⚙️ Autotrade Settings</b>
+<code>/settings</code> - View all your autotrade settings.
+<code>/settings autotrade on</code> - Enable or disable the autotrader.
+<code>/settings trading_mode LIVE</code> - Set your trading mode (LIVE or PAPER).
+<code>/settings trade_size_usdt 20</code> - Set the USDT value for each trade.
 """
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -107,28 +80,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     if created:
         logger.info(f"New user {user.id} ({user.username}) started the bot.")
-        if ADMIN_ID and context.bot:
-            full_name = user.full_name.replace("[", "\\[").replace("`", "\\`")
-            username = user.username.replace("_", "\\_") if user.username else 'N/A'
-
-            announcement = (
-                f"📣 New User Announcement 📣\n\n"
-                f"*Name:* {full_name}\n"
-                f"*Username:* @{username}\n"
-                f"*User ID:* `{user.id}`"
-            )
-            try:
-                await context.bot.send_message(chat_id=ADMIN_ID, text=announcement, parse_mode=ParseMode.MARKDOWN_V2)
-            except Exception as e:
-                logger.error(f"Failed to send new user announcement to admin: {e}")
     else:
         logger.info(f"Returning user {user.id} ({user.username}) started the bot.")
 
     welcome_message = (
-        f"🌑 <b>A new trader emerges from the shadows.</b> {user.mention_html()}, you have been summoned by <b>Lunessa Shai'ra Gork</b>, Sorceress of DeFi and guardian of RSI gates.\n\n"
-        f"Your journey begins now. I will monitor the markets for you, alert you to opportunities, and manage your trades.\n\n"
-        f"<b>Key Commands:</b>\n<code>/quest SYMBOL</code> - Analyze a cryptocurrency.\n<code>/myprofile</code> - View your open trades and settings.\n<code>/help</code> - See all available commands.\n\n"
-        f"To begin live trading, please provide your Binance API keys using the <code>/setapi</code> command in a private message with me."
+        f"🌑 Welcome, {user.mention_html()}. The Lunara autotrader is at your command.\n\n"
+        f"I will manage your trades based on the strategy we have designed.\n\n"
+        f"<b>Key Commands:</b>\n<code>/myprofile</code> - View your portfolio and settings.\n<code>/help</code> - See all available commands.\n\n"
+        f"Ensure your API keys are set and use <code>/settings</code> to configure your strategy."
     )
     await update.message.reply_html(welcome_message)
 
@@ -138,22 +97,24 @@ async def post_init(application: Application) -> None:
     if isinstance(application.persistence, RedisPersistence):
         await application.persistence.initialize()
 
+    # --- LAUNCH THE NEW TRADE EXECUTOR ---
+    logger.info("Initializing and starting the new TradeExecutor...")
+    executor = trade_executor.TradeExecutor(application.bot)
+    asyncio.create_task(executor.run())
+    logger.info("TradeExecutor is now running in the background.")
+
 async def post_shutdown(application: Application) -> None:
     logger.info("Running post-shutdown cleanup...")
     if isinstance(application.persistence, RedisPersistence):
         await application.persistence.shutdown()
 
 def main() -> None:
-    logger.info("🚀 Starting Lunara Bot...")
+    logger.info("🚀 Starting Lunara Bot with the new Trade Executor...")
 
     # --- Assertions for core configuration ---
     assert config.TELEGRAM_BOT_TOKEN, "CRITICAL: TELEGRAM_BOT_TOKEN is not set!"
     assert config.REDIS_URL, "CRITICAL: REDIS_URL is not set!"
     assert config.ADMIN_USER_ID, "CRITICAL: ADMIN_USER_ID is not set!"
-    assert config.SLIP_ENCRYPTION_KEY, "CRITICAL: SLIP_ENCRYPTION_KEY is not set!"
-
-    # Initialize the old database (if needed, otherwise can be removed)
-    db.initialize_database()
 
     # Initialize the new thread-safe database
     new_db.init_db()
@@ -168,7 +129,7 @@ def main() -> None:
         .build()
     )
 
-    # --- Command Handlers (Now cleaned up) ---
+    # --- Command Handlers ---
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("myprofile", trade.myprofile_command))
@@ -180,13 +141,6 @@ def main() -> None:
     application.add_handler(CommandHandler("removecoins", trade.removecoins_command))
     application.add_handler(CommandHandler("pay", handlers.pay_command))
     application.add_handler(CommandHandler("settings", trade.settings_command))
-
-    # Admin commands
-    application.add_handler(CommandHandler("diagnose_slips", diagnose_slips_command, filters=filters.User(user_id=ADMIN_ID)))
-
-    # --- Job Queue for background tasks ---
-    job_queue = application.job_queue
-    job_queue.run_repeating(autotrade_jobs.autotrade_cycle, interval=60, first=10)
 
     logger.info("Starting bot polling...")
     application.run_polling()
