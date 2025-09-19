@@ -5,7 +5,7 @@ import os
 import sys
 import threading
 
-# --- Setup logging and path ---
+# --- Setup logging and path -- -
 if __package__:
     from . import logging_config
 else:
@@ -43,6 +43,11 @@ else:
 
 logger = logging.getLogger(__name__)
 
+# --- Imperial Gatekeeper ---
+# This flag ensures the main() function's core logic runs only once.
+_MAIN_HAS_RUN = False
+# -------------------------
+
 # --- Constants ---
 HELP_MESSAGE = """🔮 <b>LunessaSignals Guide</b> 🔮
 
@@ -76,6 +81,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    # Ensure the user is created before showing the welcome message
     new_db.get_or_create_user(user.id)
     
     logger.info(f"User {user.id} ({user.username}) started the bot.")
@@ -135,6 +141,12 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def main() -> None:
     """The synchronous main function to rule them all."""
+    global _MAIN_HAS_RUN
+    if _MAIN_HAS_RUN:
+        logger.warning("main() called more than once! Aborting duplicate run.")
+        return
+    _MAIN_HAS_RUN = True
+
     logger.info("🚀 Starting Lunara Bot...")
     
     # --- Start the health-check web server in a background thread ---
