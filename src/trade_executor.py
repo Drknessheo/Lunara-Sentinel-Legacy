@@ -23,9 +23,8 @@ class TradeExecutor:
 
     async def run(self):
         logger.info("[EXECUTOR] Starting TradeExecutor run loop...")
-        if config.GEMINI_API_KEY:
-            genai.configure(api_key=config.GEMINI_API_KEY)
-            logger.info("[EXECUTOR] Gemini configured successfully.")
+        # Initial configuration is handled by config.py, we just need to use the keys.
+        # The presence of keys is checked on startup in config.py
         
         # On startup, sync the state for all known users from DB to Redis
         await self._initial_state_sync()
@@ -127,6 +126,13 @@ class TradeExecutor:
                 await self._buy_trade(user_id, symbol, settings)
 
     async def _get_batch_gemini_decisions(self, user_id: int, symbols: list[str], settings: dict) -> dict:
+        api_key = config.get_next_gemini_key()
+        if not api_key:
+            logger.error(f"[GEMINI_BATCH] No API key available for user {user_id}. Skipping Gemini call.")
+            return {s: "HOLD" for s in symbols}
+
+        genai.configure(api_key=api_key)
+
         batch_analysis = {}
         tasks = [self._analyze_and_prepare(s, settings) for s in symbols]
         results = await asyncio.gather(*tasks, return_exceptions=True)

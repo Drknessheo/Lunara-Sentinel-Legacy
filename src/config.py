@@ -1,5 +1,6 @@
 import os
 import sys
+import itertools
 from dotenv import load_dotenv
 
 # 1. --- Environment Loading ---
@@ -18,12 +19,23 @@ BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY")
 REDIS_URL = os.getenv("REDIS_URL")
 ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", 0))
 
-# Gemini Ministry Keys - Dual Key System for API Limits
+# --- Gemini Ministry: Diplomatic Pouch (Key Rotation) ---
 GEMINI_KEY_1 = os.getenv("GEMINI_KEY_1")
 GEMINI_KEY_2 = os.getenv("GEMINI_KEY_2")
-# The TradeExecutor specifically looks for GEMINI_API_KEY. We will provide it.
-GEMINI_API_KEY = GEMINI_KEY_1
+
+# Create a cycle of all available, valid keys.
+_GEMINI_API_KEYS = [key for key in [GEMINI_KEY_1, GEMINI_KEY_2] if key]
+_gemini_key_cycler = itertools.cycle(_GEMINI_API_KEYS) if _GEMINI_API_KEYS else None
+
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+
+def get_next_gemini_key():
+    """Rotates through the available Gemini API keys, providing the next one in the cycle."""
+    if not _gemini_key_cycler:
+        return None
+    next_key = next(_gemini_key_cycler)
+    # logger.debug(f"Using Gemini Key ending in ...{next_key[-4:]}") # Uncomment for debugging
+    return next_key
 
 # Unify encryption keys
 ENCRYPTION_KEY_STR = (
@@ -48,8 +60,8 @@ if not REDIS_URL:
     print("Warning: REDIS_URL is not set.")
 if not ADMIN_USER_ID:
     print("Warning: ADMIN_USER_ID is not set.")
-if not GEMINI_API_KEY:
-    print("Warning: GEMINI_API_KEY is not set. Autotrade intelligence will be limited.")
+if not _GEMINI_API_KEYS:
+    print("Warning: No Gemini API keys (GEMINI_KEY_1, GEMINI_KEY_2) are set. Autotrade intelligence will be disabled.")
 
 def safe_print_config():
     """
