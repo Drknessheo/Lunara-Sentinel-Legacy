@@ -3,12 +3,11 @@ from typing import Optional
 from .core.redis_client import get_redis_client
 
 # --- Key Definitions for Autotrade Settings ---
-# This is the single source of truth for all user-configurable settings.
 KEY_DEFINITIONS = {
     # Grand Campaign Goal
     "portfolio_target_usdt": {
         "name": "Portfolio Target (USDT)",
-        "default": 0.0,  # 0.0 means the campaign is continuous and has no end target.
+        "default": 0.0,
         "type": float,
         "min": 0.0,
         "max": 10000000.0,
@@ -59,10 +58,10 @@ KEY_DEFINITIONS = {
     },
     "max_hold_time": {
         "name": "Max Hold Time (seconds)",
-        "default": 86400,  # 24 hours
+        "default": 86400,
         "type": int,
-        "min": 300,  # 5 minutes
-        "max": 2592000,  # 30 days
+        "min": 300,
+        "max": 2592000,
         "description": "Maximum time to hold a position before a tactical retreat (sell)."
     },
 }
@@ -92,7 +91,6 @@ def validate_and_set(user_id: int, key: str, value_str: str) -> tuple[bool, str]
 
     spec = KEY_DEFINITIONS[key]
     try:
-        # Coerce value to the correct type
         if spec['type'] is float:
             coerced_value = float(value_str)
         elif spec['type'] is int:
@@ -102,13 +100,11 @@ def validate_and_set(user_id: int, key: str, value_str: str) -> tuple[bool, str]
     except ValueError:
         return False, f"Invalid value for {spec['name']}. Expected a {spec['type'].__name__}."
 
-    # Validate range
     if 'min' in spec and coerced_value < spec['min']:
         return False, f"{spec['name']} cannot be less than {spec['min']}."
     if 'max' in spec and coerced_value > spec['max']:
         return False, f"{spec['name']} cannot be more than {spec['max']}."
 
-    # Persist the validated setting
     client = get_redis_client()
     if not client:
         return False, "Error: Could not connect to settings database."
@@ -117,7 +113,6 @@ def validate_and_set(user_id: int, key: str, value_str: str) -> tuple[bool, str]
     current_settings = get_user_settings(user_id)
     current_settings[key] = coerced_value
 
-    # Inter-field validation for the trailing stop
     trailing_activation = current_settings.get('trailing_activation_percentage', KEY_DEFINITIONS['trailing_activation_percentage']['default'])
     trailing_drop = current_settings.get('trailing_stop_drop_percentage', KEY_DEFINITIONS['trailing_stop_drop_percentage']['default'])
 
