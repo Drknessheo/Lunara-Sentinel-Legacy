@@ -58,40 +58,31 @@ def _migrate_db(conn: sqlite3.Connection):
     cursor = conn.cursor()
     logger.info("Checking for necessary database migrations...")
 
-    # Migration 1: Add 'watchlist' column to 'users' table
-    cursor.execute("PRAGMA table_info(users)")
-    columns = [row['name'] for row in cursor.fetchall()]
+    # --- MIGRATION REGISTRY ---
+    # A list of tuples: (table_name, column_name, column_definition)
+    migrations = [
+        ('trades', 'symbol', 'TEXT NOT NULL DEFAULT 'UNKNOWN''),
+        ('users', 'watchlist', 'TEXT'),
+        ('trades', 'stop_loss', 'REAL'),
+    ]
 
-    if 'watchlist' not in columns:
-        try:
-            logger.info("Applying migration: Adding 'watchlist' column to 'users' table.")
-            cursor.execute("ALTER TABLE users ADD COLUMN watchlist TEXT")
-            logger.info("Migration successful.")
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" in str(e):
-                logger.warning("Migration for 'watchlist' column already applied by another process.")
-            else:
-                logger.error(f"Failed to apply 'watchlist' migration: {e}")
-                raise
-    else:
-        logger.info("'watchlist' column already exists. No migration needed.")
-
-    # Migration 2: Add 'stop_loss' column to 'trades' table
-    cursor.execute("PRAGMA table_info(trades)")
-    columns = [row['name'] for row in cursor.fetchall()]
-    if 'stop_loss' not in columns:
-        try:
-            logger.info("Applying migration: Adding 'stop_loss' column to 'trades' table.")
-            cursor.execute("ALTER TABLE trades ADD COLUMN stop_loss REAL")
-            logger.info("Migration successful.")
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" in str(e):
-                logger.warning("Migration for 'stop_loss' column already applied by another process.")
-            else:
-                logger.error(f"Failed to apply 'stop_loss' migration: {e}")
-                raise
-    else:
-        logger.info("'stop_loss' column already exists. No migration needed.")
+    for table, column, definition in migrations:
+        cursor.execute(f"PRAGMA table_info({table})")
+        columns = [row['name'] for row in cursor.fetchall()]
+        
+        if column not in columns:
+            try:
+                logger.info(f"Applying migration: Adding '{column}' to '{table}' table.")
+                cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+                logger.info("Migration successful.")
+            except sqlite3.OperationalError as e:
+                if "duplicate column name" in str(e):
+                    logger.warning(f"Migration for '{column}' column already applied by another process.")
+                else:
+                    logger.error(f"Failed to apply '{column}' migration: {e}")
+                    raise
+        else:
+            logger.info(f"'{column}' column in '{table}' already exists. No migration needed.")
 
 
 # === Main DB Functions ===
@@ -129,9 +120,7 @@ def init_db():
             trade_size_usdt REAL
         );
         """)
-        # Apply migrations to ensure older databases are up-to-date
         _migrate_db(conn)
-
 
 def get_or_create_user(user_id):
     conn = get_connection()
@@ -143,7 +132,6 @@ def get_or_create_user(user_id):
         user = conn.execute("SELECT * FROM users WHERE user_id=?", (user_id,)).fetchone()
         created = True
 
-    # Emperor's Decree: Pre-populate the admin's watchlist on first creation
     if created and user_id == config.ADMIN_USER_ID:
         logger.info(f"First-time setup for Admin user {user_id}. Adding default watchlist.")
         add_coins_to_watchlist(user_id, DEFAULT_SETTINGS['watchlist'].split(','))
@@ -158,9 +146,7 @@ def create_trade(user_id, symbol, buy_price, quantity, trade_size_usdt):
             (user_id, symbol, buy_price, quantity, trade_size_usdt)
         )
 
-
 def update_trade(trade: dict):
-    """Updates a trade in the database, specifically the stop_loss."""
     if 'id' not in trade or 'stop_loss' not in trade:
         logger.error("Attempted to update a trade without 'id' or 'stop_loss'.")
         return
@@ -172,7 +158,6 @@ def update_trade(trade: dict):
             (trade['stop_loss'], trade['id'])
         )
     logger.info(f"Updated trade {trade['id']} with new stop_loss: {trade['stop_loss']}")
-
 
 def store_user_api_keys(user_id, api_key, secret_key):
     get_or_create_user(user_id)
@@ -186,7 +171,6 @@ def store_user_api_keys(user_id, api_key, secret_key):
         )
 
 def get_user_api_keys(user_id):
-    # This logic should be revisited; direct config access is not ideal for multi-user.
     if user_id == config.ADMIN_USER_ID and config.BINANCE_API_KEY and config.BINANCE_SECRET_KEY:
         return config.BINANCE_API_KEY, config.BINANCE_SECRET_KEY
 
@@ -282,7 +266,6 @@ def get_user_effective_settings(user_id: int) -> dict:
         else:
             value = user_value
 
-        # Format for display
         if setting_name == 'autotrade':
             settings[setting_name] = 'on' if value == 1 else 'off'
         else:
@@ -293,7 +276,6 @@ def update_user_setting(user_id: int, setting_name: str, value):
     logger.info(f"[DB_WRITE] Attempting to update setting '{setting_name}' for user {user_id} with value '{value}'.")
     
     if setting_name not in SETTING_TO_COLUMN_MAP:
-        logger.error(f"[DB_WRITE] Invalid setting name '{setting_name}' provided.")
         raise ValueError(f"Invalid setting name: {setting_name}")
 
     column_name = SETTING_TO_COLUMN_MAP[setting_name]
@@ -315,8 +297,6 @@ def update_user_setting(user_id: int, setting_name: str, value):
         logger.error(f"[DB_WRITE] Failed to process value '{value}' for setting '{setting_name}': {e}")
         raise
 
-    logger.debug(f"[DB_WRITE] Processed value for column '{column_name}' is '{processed_value}'.")
-
     try:
         conn = get_connection()
         with conn:
@@ -326,6 +306,4 @@ def update_user_setting(user_id: int, setting_name: str, value):
             logger.info(f"[DB_WRITE] SUCCESS: Setting '{setting_name}' for user {user_id} was updated in the database.")
     except sqlite3.Error as e:
         logger.critical(f"[DB_WRITE] FAILED to update database for user {user_id}, setting '{setting_name}': {e}", exc_info=True)
-        # Depending on the desired behavior, we might want to raise the exception
-        # to let the calling function know the transaction failed.
         raise
