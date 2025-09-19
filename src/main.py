@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import sys
+import threading
 
 # --- Setup logging and path ---
 if __package__:
@@ -29,7 +30,7 @@ from telegram.ext import (
 
 # Ensure all local modules are imported correctly based on execution context
 if __package__:
-    from . import config, handlers, trade, trade_executor
+    from . import config, handlers, trade, trade_executor, web_server
     from . import db as new_db # The new thread-safe db module
     from .redis_persistence import RedisPersistence
 else:
@@ -37,6 +38,7 @@ else:
     import handlers
     import trade
     import trade_executor
+    import web_server
     import db as new_db
     from redis_persistence import RedisPersistence
 
@@ -110,6 +112,12 @@ async def post_shutdown(application: Application) -> None:
 
 def main() -> None:
     logger.info("🚀 Starting Lunara Bot with the new Trade Executor...")
+    
+    # --- Start the health-check web server in a background thread ---
+    logger.info("Starting health-check web server in background...")
+    web_server_thread = threading.Thread(target=web_server.run_web_server, daemon=True)
+    web_server_thread.start()
+    logger.info("Health-check web server is running.")
 
     # --- Assertions for core configuration ---
     assert config.TELEGRAM_BOT_TOKEN, "CRITICAL: TELEGRAM_BOT_TOKEN is not set!"
