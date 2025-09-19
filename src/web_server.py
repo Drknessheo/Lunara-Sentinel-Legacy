@@ -1,6 +1,7 @@
 
 from flask import Flask, jsonify
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -19,10 +20,14 @@ def health_check():
 
 def run_web_server():
     """
-    Starts the Flask web server.
+    Starts the Flask web server, listening on the port specified by Render.
     """
-    # Note: The host must be '0.0.0.0' to be accessible from outside the container
-    app.run(host='0.0.0.0', port=10000, debug=False)
+    # The port is dynamically set by the PORT environment variable.
+    port = int(os.environ.get("PORT", 10000))
+    
+    # The host must be '0.0.0.0' to be accessible from outside the container.
+    log.info(f"Starting Flask web server on host 0.0.0.0 and port {port}...")
+    app.run(host='0.0.0.0', port=port, debug=False)
 
 if __name__ == "__main__":
     log.info("Starting Flask web server directly...")
