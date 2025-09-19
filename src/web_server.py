@@ -9,21 +9,27 @@ log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-@app.route('/')
+@app.route('/healthz')
 def health_check():
     """
     A simple health-check endpoint that returns a 200 OK status.
     Render uses this to determine if the service is live.
     """
-    log.info("Health check endpoint was hit.")
+    log.info("Health check endpoint (/healthz) was hit.")
     return jsonify({"status": "ok"}), 200
+
+@app.route('/')
+def root_path():
+    """A default handler for the root path."""
+    log.info("Root path (/) was hit.")
+    return jsonify({"message": "Lunara Bot is operational"}), 200
 
 def run_web_server():
     """
     Starts the Flask web server, listening on the port specified by Render.
     """
     # The port is dynamically set by the PORT environment variable.
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 8080))
     
     # The host must be '0.0.0.0' to be accessible from outside the container.
     log.info(f"Starting Flask web server on host 0.0.0.0 and port {port}...")
