@@ -91,7 +91,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def post_init(application: Application) -> None:
     """Sacred handler to run after the bot is initialized but before polling starts."""
     logger.info("Running post-initialization setup...")
+    
+    logger.info("Sending delete_webhook to Telegram to ensure a clean start...")
     await application.bot.delete_webhook(drop_pending_updates=True)
+    logger.info("Webhook deleted. Pausing for 2 seconds before polling to prevent race conditions.")
+    await asyncio.sleep(2) # A brief pause to allow Telegram to process the request.
     
     logger.info("Initializing and starting the TradeExecutor as a background task...")
     executor = trade_executor.TradeExecutor(application.bot)
@@ -109,6 +113,25 @@ async def post_shutdown(application: Application) -> None:
             await task
         except asyncio.CancelledError:
             logger.info("Trade executor task successfully cancelled.")
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log Errors caused by Updates and send a notification to the admin."""
+    logger.error(f"Exception while handling an update: {context.error}", exc_info=context.error)
+    
+    # Notify the admin user about the error
+    if config.ADMIN_USER_ID:
+        try:
+            # Truncate the error message if it's too long
+            error_message = str(context.error)
+            if len(error_message) > 3000:
+                error_message = error_message[:3000] + "..."
+
+            await context.bot.send_message(
+                chat_id=config.ADMIN_USER_ID,
+                text=f"🚨 An error occurred in the bot: {error_message}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to send error notification to admin: {e}")
 
 def main() -> None:
     """The synchronous main function to rule them all."""
@@ -139,6 +162,9 @@ def main() -> None:
         .post_shutdown(post_shutdown)
         .build()
     )
+
+    # --- Register Error Handler ---
+    application.add_error_handler(error_handler)
 
     # --- Register Command Handlers ---
     application.add_handler(CommandHandler("start", start))
