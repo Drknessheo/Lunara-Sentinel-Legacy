@@ -17,8 +17,9 @@ logger = logging.getLogger(__name__)
 
 def escape_markdown_v2(text: str) -> str:
     """Escapes string for Telegram's MarkdownV2 parse mode."""
-    # Use re.escape to escape all special characters.
-    return re.sub(r'([_\*\~\`\|\{\}\[\]\(\)\>\#\+\-\=\.!])', r'\\\1', str(text))
+    # Escape the characters `_`, `*`, `[`, `]`, `(`, `)`, `~`, `` ` ``, `>`, `#`, `+`, `-`, `=`, `|`, `{`, `}`, `.`,
+    # `!` by prepending them with a backslash.
+    return re.sub(r'([_*[\]()~`>#+\-=|{}.!])', r'\\\1', str(text))
 
 async def get_user_id(update: Update) -> int | None:
     """Extracts user ID from an update."""
@@ -69,11 +70,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     _, created = await db.get_or_create_user(user_id)
 
     welcome_message = (
-        "Welcome to the Empire, Commander. Your command center is ready."
+        "Welcome to the Empire, Commander\. Your command center is ready\."
         if created else
-        "Welcome back, Commander. Your legions await your command."
+        "Welcome back, Commander\. Your legions await your command\."
     )
-    await update.message.reply_text(f"{welcome_message}\n\nUse /status or /myprofile to see your configuration.")
+    await update.message.reply_text(f"{welcome_message}\n\nUse /status or /myprofile to see your configuration\.", parse_mode=ParseMode.MARKDOWN_V2)
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays the user's current settings and open trades."""
@@ -125,7 +126,7 @@ async def settings_callback_handler(update: Update, context: ContextTypes.DEFAUL
     action = parts[0]
 
     if action == 'settings_done':
-        await query.edit_message_text("Settings saved\. The empire adapts to your command\.")
+        await query.edit_message_text("Settings saved\. The empire adapts to your command\.", parse_mode=ParseMode.MARKDOWN_V2)
         return
 
     setting_key = parts[1]
@@ -171,7 +172,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text(escape_markdown_v2(str(e)))
     except Exception as e:
         logger.error(f"Failed to update setting {setting_key} for user {user_id}: {e}")
-        await update.message.reply_text("An error occurred\. The Imperial Guard has been notified\.")
+        await update.message.reply_text("An error occurred\. The Imperial Guard has been notified\.", parse_mode=ParseMode.MARKDOWN_V2)
 
 PAYMENT_MESSAGE = '''
 <b>💳 Subscription & Payment Information</b>
@@ -203,6 +204,6 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
     if isinstance(update, Update) and update.effective_message:
         try:
-            await update.effective_message.reply_text("An internal error occurred\. The Imperial Guard has been notified\.")
+            await update.effective_message.reply_text("An internal error occurred\. The Imperial Guard has been notified\.", parse_mode=ParseMode.MARKDOWN_V2)
         except Exception as e:
             logger.error(f"Failed to send error message to user: {e}")
