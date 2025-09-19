@@ -5,7 +5,6 @@ import os
 import sys
 
 # --- Setup logging and path ---
-# This ensures that the script can be run directly or as a module
 if __package__:
     from . import logging_config
 else:
@@ -13,15 +12,13 @@ else:
 
 logging_config.setup_logging()
 
-# Add the project root to the path to allow for absolute imports
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
 # --- Import Core Components ---
-# These are the new, fully asynchronous modules.
 from src import config
 from src import db
 from src import handlers
@@ -54,13 +51,18 @@ async def main() -> None:
         .build()
     )
 
-    # --- Register the New Asynchronous Handlers ---
+    # --- Register the Corrected and Completed Asynchronous Handlers ---
     application.add_handler(CommandHandler("start", handlers.start_command))
     application.add_handler(CommandHandler("status", handlers.status_command))
+    application.add_handler(CommandHandler("myprofile", handlers.myprofile_command)) # <-- The missing alias
     application.add_handler(CommandHandler("settings", handlers.settings_command))
     application.add_handler(CommandHandler("pay", handlers.pay_command))
-    # This handler is for the inline keyboard buttons from the /settings command
-    application.add_handler(CallbackQueryHandler(handlers.set_setting_callback))
+    
+    # Use the new, robust callback handler for all setting interactions
+    application.add_handler(CallbackQueryHandler(handlers.settings_callback_handler))
+    
+    # Add a handler for text messages to capture setting updates
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handlers.message_handler))
     
     # Register the central error handler
     application.add_error_handler(handlers.error_handler)
