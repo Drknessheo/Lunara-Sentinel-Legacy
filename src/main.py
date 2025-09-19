@@ -1,3 +1,4 @@
+
 import asyncio
 import logging
 import os
@@ -24,29 +25,25 @@ from telegram.ext import (
     Application,
     CommandHandler,
     ContextTypes,
-    MessageHandler,
-    filters,
 )
 
 # Ensure all local modules are imported correctly based on execution context
 if __package__:
-    from . import config, handlers, trade, trade_executor, web_server
-    from . import db as new_db # The new thread-safe db module
+    from . import config, trade, trade_executor, web_server, handlers
+    from . import db as new_db
     from .redis_persistence import RedisPersistence
 else:
     import config
-    import handlers
     import trade
     import trade_executor
     import web_server
+    import handlers
     import db as new_db
     from redis_persistence import RedisPersistence
 
 logger = logging.getLogger(__name__)
 
 # --- Constants ---
-ADMIN_ID = getattr(config, "ADMIN_USER_ID", None)
-
 HELP_MESSAGE = """🔮 <b>LunessaSignals Guide</b> 🔮
 
 Your ultimate guide to mastering the crypto markets.
@@ -79,12 +76,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    user_record, created = new_db.get_or_create_user(user.id)
+    new_db.get_or_create_user(user.id)
     
-    if created:
-        logger.info(f"New user {user.id} ({user.username}) started the bot.")
-    else:
-        logger.info(f"Returning user {user.id} ({user.username}) started the bot.")
+    logger.info(f"User {user.id} ({user.username}) started the bot.")
 
     welcome_message = (
         f"🌑 Welcome, {user.mention_html()}. The Lunara autotrader is at your command.\n\n"
@@ -94,58 +88,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
     await update.message.reply_html(welcome_message)
 
-async def post_init(application: Application) -> None:
-    logger.info("Running post-initialization setup...")
-    await application.bot.delete_webhook(drop_pending_updates=True)
-    if isinstance(application.persistence, RedisPersistence):
-        await application.persistence.initialize()
-
-    # --- LAUNCH THE NEW TRADE EXECUTOR ---
-    logger.info("Initializing and starting the new TradeExecutor...")
-    executor = trade_executor.TradeExecutor(application.bot)
-    # Store the task in bot_data for graceful shutdown
-    application.bot_data['executor_task'] = asyncio.create_task(executor.run())
-    logger.info("TradeExecutor is now running in the background.")
-
-async def post_shutdown(application: Application) -> None:
-    logger.info("Running post-shutdown cleanup...")
+async def main() -> None:
+    logger.info("🚀 Starting Lunara Bot in its new, unified asynchronous architecture...")
     
-    # Cancel the trade executor task
-    if 'executor_task' in application.bot_data:
-        task = application.bot_data['executor_task']
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            logger.info("Trade executor task successfully cancelled.")
+    # --- Assertions for core configuration ---
+    assert config.TELEGRAM_BOT_TOKEN, "CRITICAL: TELEGRAM_BOT_TOKEN is not set!"
+    assert config.REDIS_URL, "CRITICAL: REDIS_URL is not set!"
+    assert config.ADMIN_USER_ID, "CRITICAL: ADMIN_USER_ID is not set!"
 
-    if isinstance(application.persistence, RedisPersistence):
-        await application.persistence.shutdown()
-
-def main() -> None:
-    logger.info("🚀 Starting Lunara Bot with the new Trade Executor...")
-    
     # --- Start the health-check web server in a background thread ---
     logger.info("Starting health-check web server in background...")
     web_server_thread = threading.Thread(target=web_server.run_web_server, daemon=True)
     web_server_thread.start()
     logger.info("Health-check web server is running.")
 
-    # --- Assertions for core configuration ---
-    assert config.TELEGRAM_BOT_TOKEN, "CRITICAL: TELEGRAM_BOT_TOKEN is not set!"
-    assert config.REDIS_URL, "CRITICAL: REDIS_URL is not set!"
-    assert config.ADMIN_USER_ID, "CRITICAL: ADMIN_USER_ID is not set!"
-
     # Initialize the new thread-safe database
     new_db.init_db()
 
     persistence = RedisPersistence(redis_url=config.REDIS_URL)
+    
     application = (
         Application.builder()
         .token(config.TELEGRAM_BOT_TOKEN)
         .persistence(persistence)
-        .post_init(post_init)
-        .post_shutdown(post_shutdown)
         .build()
     )
 
@@ -163,8 +128,26 @@ def main() -> None:
     application.add_handler(CommandHandler("pay", handlers.pay_command))
     application.add_handler(CommandHandler("settings", trade.settings_command))
 
-    logger.info("Starting bot polling...")
-    application.run_polling()
+    # The new way: Run Application and TradeExecutor concurrently
+    try:
+        logger.info("Initializing application and persistence...")
+        await application.initialize()
+        await application.persistence.initialize()
+        await application.bot.delete_webhook(drop_pending_updates=True)
+
+        logger.info("Initializing and starting the TradeExecutor...")
+        executor = trade_executor.TradeExecutor(application.bot)
+        
+        logger.info("Running bot polling and trade executor concurrently...")
+        await asyncio.gather(
+            application.run_polling(poll_interval=1.0),
+            executor.run()
+        )
+
+    finally:
+        logger.info("Shutting down application and trade executor...")
+        await application.persistence.shutdown()
+        await application.shutdown()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

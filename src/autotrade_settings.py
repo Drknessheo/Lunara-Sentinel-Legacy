@@ -1,4 +1,3 @@
-
 import logging
 from . import db as new_db
 
@@ -53,4 +52,3 @@ async def validate_and_set(user_id: int, key: str, value_str: str) -> tuple[bool
     except Exception as e:
         logger.error(f"Unexpected error updating setting '{key}' for user {user_id}: {e}")
         return False, "An unexpected error occurred while saving your setting."
-
