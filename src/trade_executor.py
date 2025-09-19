@@ -146,7 +146,7 @@ class TradeExecutor:
             ) * 100
             if drop_from_peak_percent >= trailing_drop:
                 final_pnl = (
-                    (current_price - trade["buy_price"]) / trade["buy_price"]
+                    (current_price - trade['buy_price']) / trade['buy_price']
                 ) * 100
                 return f"🐉 Dragon strike! Profit of {final_pnl:.2f}% locked in."
         return None
@@ -165,7 +165,10 @@ class TradeExecutor:
             decision = await self._get_gemini_buy_decision(symbol)
             if decision == "BUY":
                 await self._buy_trade(user_id, symbol, settings)
-                await asyncio.sleep(1) # Small delay to avoid rate limits
+                
+            # IMPERIAL DECREE: We must pause to appease the Gemini API gods.
+            # A 5-second delay ensures we do not exceed the 15 requests/minute free tier limit.
+            await asyncio.sleep(5)
 
     async def _get_gemini_buy_decision(self, symbol: str) -> str:
         """Consults Gemini for a buy/hold decision."""
