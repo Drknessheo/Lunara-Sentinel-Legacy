@@ -1,3 +1,4 @@
+
 """
 Handles all direct communication with the Binance API.
 
@@ -5,6 +6,7 @@ This module centralizes Binance client management, API calls for market data,
 and order execution. It is designed to be self-contained and easily testable.
 """
 
+import asyncio
 import logging
 import os
 import math
@@ -120,26 +122,31 @@ def get_symbol_info(symbol: str):
         return None
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
-def get_historical_klines(*args, **kwargs):
-    """
-    Wrapper for client.get_historical_klines with retry logic."""
+def _blocking_get_historical_klines(*args, **kwargs):
+    """Wrapper for client.get_historical_klines with retry logic."""
     ensure_binance_client()
     if not client:
         raise TradeError("Binance client not available for fetching klines.")
     return client.get_historical_klines(*args, **kwargs)
 
+async def get_historical_klines(*args, **kwargs):
+    """Asynchronous version of get_historical_klines."""
+    return await asyncio.to_thread(_blocking_get_historical_klines, *args, **kwargs)
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(BinanceAPIException))
-def get_current_price(symbol: str):
-    """
-    Fetches the current price of a given symbol from Binance."""
+def _blocking_get_current_price(symbol: str):
+    """Synchronous implementation for fetching the current price."""
     ensure_binance_client()
     if not client:
         raise TradeError("Binance client not available for fetching price.")
     ticker = client.get_symbol_ticker(symbol=symbol)
     return float(ticker["price"])
 
-def get_all_spot_balances(user_id: int) -> list | None:
+async def get_current_price(symbol: str):
+    """Asynchronously fetches the current price of a given symbol from Binance."""
+    return await asyncio.to_thread(_blocking_get_current_price, symbol)
+
+def _blocking_get_all_spot_balances(user_id: int) -> list:
     api_key, secret_key = new_db.get_user_api_keys(user_id)
     if not api_key or not secret_key:
         raise TradeError("API keys not set. Use /setapi.")
@@ -151,3 +158,52 @@ def get_all_spot_balances(user_id: int) -> list | None:
         raise TradeError(f"Binance API error: {e.message}")
     except Exception as e:
         raise TradeError(f"Unexpected error fetching balances: {e}")
+
+async def get_all_spot_balances(user_id: int) -> list | None:
+    """Asynchronously fetches all spot balances for a user."""
+    try:
+        return await asyncio.to_thread(_blocking_get_all_spot_balances, user_id)
+    except TradeError as e:
+        raise e  # Re-raise known trade errors
+    except Exception as e:
+        logger.error(f"Failed to fetch balances for user {user_id} in background thread: {e}")
+        return None
+
+async def get_total_account_balance_usdt(user_id: int) -> float:
+    """
+    Asynchronously calculates the total account value in USDT by fetching all balances
+    and converting non-USDT assets to their USDT value.
+    """
+    try:
+        balances = await get_all_spot_balances(user_id)
+        if not balances:
+            return 0.0
+
+        total_usdt_value = 0.0
+        stablecoins = {'USDT', 'BUSD', 'USDC', 'DAI', 'TUSD'}
+
+        for balance in balances:
+            asset = balance['asset']
+            total_qty = float(balance['free']) + float(balance['locked'])
+
+            if total_qty == 0:
+                continue
+
+            if asset in stablecoins:
+                total_usdt_value += total_qty
+            else:
+                try:
+                    symbol = f"{asset}USDT"
+                    price = await get_current_price(symbol)
+                    total_usdt_value += total_qty * price
+                except Exception:
+                    logger.warning(f"Could not get USDT price for asset '{asset}'. It will be excluded from total balance.")
+        
+        return total_usdt_value
+
+    except TradeError as e:
+        logger.error(f"Cannot calculate total balance for user {user_id} due to a trade error: {e}")
+        raise  # Re-raise to be handled by the caller
+    except Exception as e:
+        logger.error(f"An unexpected error occurred while calculating total balance for user {user_id}: {e}")
+        return 0.0
