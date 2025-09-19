@@ -62,7 +62,7 @@ def safe_print_config():
         "BTC_ALERT_THRESHOLD_PERCENT", "HELD_TOO_LONG_HOURS",
         "NEAR_STOP_LOSS_THRESHOLD_PERCENT", "NEAR_TAKE_PROFIT_THRESHOLD_PERCENT",
         "RSI_BUY_RECOVERY_THRESHOLD", "WATCHLIST_TIMEOUT_HOURS",
-        "PAPER_TRADE_SIZE_USDT", "PAPER_STARTING_BALANCE", "GEMINI_MODEL"
+        "PAPER_TRADE_SIZE_USDT", "PAPER_STARTING_BALANCE", "GEMINI_MODEL", "USE_FAKE_REDIS"
     ]
     for key, value in os.environ.items():
         is_safe = key.upper() in safe_keys or not any(
@@ -74,6 +74,7 @@ def safe_print_config():
             print(f"  - {key}: **** MASKED ****")
 
 # 4. --- Application & Bot Behavior Settings ---
+USE_FAKE_REDIS = os.getenv("USE_FAKE_REDIS", "False").lower() in ["true", "1", "t"]
 PER_TRADE_ALLOCATION_PERCENT = 5.0
 TELEGRAM_SYNC_LOG_ENABLED = True
 AI_TRADE_INTERVAL_MINUTES = 10
