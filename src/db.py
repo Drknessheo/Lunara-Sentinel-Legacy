@@ -41,7 +41,7 @@ def get_connection() -> sqlite3.Connection:
     """Return a SQLite connection for the current thread."""
     conn = getattr(_thread_local, "connection", None)
     if conn is None:
-        conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
+        conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         _thread_local.connection = conn
     return conn
@@ -95,7 +95,6 @@ def _migrate_db(conn: sqlite3.Connection):
 
 
 # === Main DB Functions ===
-
 def init_db():
     """Initializes the database, creates tables if they don't exist, and runs migrations."""
     conn = get_connection()
@@ -113,7 +112,8 @@ def init_db():
             custom_stop_loss REAL,
             custom_trailing_activation REAL,
             custom_trailing_drop REAL,
-            custom_profit_target REAL
+            custom_profit_target REAL,
+            watchlist TEXT
         );
         """)
         conn.execute("""
@@ -125,7 +125,8 @@ def init_db():
             quantity REAL NOT NULL,
             buy_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             status TEXT NOT NULL DEFAULT 'open',
-            stop_loss REAL
+            stop_loss REAL,
+            trade_size_usdt REAL
         );
         """)
         # Apply migrations to ensure older databases are up-to-date
@@ -138,7 +139,7 @@ def get_or_create_user(user_id):
     created = False
     if not user:
         with conn:
-            conn.execute("INSERT INTO users (user_id) VALUES (?)", (user_id,))
+            conn.execute("INSERT INTO users (user_id, watchlist) VALUES (?, ?)", (user_id, DEFAULT_SETTINGS['watchlist']))
         user = conn.execute("SELECT * FROM users WHERE user_id=?", (user_id,)).fetchone()
         created = True
 
@@ -148,6 +149,15 @@ def get_or_create_user(user_id):
         add_coins_to_watchlist(user_id, DEFAULT_SETTINGS['watchlist'].split(','))
 
     return user, created
+
+def create_trade(user_id, symbol, buy_price, quantity, trade_size_usdt):
+    conn = get_connection()
+    with conn:
+        conn.execute(
+            "INSERT INTO trades (user_id, symbol, buy_price, quantity, trade_size_usdt) VALUES (?, ?, ?, ?, ?)",
+            (user_id, symbol, buy_price, quantity, trade_size_usdt)
+        )
+
 
 def update_trade(trade: dict):
     """Updates a trade in the database, specifically the stop_loss."""
@@ -176,7 +186,8 @@ def store_user_api_keys(user_id, api_key, secret_key):
         )
 
 def get_user_api_keys(user_id):
-    if user_id == config.ADMIN_USER_ID:
+    # This logic should be revisited; direct config access is not ideal for multi-user.
+    if user_id == config.ADMIN_USER_ID and config.BINANCE_API_KEY and config.BINANCE_SECRET_KEY:
         return config.BINANCE_API_KEY, config.BINANCE_SECRET_KEY
 
     user, _ = get_or_create_user(user_id)
@@ -188,6 +199,7 @@ def get_user_api_keys(user_id):
         secret_key = fernet.decrypt(user['secret_key']).decode()
         return api_key, secret_key
     except Exception:
+        logger.error(f"Failed to decrypt API keys for user {user_id}.")
         return None, None
 
 def get_open_trades_by_user(user_id):
@@ -217,7 +229,6 @@ def get_active_autotrade_count():
     return conn.execute("SELECT COUNT(*) FROM users WHERE autotrade_enabled=1").fetchone()[0]
 
 def get_users_with_autotrade_enabled():
-    # This function is essential for the TradeExecutor's main loop.
     conn = get_connection()
     users = conn.execute("SELECT user_id FROM users WHERE autotrade_enabled=1").fetchall()
     return [user['user_id'] for user in users]
@@ -229,8 +240,7 @@ def get_all_users():
 
 def add_coins_to_watchlist(user_id, coins_to_add: list):
     user, _ = get_or_create_user(user_id)
-    current_watchlist_str = user['watchlist'] if 'watchlist' in user.keys() else ''
-    current_watchlist_str = current_watchlist_str or ''
+    current_watchlist_str = user['watchlist'] or ''
     current_watchlist = set(current_watchlist_str.split(',')) if current_watchlist_str else set()
     for coin in coins_to_add:
         current_watchlist.add(coin.upper())
@@ -241,8 +251,7 @@ def add_coins_to_watchlist(user_id, coins_to_add: list):
 
 def remove_coins_from_watchlist(user_id, coins_to_remove: list):
     user, _ = get_or_create_user(user_id)
-    current_watchlist_str = user['watchlist'] if 'watchlist' in user.keys() else ''
-    current_watchlist_str = current_watchlist_str or ''
+    current_watchlist_str = user['watchlist'] or ''
     current_watchlist = set(current_watchlist_str.split(',')) if current_watchlist_str else set()
 
     for coin in coins_to_remove:
@@ -281,23 +290,42 @@ def get_user_effective_settings(user_id: int) -> dict:
     return settings
 
 def update_user_setting(user_id: int, setting_name: str, value):
+    logger.info(f"[DB_WRITE] Attempting to update setting '{setting_name}' for user {user_id} with value '{value}'.")
+    
     if setting_name not in SETTING_TO_COLUMN_MAP:
+        logger.error(f"[DB_WRITE] Invalid setting name '{setting_name}' provided.")
         raise ValueError(f"Invalid setting name: {setting_name}")
 
     column_name = SETTING_TO_COLUMN_MAP[setting_name]
     processed_value = value
-    if setting_name == 'autotrade':
-        processed_value = 1 if str(value).lower() in ['on', 'true', '1', 'enabled'] else 0
-    elif setting_name == 'trading_mode':
-        processed_value = str(value).upper()
-        if processed_value not in ['LIVE', 'PAPER']:
-            raise ValueError("Trading mode must be LIVE or PAPER")
-    elif setting_name in ['paper_balance', 'rsi_buy', 'rsi_sell', 'stop_loss', 'trailing_activation',
-                          'trailing_drop', 'profit_target']:
-        processed_value = float(value)
-    elif setting_name == 'watchlist':
-        processed_value = str(value)
+    
+    try:
+        if setting_name == 'autotrade':
+            processed_value = 1 if str(value).lower() in ['on', 'true', '1', 'enabled'] else 0
+        elif setting_name == 'trading_mode':
+            processed_value = str(value).upper()
+            if processed_value not in ['LIVE', 'PAPER']:
+                raise ValueError("Trading mode must be LIVE or PAPER")
+        elif setting_name in ['paper_balance', 'rsi_buy', 'rsi_sell', 'stop_loss', 'trailing_activation',
+                              'trailing_drop', 'profit_target']:
+            processed_value = float(value)
+        elif setting_name == 'watchlist':
+            processed_value = str(value)
+    except (ValueError, TypeError) as e:
+        logger.error(f"[DB_WRITE] Failed to process value '{value}' for setting '{setting_name}': {e}")
+        raise
 
-    conn = get_connection()
-    with conn:
-        conn.execute(f"UPDATE users SET {column_name}=? WHERE user_id=?", (processed_value, user_id))
+    logger.debug(f"[DB_WRITE] Processed value for column '{column_name}' is '{processed_value}'.")
+
+    try:
+        conn = get_connection()
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute(f"UPDATE users SET {column_name}=? WHERE user_id=?", (processed_value, user_id))
+            conn.commit()
+            logger.info(f"[DB_WRITE] SUCCESS: Setting '{setting_name}' for user {user_id} was updated in the database.")
+    except sqlite3.Error as e:
+        logger.critical(f"[DB_WRITE] FAILED to update database for user {user_id}, setting '{setting_name}': {e}", exc_info=True)
+        # Depending on the desired behavior, we might want to raise the exception
+        # to let the calling function know the transaction failed.
+        raise
