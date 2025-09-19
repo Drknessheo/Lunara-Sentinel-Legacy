@@ -31,7 +31,7 @@ class TradeExecutor:
 
         while True:
             try:
-                user_ids = db.get_users_with_autotrade_enabled()
+                user_ids = await db.get_users_with_autotrade_enabled()
                 if user_ids:
                     logger.debug(f"[EXECUTOR] Processing {len(user_ids)} active users.")
                     await asyncio.gather(*[self._process_user(user_id) for user_id in user_ids])
@@ -44,9 +44,10 @@ class TradeExecutor:
 
     async def _initial_state_sync(self):
         logger.info("[EXECUTOR_INIT] Performing initial state synchronization from DB to Redis...")
-        all_users = db.get_all_users()
+        all_users = await db.get_all_users()
         for user_id in all_users:
-            redis_client.sync_initial_state(user_id, db.get_open_trades_by_user(user_id))
+            open_trades = await db.get_open_trades_by_user(user_id)
+            redis_client.sync_initial_state(user_id, open_trades)
         logger.info("[EXECUTOR_INIT] Initial state sync complete.")
 
     async def _process_user(self, user_id: int):
@@ -67,7 +68,7 @@ class TradeExecutor:
 
     # --- Defensive Logic (The Sentinel) ---
     async def _check_and_sell_open_trades(self, user_id: int, settings: dict):
-        open_trades = db.get_open_trades_by_user(user_id)
+        open_trades = await db.get_open_trades_by_user(user_id)
         if open_trades:
             await asyncio.gather(*[self._evaluate_and_execute_sell(dict(trade), settings) for trade in open_trades])
 
@@ -181,7 +182,7 @@ Market Data:
         quantity = size / price
         
         try:
-            db.create_trade(user_id, symbol, price, quantity, size)
+            await db.create_trade(user_id, symbol, price, quantity, size)
             redis_client.add_active_trade(user_id, symbol)
             await self._notify_user(user_id, f"✅ Bought {quantity:.4f} {symbol} at ${price:,.4f}.")
         except Exception as e:
@@ -190,7 +191,7 @@ Market Data:
     async def _sell_trade(self, trade: dict, price: float, reason: str):
         uid, sym, tid = trade["user_id"], trade["symbol"], trade["id"]
         try:
-            db.mark_trade_closed(tid, reason)
+            await db.mark_trade_closed(tid, reason)
             redis_client.remove_active_trade(uid, sym)
             if uid in self.user_states and sym in self.user_states[uid]: del self.user_states[uid][sym]
             pnl = ((price - trade['buy_price']) / trade['buy_price']) * 100
