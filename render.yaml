@@ -2,5 +2,3 @@ services:
   - type: worker
     name: lunara-bot
     env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "python -m src.main"

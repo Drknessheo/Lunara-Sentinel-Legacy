@@ -23,16 +23,21 @@ def analyze_symbol(symbol: str, kline_data: list, settings: dict) -> dict:
         return {}
 
     try:
-        df = pd.DataFrame(kline_data, columns=[
+        # --- Memory Optimization: Define columns and dtypes ---
+        kline_columns = [
             'timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time',
             'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume',
             'taker_buy_quote_asset_volume', 'ignore'
-        ])
+        ]
+        used_cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+        
+        df = pd.DataFrame(kline_data, columns=kline_columns)
+        df = df[used_cols]
 
         for col in ['open', 'high', 'low', 'close', 'volume']:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
+            df[col] = pd.to_numeric(df[col], errors='coerce').astype('float32')
 
-        df.dropna(subset=['open', 'high', 'low', 'close', 'volume'], inplace=True)
+        df.dropna(inplace=True)
         if len(df) < 30:
             logger.warning(f"Insufficient valid data points for {symbol} after cleaning.")
             return {}
@@ -83,10 +88,12 @@ def analyze_symbol(symbol: str, kline_data: list, settings: dict) -> dict:
 
         if not latest_indicators:
             logger.warning(f"Technical analysis for {symbol} yielded no valid indicators.")
+            del df # Memory Optimization
             return {}
 
         # Attach the symptoms to the final report
         latest_indicators['symptoms'] = symptoms
+        del df # Memory Optimization
         return latest_indicators
 
     except Exception as e:
