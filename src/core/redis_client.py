@@ -9,6 +9,9 @@ logger = logging.getLogger(__name__)
 
 # --- Constants ---
 STRATEGIC_RETREAT_PERIODS = [3600, 10800, 21600, 32400]  # 1h, 3h, 6h, 9h
+MASTER_LOCK_KEY = "LUNARA_LEGION_MASTER_LOCK"
+LOCK_EXPIRY_SECONDS = 30  # Increased expiry for more stability
+instance_id = f"legion_instance_{time.time()}" # A unique ID for this bot instance
 
 redis_client = None
 
@@ -29,6 +32,57 @@ def get_redis_client():
     if redis_client is None:
         raise ConnectionError("Redis client is not available.")
     return redis_client
+
+# --- Master Lock Protocol ---
+def acquire_master_lock() -> bool:
+    """Attempts to acquire the master lock for this bot instance."""
+    try:
+        client = get_redis_client()
+        # Atomically set the key if it does not exist, with an expiry
+        logger.info(f"Instance {instance_id} attempting to acquire master lock...")
+        is_acquired = client.set(MASTER_LOCK_KEY, instance_id, ex=LOCK_EXPIRY_SECONDS, nx=True)
+        if is_acquired:
+            logger.info(f"Instance {instance_id} has acquired the master lock. We are the Prime Legion.")
+        else:
+            current_holder = client.get(MASTER_LOCK_KEY)
+            logger.warning(f"Instance {instance_id} failed to acquire lock. Prime Legion is {current_holder}.")
+        return is_acquired
+    except Exception as e:
+        logger.error(f"[REDIS_LOCK] Failed to acquire master lock: {e}")
+        return False # Fail safe
+
+def renew_master_lock():
+    """Renews the master lock if this instance still holds it."""
+    try:
+        client = get_redis_client()
+        # Use a transaction to ensure we only renew our own lock
+        pipe = client.pipeline()
+        pipe.watch(MASTER_LOCK_KEY)
+        if pipe.get(MASTER_LOCK_KEY) == instance_id:
+            pipe.multi()
+            pipe.expire(MASTER_LOCK_KEY, LOCK_EXPIRY_SECONDS)
+            pipe.execute()
+            logger.debug(f"Master lock renewed by {instance_id}.")
+        pipe.unwatch()
+    except Exception as e:
+        logger.error(f"[REDIS_LOCK] Failed to renew master lock by {instance_id}: {e}")
+
+def release_master_lock():
+    """Releases the master lock if this instance holds it."""
+    try:
+        client = get_redis_client()
+        # Use a transaction to ensure we only delete our own lock
+        pipe = client.pipeline()
+        pipe.watch(MASTER_LOCK_KEY)
+        if pipe.get(MASTER_LOCK_KEY) == instance_id:
+            pipe.multi()
+            pipe.delete(MASTER_LOCK_KEY)
+            pipe.execute()
+            logger.info(f"Master lock released by {instance_id}.")
+        pipe.unwatch()
+    except Exception as e:
+        logger.error(f"[REDIS_LOCK] Failed to release master lock by {instance_id}: {e}")
+
 
 # --- Key Generation ---
 def get_key(namespace: str, user_id: int, identifier: str = "") -> str:

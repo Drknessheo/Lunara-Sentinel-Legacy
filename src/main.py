@@ -24,6 +24,7 @@ from src import db
 from src import handlers
 from src.trade_executor import TradeExecutor
 from src.redis_persistence import RedisPersistence
+from src.core import redis_client # Import the redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,13 @@ async def main() -> None:
     await db.init_db()
     logger.info("Database initialization complete.")
 
+    # --- DIGITAL CEASEFIRE: Acquire lock or stand down ---
+    lock_acquired = redis_client.acquire_master_lock()
+    if not lock_acquired:
+        logger.warning("Another bot instance is active. This instance will stand down.")
+        # Optional: could sleep and retry, but for Render's restarts, exiting is cleaner.
+        return # Exit gracefully
+
     # --- Build Application ---
     persistence = RedisPersistence(redis_url=config.REDIS_URL)
     
@@ -53,7 +61,6 @@ async def main() -> None:
 
     # --- Register the Corrected and Completed Asynchronous Handlers ---
     application.add_handler(CommandHandler("start", handlers.start_command))
-    # *** THE FINAL PIECE: The /help command is now registered ***
     application.add_handler(CommandHandler("help", handlers.help_command))
     application.add_handler(CommandHandler("status", handlers.status_command))
     application.add_handler(CommandHandler("myprofile", handlers.myprofile_command))
@@ -78,12 +85,16 @@ async def main() -> None:
         await application.start()
         await application.updater.start_polling()
         
-        await executor_task
+        # Keep the master lock renewed
+        while True:
+            redis_client.renew_master_lock()
+            await asyncio.sleep(10) # Renew lock every 10 seconds
 
     except (KeyboardInterrupt, SystemExit):
         logger.info("Shutdown signal received.")
     finally:
         logger.info("Beginning graceful shutdown...")
+        redis_client.release_master_lock() # Release the lock on shutdown
         if application.updater and application.updater.running:
             await application.updater.stop()
         if application.running:
