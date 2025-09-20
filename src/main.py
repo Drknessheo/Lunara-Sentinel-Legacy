@@ -53,18 +53,15 @@ async def main() -> None:
 
     # --- Register the Corrected and Completed Asynchronous Handlers ---
     application.add_handler(CommandHandler("start", handlers.start_command))
+    # *** THE FINAL PIECE: The /help command is now registered ***
+    application.add_handler(CommandHandler("help", handlers.help_command))
     application.add_handler(CommandHandler("status", handlers.status_command))
-    application.add_handler(CommandHandler("myprofile", handlers.myprofile_command)) # <-- The missing alias
+    application.add_handler(CommandHandler("myprofile", handlers.myprofile_command))
     application.add_handler(CommandHandler("settings", handlers.settings_command))
     application.add_handler(CommandHandler("pay", handlers.pay_command))
     
-    # Use the new, robust callback handler for all setting interactions
     application.add_handler(CallbackQueryHandler(handlers.settings_callback_handler))
-    
-    # Add a handler for text messages to capture setting updates
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handlers.message_handler))
-    
-    # Register the central error handler
     application.add_error_handler(handlers.error_handler)
 
     # --- Start Background Tasks --- 
@@ -81,7 +78,6 @@ async def main() -> None:
         await application.start()
         await application.updater.start_polling()
         
-        # Keep the main function alive to allow background tasks to run
         await executor_task
 
     except (KeyboardInterrupt, SystemExit):
@@ -101,5 +97,4 @@ async def main() -> None:
         logger.info("Empire has been laid to rest. Goodbye.")
 
 if __name__ == "__main__":
-    # The entry point for the new asynchronous empire.
     asyncio.run(main())

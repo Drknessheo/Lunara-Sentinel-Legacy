@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 def escape_markdown_v2(text: str) -> str:
     """Escapes string for Telegram's MarkdownV2 parse mode."""
-    # This function is correct and will be used for all DYNAMIC data.
     return re.sub(r'([_*[\]()~`>#+\-=|{}.!])', r'\\\1', str(text))
 
 async def get_user_id(update: Update) -> int | None:
@@ -26,9 +25,7 @@ async def get_user_id(update: Update) -> int | None:
     return None
 
 def build_settings_keyboard(settings: dict) -> InlineKeyboardMarkup:
-    """Builds the dynamic settings keyboard with current values."""
     keyboard = []
-    # Display order for settings in the keyboard
     setting_order = [
         'autotrade', 'trading_mode', 'rsi_buy', 'rsi_sell', 'stop_loss',
         'trailing_activation', 'trailing_drop', 'profit_target', 'paper_balance', 'watchlist'
@@ -36,7 +33,6 @@ def build_settings_keyboard(settings: dict) -> InlineKeyboardMarkup:
 
     for key in setting_order:
         value = settings.get(key)
-        # Truncate long watchlist for display
         display_value = f": {value[:30]}..." if key == 'watchlist' and value and len(value) > 30 else f": {value}"
 
         if key == 'autotrade':
@@ -70,8 +66,19 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if created else
         "Welcome back, Commander\\. Your legions await your command\\."
     )
-    # Correctly escaped static message.
-    await update.message.reply_text(f"{welcome_message}\n\nUse /status or /myprofile to see your configuration\\.", parse_mode=ParseMode.MARKDOWN_V2)
+    await update.message.reply_text(f"{welcome_message}\n\nUse /help to see available commands\\.", parse_mode=ParseMode.MARKDOWN_V2)
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Displays a list of available commands."""
+    help_text = "*Your Imperial Command Manual*\n\n"
+    help_text += "/start \- Initialize your command center\.\n"
+    help_text += "/help \- Display this command manual\.\n"
+    help_text += "/status \- View your current settings and open trades\.\n"
+    help_text += "/myprofile \- Alias for /status\.\n"
+    help_text += "/settings \- Open the interactive settings panel\.\n"
+    help_text += "/pay \- View subscription and payment information\.\n"
+
+    await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN_V2)
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = await get_user_id(update)
@@ -85,19 +92,15 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     for key, value in settings.items():
         key_name = escape_markdown_v2(key.replace('_', ' ').title())
         value_str = escape_markdown_v2(str(value))
-        # Correctly escaped hyphen.
         status_text += f"\\- *{key_name}*: `{value_str}`\n"
 
     if open_trades:
-        # Correctly escaped parentheses.
         status_text += "\n*Active Campaigns \\(Open Trades\\):*\n"
         for trade in open_trades:
             symbol = escape_markdown_v2(trade['symbol'])
             buy_price = escape_markdown_v2(f"${trade['buy_price']:,.4f}")
-            # Correctly escaped hyphen.
             status_text += f"\\- `{symbol}` @ {buy_price}\n"
     else:
-        # Correctly escaped period.
         status_text += "\n*No active campaigns at this time\\.*\n"
 
     await update.message.reply_text(status_text, parse_mode=ParseMode.MARKDOWN_V2)
@@ -115,7 +118,16 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def settings_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
+    # *** THE ADDED ARMOR: Gracefully handle old queries ***
+    try:
+        await query.answer()
+    except BadRequest as e:
+        if "Query is too old" in str(e):
+            logger.warning(f"Handled old query for user {update.effective_user.id}. Bot may have been busy.")
+            return
+        else:
+            raise # Re-raise other BadRequest errors
+
     user_id = await get_user_id(update)
     if not user_id: return
 
@@ -123,13 +135,12 @@ async def settings_callback_handler(update: Update, context: ContextTypes.DEFAUL
     action = parts[0]
 
     if action == 'settings_done':
-        # Correctly escaped period.
         await query.edit_message_text("Settings saved\\. The empire adapts to your command\\.", parse_mode=ParseMode.MARKDOWN_V2)
         return
 
     setting_key = parts[1]
 
-    if action == 'set':  # Handle toggle buttons
+    if action == 'set':
         new_value = parts[2]
         await db.update_user_setting(user_id, setting_key, new_value)
         logger.info(f"User {user_id} toggled setting '{setting_key}' to '{new_value}'.")
@@ -140,18 +151,14 @@ async def settings_callback_handler(update: Update, context: ContextTypes.DEFAUL
         except BadRequest as e:
             if "Message is not modified" not in str(e): raise
 
-    elif action == 'prompt': # Handle buttons that require user text input
-        # *** THE CRITICAL FIX: SETTING THE CONTEXT FOR THE MESSAGE HANDLER ***
+    elif action == 'prompt':
         context.user_data['awaiting_setting'] = setting_key
         setting_name = escape_markdown_v2(setting_key.replace('_', ' ').title())
-        # Correctly escaped period.
         await query.message.reply_text(f"Please enter the new value for *{setting_name}*\\.", parse_mode=ParseMode.MARKDOWN_V2)
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = await get_user_id(update)
-    # *** THE CRITICAL FIX: CHECKING THE CONTEXT ***
     if not user_id or 'awaiting_setting' not in context.user_data:
-        # This message is not a reply for a setting, ignore it.
         return
 
     setting_key = context.user_data.pop('awaiting_setting')
@@ -161,18 +168,15 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await db.update_user_setting(user_id, setting_key, new_value)
         setting_name = escape_markdown_v2(setting_key.replace('_', ' ').title())
         logger.info(f"User {user_id} set '{setting_key}' to '{new_value}'.")
-        # Correctly escaped period.
         await update.message.reply_text(f"✅ *{setting_name}* has been updated\\.", parse_mode=ParseMode.MARKDOWN_V2)
 
         settings = await db.get_user_effective_settings(user_id)
         keyboard = build_settings_keyboard(settings)
-        # Correctly escaped period.
         await update.message.reply_text("Settings updated\\. Choose another setting or select Done:", reply_markup=keyboard)
     except ValueError as e:
         await update.message.reply_text(escape_markdown_v2(str(e)))
     except Exception as e:
         logger.error(f"Failed to update setting {setting_key} for user {user_id}: {e}")
-        # Correctly escaped period.
         await update.message.reply_text("An error occurred\\. The Imperial Guard has been notified\\.", parse_mode=ParseMode.MARKDOWN_V2)
 
 PAYMENT_MESSAGE = '''
@@ -190,14 +194,13 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.message.reply_html(PAYMENT_MESSAGE)
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if isinstance(context.error, BadRequest) and "Message is not modified" in str(context.error):
-        return # Suppress this common, harmless error.
+    if isinstance(context.error, BadRequest) and ("Message is not modified" in str(context.error) or "Query is too old" in str(context.error)):
+        return # Suppress these common, now-handled errors.
 
     logger.error(f"Exception while handling an update: {context.error}", exc_info=context.error)
 
     if isinstance(update, Update) and update.effective_message:
         try:
-            # Correctly escaped period.
             await update.effective_message.reply_text("An internal error occurred\\. The Imperial Guard has been notified\\.", parse_mode=ParseMode.MARKDOWN_V2)
         except Exception as e:
             logger.error(f"Failed to send final error message to user: {e}")

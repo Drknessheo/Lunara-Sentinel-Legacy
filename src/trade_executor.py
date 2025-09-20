@@ -2,7 +2,7 @@
 import asyncio
 import logging
 import json
-from datetime import datetime
+import functools
 
 import google.generativeai as genai
 
@@ -14,16 +14,27 @@ from .core import binance_client, redis_client
 
 logger = logging.getLogger(__name__)
 
-# --- Constants ---
-# The new, high-frequency loop interval
 TRADE_MONITOR_INTERVAL_SECONDS = 20
 
+# --- Synchronous Gemini Consultation --- #
+def _run_gemini_consultation_sync(api_key: str, model_name: str, prompt: str) -> dict:
+    """Synchronous function to be run in a separate thread."""
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name)
+        response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(temperature=0.0, response_mime_type="application/json"))
+        return json.loads(response.text)
+    except Exception as e:
+        logger.error(f"[ORACLE_THREAD] Gemini consultation failed in background thread: {e}")
+        # In case of a catastrophic failure in the thread, return an empty dict.
+        return {}
+
 class TradeExecutor:
-    """A unified, high-frequency trading executor that embodies the 'Ultimate Grasp' strategy."""
+    """A unified, high-frequency trading executor."""
 
     def __init__(self, bot):
         self.bot = bot
-        self.user_states = {} # For in-memory state like trailing stop status
+        self.user_states = {}
 
     async def run(self):
         logger.info(f"[EXECUTOR] Starting TradeExecutor run loop (interval: {TRADE_MONITOR_INTERVAL_SECONDS}s)...")
@@ -33,10 +44,7 @@ class TradeExecutor:
             try:
                 user_ids = await db.get_users_with_autotrade_enabled()
                 if user_ids:
-                    logger.debug(f"[EXECUTOR] Processing {len(user_ids)} active users.")
                     await asyncio.gather(*[self._process_user(user_id) for user_id in user_ids])
-                else:
-                    logger.debug("[EXECUTOR] No autotrade users this cycle.")
             except Exception as e:
                 logger.error(f"[EXECUTOR] Unhandled error in main run loop: {e}", exc_info=True)
             
@@ -51,22 +59,16 @@ class TradeExecutor:
         logger.info("[EXECUTOR_INIT] Initial state sync complete.")
 
     async def _process_user(self, user_id: int):
-        """Processes both sell (defense) and buy (offense) logic in a single, rapid cycle."""
         try:
             settings = await settings_manager.get_effective_settings(user_id)
-            if not (settings and settings.get('autotrade') == 'on'):
-                return
+            if not (settings and settings.get('autotrade') == 'on'): return
 
-            # 1. High-Frequency Defense: Always check open trades for sell conditions.
             await self._check_and_sell_open_trades(user_id, settings)
-            
-            # 2. High-Frequency Offense Analysis & Strategic Execution
             await self._analyze_and_conditionally_buy(user_id, settings)
 
         except Exception as e:
             logger.error(f"[EXECUTOR] Error processing user {user_id}: {e}", exc_info=True)
 
-    # --- Defensive Logic (The Sentinel) ---
     async def _check_and_sell_open_trades(self, user_id: int, settings: dict):
         open_trades = await db.get_open_trades_by_user(user_id)
         if open_trades:
@@ -107,63 +109,52 @@ class TradeExecutor:
                 return f"🐉 Dragon strike! Profit of {pnl:.2f}% locked in."
         return None
 
-    # --- Offensive Logic (The Chamberlain) ---
     async def _analyze_and_conditionally_buy(self, user_id: int, settings: dict):
-        # Check if the Oracle is on cooldown for this user.
-        if redis_client.is_gemini_cooldown_active(user_id):
-            logger.debug(f"[CHAMBERLAIN] Gemini cooldown is active for user {user_id}. Skipping buy analysis.")
-            return
+        if redis_client.is_gemini_cooldown_active(user_id): return
 
-        logger.info(f"[CHAMBERLAIN] Cooldown ended for user {user_id}. Analyzing watchlist for buy opportunities.")
         watchlist = settings.get('watchlist', '').split(',')
-        if not watchlist: return
-
-        active_trade_symbols = redis_client.get_active_trades(user_id)
-        symbols_to_evaluate = sorted([s.strip() for s in watchlist if s.strip() and s.strip() not in active_trade_symbols])
+        active_trades = redis_client.get_active_trades(user_id)
+        symbols_to_evaluate = sorted([s.strip() for s in watchlist if s.strip() and s.strip() not in active_trades])
 
         if not symbols_to_evaluate: return
 
-        # Consult the Scribe first (for Strategic Retreat or recent success)
         decisions = redis_client.get_gemini_decision_cache(user_id, symbols_to_evaluate)
         
         if decisions is None:
-            # If no cached decision, consult the Oracle and set the cooldown.
             decisions = await self._get_batch_gemini_decisions(user_id, symbols_to_evaluate, settings)
-            redis_client.set_gemini_cooldown(user_id)
 
         for symbol, decision in decisions.items():
             if decision == "BUY":
                 await self._buy_trade(user_id, symbol, settings)
 
     async def _get_batch_gemini_decisions(self, user_id: int, symbols: list[str], settings: dict) -> dict:
-        logger.info(f"[ORACLE] Consulting Gemini Headmaster for user {user_id} on {symbols}.")
+        logger.info(f"[ORACLE] Offloading Gemini consultation to background thread for user {user_id} on {symbols}.")
         api_key = config.get_next_gemini_key()
         if not api_key: return redis_client.cache_gemini_failure(user_id, symbols)
 
-        genai.configure(api_key=api_key)
-        
         tasks = [self._analyze_and_prepare(s, settings) for s in symbols]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         batch_analysis = {symbols[i]: r for i, r in enumerate(results) if isinstance(r, dict) and r}
         
         if not batch_analysis: return redis_client.cache_gemini_failure(user_id, symbols)
 
-        prompt = (
-            f'''User: {user_id}. Profile: {json.dumps(settings)}. Analyze market data and decide BUY or HOLD for each symbol. Respond in valid JSON.
+        prompt = f'''User: {user_id}. Profile: {json.dumps(settings)}. Analyze market data and decide BUY or HOLD for each symbol. Respond in valid JSON.\n\nMarket Data:\n{json.dumps(batch_analysis, indent=2)}'''
 
-Market Data:
-{json.dumps(batch_analysis, indent=2)}'''
+        # *** THE CRITICAL FIX: Offload the blocking call to a separate thread ***
+        loop = asyncio.get_running_loop()
+        decisions = await loop.run_in_executor(
+            None,  # Use the default thread pool executor
+            functools.partial(_run_gemini_consultation_sync, api_key, config.GEMINI_MODEL, prompt)
         )
 
-        try:
-            model = genai.GenerativeModel(config.GEMINI_MODEL)
-            response = await model.generate_content_async(prompt, generation_config=genai.types.GenerationConfig(temperature=0.0, response_mime_type="application/json"))
-            decisions = json.loads(response.text)
+        if decisions:
             redis_client.set_gemini_decision_cache(user_id, symbols, decisions)
-            return decisions
-        except Exception as e:
-            logger.error(f"[ORACLE] Gemini consultation failed: {e}. Triggering Strategic Retreat.")
-            return redis_client.cache_gemini_failure(user_id, symbols)
+        else:
+            logger.warning(f"[ORACLE] Gemini consultation returned empty. Caching as failure.")
+            decisions = redis_client.cache_gemini_failure(user_id, symbols)
+        
+        redis_client.set_gemini_cooldown(user_id) # Set cooldown regardless of success or failure
+        return decisions
 
     async def _analyze_and_prepare(self, symbol: str, settings: dict) -> dict:
         try:
@@ -173,7 +164,6 @@ Market Data:
             logger.error(f"Error analyzing {symbol}: {e}")
             return {}
 
-    # --- Trade Execution ---
     async def _buy_trade(self, user_id: int, symbol: str, settings: dict):
         price = await binance_client.get_current_price(symbol)
         if not price: return
