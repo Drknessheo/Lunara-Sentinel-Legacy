@@ -44,7 +44,9 @@ class TradeExecutor:
             try:
                 user_ids = await db.get_users_with_autotrade_enabled()
                 if user_ids:
-                    await asyncio.gather(*[self._process_user(user_id) for user_id in user_ids])
+                    # Process users sequentially to avoid overwhelming resources
+                    for user_id in user_ids:
+                        await self._process_user(user_id)
             except Exception as e:
                 logger.error(f"[EXECUTOR] Unhandled error in main run loop: {e}", exc_info=True)
             
@@ -72,6 +74,7 @@ class TradeExecutor:
     async def _check_and_sell_open_trades(self, user_id: int, settings: dict):
         open_trades = await db.get_open_trades_by_user(user_id)
         if open_trades:
+            # Sell checks can still be concurrent as they are less memory intensive
             await asyncio.gather(*[self._evaluate_and_execute_sell(dict(trade), settings) for trade in open_trades])
 
     async def _evaluate_and_execute_sell(self, trade: dict, settings: dict):
@@ -128,22 +131,30 @@ class TradeExecutor:
                 await self._buy_trade(user_id, symbol, settings)
 
     async def _get_batch_gemini_decisions(self, user_id: int, symbols: list[str], settings: dict) -> dict:
-        logger.info(f"[ORACLE] Offloading Gemini consultation to background thread for user {user_id} on {symbols}.")
+        logger.info(f"[ORACLE] Starting sequential Gemini consultation for user {user_id} on {len(symbols)} symbols.")
         api_key = config.get_next_gemini_key()
         if not api_key: return redis_client.cache_gemini_failure(user_id, symbols)
 
-        tasks = [self._analyze_and_prepare(s, settings) for s in symbols]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        batch_analysis = {symbols[i]: r for i, r in enumerate(results) if isinstance(r, dict) and r}
+        # --- STRATEGIC REFACTOR: Process symbols sequentially to conserve memory ---
+        batch_analysis = {}
+        for symbol in symbols:
+            try:
+                # Process one symbol at a time
+                analysis_result = await self._analyze_and_prepare(symbol, settings)
+                if analysis_result:
+                    batch_analysis[symbol] = analysis_result
+                # A small sleep to prevent hitting API rate limits too aggressively
+                await asyncio.sleep(1) 
+            except Exception as e:
+                logger.error(f"Error during sequential analysis of {symbol}: {e}")
         
         if not batch_analysis: return redis_client.cache_gemini_failure(user_id, symbols)
 
         prompt = f'''User: {user_id}. Profile: {json.dumps(settings)}. Analyze market data and decide BUY or HOLD for each symbol. Respond in valid JSON.\n\nMarket Data:\n{json.dumps(batch_analysis, indent=2)}'''
 
-        # *** THE CRITICAL FIX: Offload the blocking call to a separate thread ***
         loop = asyncio.get_running_loop()
         decisions = await loop.run_in_executor(
-            None,  # Use the default thread pool executor
+            None,
             functools.partial(_run_gemini_consultation_sync, api_key, config.GEMINI_MODEL, prompt)
         )
 
@@ -153,7 +164,7 @@ class TradeExecutor:
             logger.warning(f"[ORACLE] Gemini consultation returned empty. Caching as failure.")
             decisions = redis_client.cache_gemini_failure(user_id, symbols)
         
-        redis_client.set_gemini_cooldown(user_id) # Set cooldown regardless of success or failure
+        redis_client.set_gemini_cooldown(user_id)
         return decisions
 
     async def _analyze_and_prepare(self, symbol: str, settings: dict) -> dict:
