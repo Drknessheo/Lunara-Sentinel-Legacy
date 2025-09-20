@@ -42,7 +42,8 @@ multidict==6.6.4
 packaging==25.0
 pillow==11.3.0
 pluggy==1.6.0
-prometheus_client==0.22.2
+prometheus_client==0.23.1
+psutil
 prometheus_flask_exporter==0.23.2
 propcache==0.3.2
 pycparser==2.22
