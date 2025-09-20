@@ -1,0 +1,18 @@
+{
+  "name": "LunaraBot",
+  "version": "1.0.0",
+  "description": "The primary Telegram command and control interface for the empire's legions. It provides real-time status, configuration, and trade execution capabilities.",
+  "entry_point": "blueprint_interface.py",
+  "semantic_trigger": "start_bot_and_narrate",
+  "permissions": {
+    "can_read_user_data": true,
+    "can_execute_trades": true,
+    "can_manage_settings": true,
+    "can_send_notifications": true
+  },
+  "dependencies": [
+    "python-telegram-bot",
+    "asyncio",
+    "redis"
+  ]
+}

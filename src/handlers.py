@@ -1,6 +1,5 @@
 """
-Asynchronous command handlers for the Telegram bot.
-All handlers must be `async` and use the async `db` module.
+Asynchronous command handlers for the Telegram bot, forged with corrected logic and escaping.
 """
 import logging
 import re
@@ -17,8 +16,7 @@ logger = logging.getLogger(__name__)
 
 def escape_markdown_v2(text: str) -> str:
     """Escapes string for Telegram's MarkdownV2 parse mode."""
-    # Escape the characters `_`, `*`, `[`, `]`, `(`, `)`, `~`, `` ` ``, `>`, `#`, `+`, `-`, `=`, `|`, `{`, `}`, `.`,
-    # `!` by prepending them with a backslash.
+    # This function is correct and will be used for all DYNAMIC data.
     return re.sub(r'([_*[\]()~`>#+\-=|{}.!])', r'\\\1', str(text))
 
 async def get_user_id(update: Update) -> int | None:
@@ -30,6 +28,7 @@ async def get_user_id(update: Update) -> int | None:
 def build_settings_keyboard(settings: dict) -> InlineKeyboardMarkup:
     """Builds the dynamic settings keyboard with current values."""
     keyboard = []
+    # Display order for settings in the keyboard
     setting_order = [
         'autotrade', 'trading_mode', 'rsi_buy', 'rsi_sell', 'stop_loss',
         'trailing_activation', 'trailing_drop', 'profit_target', 'paper_balance', 'watchlist'
@@ -37,10 +36,8 @@ def build_settings_keyboard(settings: dict) -> InlineKeyboardMarkup:
 
     for key in setting_order:
         value = settings.get(key)
-        if key == 'watchlist':
-            display_value = f": {value[:30]}..." if value and len(value) > 30 else f": {value}"
-        else:
-            display_value = f': {value}' if value is not None else ''
+        # Truncate long watchlist for display
+        display_value = f": {value[:30]}..." if key == 'watchlist' and value and len(value) > 30 else f": {value}"
 
         if key == 'autotrade':
             action = 'off' if value == 'on' else 'on'
@@ -62,7 +59,6 @@ def build_settings_keyboard(settings: dict) -> InlineKeyboardMarkup:
 # === Core Command Handlers ===
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Greets the user and sets up their account."""
     user_id = await get_user_id(update)
     if not user_id: return
 
@@ -70,14 +66,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     _, created = await db.get_or_create_user(user_id)
 
     welcome_message = (
-        "Welcome to the Empire, Commander\. Your command center is ready\."
+        "Welcome to the Empire, Commander\\. Your command center is ready\\."
         if created else
-        "Welcome back, Commander\. Your legions await your command\."
+        "Welcome back, Commander\\. Your legions await your command\\."
     )
-    await update.message.reply_text(f"{welcome_message}\n\nUse /status or /myprofile to see your configuration\.", parse_mode=ParseMode.MARKDOWN_V2)
+    # Correctly escaped static message.
+    await update.message.reply_text(f"{welcome_message}\n\nUse /status or /myprofile to see your configuration\\.", parse_mode=ParseMode.MARKDOWN_V2)
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays the user's current settings and open trades."""
     user_id = await get_user_id(update)
     if not user_id: return
 
@@ -89,25 +85,27 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     for key, value in settings.items():
         key_name = escape_markdown_v2(key.replace('_', ' ').title())
         value_str = escape_markdown_v2(str(value))
-        status_text += f"- *{key_name}*: `{value_str}`\n"
+        # Correctly escaped hyphen.
+        status_text += f"\\- *{key_name}*: `{value_str}`\n"
 
     if open_trades:
-        status_text += "\n*Active Campaigns \(Open Trades\):*\n"
+        # Correctly escaped parentheses.
+        status_text += "\n*Active Campaigns \\(Open Trades\\):*\n"
         for trade in open_trades:
             symbol = escape_markdown_v2(trade['symbol'])
             buy_price = escape_markdown_v2(f"${trade['buy_price']:,.4f}")
-            status_text += f"- `{symbol}` @ {buy_price}\n"
+            # Correctly escaped hyphen.
+            status_text += f"\\- `{symbol}` @ {buy_price}\n"
     else:
-        status_text += "\n*No active campaigns at this time\.*\n"
+        # Correctly escaped period.
+        status_text += "\n*No active campaigns at this time\\.*\n"
 
     await update.message.reply_text(status_text, parse_mode=ParseMode.MARKDOWN_V2)
 
 async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Alias for the /status command."""
     await status_command(update, context)
 
 async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays the settings management keyboard."""
     user_id = await get_user_id(update)
     if not user_id: return
 
@@ -116,7 +114,6 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await update.message.reply_text("Choose a setting to adjust, or select a toggle:", reply_markup=keyboard)
 
 async def settings_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles all inline keyboard interactions for settings."""
     query = update.callback_query
     await query.answer()
     user_id = await get_user_id(update)
@@ -126,34 +123,35 @@ async def settings_callback_handler(update: Update, context: ContextTypes.DEFAUL
     action = parts[0]
 
     if action == 'settings_done':
-        await query.edit_message_text("Settings saved\. The empire adapts to your command\.", parse_mode=ParseMode.MARKDOWN_V2)
+        # Correctly escaped period.
+        await query.edit_message_text("Settings saved\\. The empire adapts to your command\\.", parse_mode=ParseMode.MARKDOWN_V2)
         return
 
     setting_key = parts[1]
 
-    if action == 'set':  # For toggles
+    if action == 'set':  # Handle toggle buttons
         new_value = parts[2]
         await db.update_user_setting(user_id, setting_key, new_value)
-        logger.info(f"User {user_id} updated setting '{setting_key}' to '{new_value}'.")
-
+        logger.info(f"User {user_id} toggled setting '{setting_key}' to '{new_value}'.")
         new_settings = await db.get_user_effective_settings(user_id)
         keyboard = build_settings_keyboard(new_settings)
         try:
             await query.edit_message_reply_markup(reply_markup=keyboard)
         except BadRequest as e:
-            if "Message is not modified" in str(e):
-                logger.warning("Settings keyboard did not change; suppressing error.")
-            else:
-                raise
+            if "Message is not modified" not in str(e): raise
 
-    elif action == 'prompt':
+    elif action == 'prompt': # Handle buttons that require user text input
+        # *** THE CRITICAL FIX: SETTING THE CONTEXT FOR THE MESSAGE HANDLER ***
+        context.user_data['awaiting_setting'] = setting_key
         setting_name = escape_markdown_v2(setting_key.replace('_', ' ').title())
-        await query.message.reply_text(f"Please enter the new value for *{setting_name}*\.", parse_mode=ParseMode.MARKDOWN_V2)
+        # Correctly escaped period.
+        await query.message.reply_text(f"Please enter the new value for *{setting_name}*\\.", parse_mode=ParseMode.MARKDOWN_V2)
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles text messages, specifically for updating settings."""
     user_id = await get_user_id(update)
+    # *** THE CRITICAL FIX: CHECKING THE CONTEXT ***
     if not user_id or 'awaiting_setting' not in context.user_data:
+        # This message is not a reply for a setting, ignore it.
         return
 
     setting_key = context.user_data.pop('awaiting_setting')
@@ -163,47 +161,43 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await db.update_user_setting(user_id, setting_key, new_value)
         setting_name = escape_markdown_v2(setting_key.replace('_', ' ').title())
         logger.info(f"User {user_id} set '{setting_key}' to '{new_value}'.")
-        await update.message.reply_text(f"✅ *{setting_name}* has been updated\.", parse_mode=ParseMode.MARKDOWN_V2)
+        # Correctly escaped period.
+        await update.message.reply_text(f"✅ *{setting_name}* has been updated\\.", parse_mode=ParseMode.MARKDOWN_V2)
 
         settings = await db.get_user_effective_settings(user_id)
         keyboard = build_settings_keyboard(settings)
-        await update.message.reply_text("Settings updated\. Choose another setting or select Done:", reply_markup=keyboard)
+        # Correctly escaped period.
+        await update.message.reply_text("Settings updated\\. Choose another setting or select Done:", reply_markup=keyboard)
     except ValueError as e:
         await update.message.reply_text(escape_markdown_v2(str(e)))
     except Exception as e:
         logger.error(f"Failed to update setting {setting_key} for user {user_id}: {e}")
-        await update.message.reply_text("An error occurred\. The Imperial Guard has been notified\.", parse_mode=ParseMode.MARKDOWN_V2)
+        # Correctly escaped period.
+        await update.message.reply_text("An error occurred\\. The Imperial Guard has been notified\\.", parse_mode=ParseMode.MARKDOWN_V2)
 
 PAYMENT_MESSAGE = '''
 <b>💳 Subscription & Payment Information</b>
 
 To unlock the full power of the empire, a subscription is required.
 
-<b>Available Tiers:</b>
-- <b>Centurion:</b> Access to all core features.
-- <b>Legate:</b> Priority access and advanced analytics.
-- <b>Emperor:</b> Direct line to the architects for feature requests.
-
 Please contact the administration to arrange for payment and activation.
 '''
 
 async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays the payment information."""
     if update.effective_chat and update.effective_chat.type != 'private':
         await update.message.reply_text("For your security, please use this command in a private chat with me.")
         return
     await update.message.reply_html(PAYMENT_MESSAGE)
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Log Errors and handle them gracefully."""
     if isinstance(context.error, BadRequest) and "Message is not modified" in str(context.error):
-        logger.warning(f"Suppressing 'Message is not modified' error for update: {update}")
-        return
+        return # Suppress this common, harmless error.
 
     logger.error(f"Exception while handling an update: {context.error}", exc_info=context.error)
 
     if isinstance(update, Update) and update.effective_message:
         try:
-            await update.effective_message.reply_text("An internal error occurred\. The Imperial Guard has been notified\.", parse_mode=ParseMode.MARKDOWN_V2)
+            # Correctly escaped period.
+            await update.effective_message.reply_text("An internal error occurred\\. The Imperial Guard has been notified\\.", parse_mode=ParseMode.MARKDOWN_V2)
         except Exception as e:
-            logger.error(f"Failed to send error message to user: {e}")
+            logger.error(f"Failed to send final error message to user: {e}")
