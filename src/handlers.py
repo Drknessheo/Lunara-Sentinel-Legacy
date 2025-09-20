@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 def escape_markdown_v2(text: str) -> str:
     """Escapes string for Telegram's MarkdownV2 parse mode."""
+    # Escape characters: _ * [ ] ( ) ~ ` > # + - = | { } . !
     return re.sub(r'([_*[\]()~`>#+\-=|{}.!])', r'\\\1', str(text))
 
 async def get_user_id(update: Update) -> int | None:
@@ -97,10 +98,9 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     # --- Strategic Settings Section ---
     status_text += "*Strategic Settings:*\n"
-    # Create a copy to avoid modifying the original dict while iterating
     settings_for_display = settings.copy()
-    settings_for_display.pop('paper_balance', None) # Remove paper_balance for display
-    settings_for_display.pop('watchlist', None) # Hide long watchlist
+    settings_for_display.pop('paper_balance', None)
+    settings_for_display.pop('watchlist', None)
 
     for key, value in settings_for_display.items():
         key_name = escape_markdown_v2(key.replace('_', ' ').title())
@@ -204,7 +204,7 @@ Please contact the administration to arrange for payment and activation.
 
 async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_chat and update.effective_chat.type != 'private':
-        await update.message.reply_text("For your security, please use this command in a private chat with me.")
+        await update.message.reply_text("For your security, please use this command in a private chat with me\\.")
         return
     await update.message.reply_html(PAYMENT_MESSAGE)
 
