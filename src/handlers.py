@@ -71,12 +71,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays a list of available commands."""
     help_text = "*Your Imperial Command Manual*\n\n"
-    help_text += "/start \\- Initialize your command center\.\n"
-    help_text += "/help \\- Display this command manual\.\n"
-    help_text += "/status \\- View your current settings and open trades\.\n"
-    help_text += "/myprofile \\- Alias for /status\.\n"
-    help_text += "/settings \\- Open the interactive settings panel\.\n"
-    help_text += "/pay \\- View subscription and payment information\.\n"
+    help_text += "/start \\- Initialize your command center\\.\n"
+    help_text += "/help \\- Display this command manual\\.\n"
+    help_text += "/status \\- View your current settings and open trades\\.\n"
+    help_text += "/myprofile \\- Alias for /status\\.\n"
+    help_text += "/settings \\- Open the interactive settings panel\\.\n"
+    help_text += "/pay \\- View subscription and payment information\\.\n"
 
     await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN_V2)
 
@@ -87,17 +87,22 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     settings = await db.get_user_effective_settings(user_id)
     open_trades = await db.get_open_trades_by_user(user_id)
 
-    # --- Refactored Treasury Section ---
-    paper_balance = settings.pop('paper_balance', 0.0) # Pop the balance, default to 0.0
-    formatted_balance = escape_markdown_v2(f"${paper_balance:,.2f}")
-
     status_text = "*Your Imperial Command Center*\n\n"
-    status_text += f"💰 *Imperial Treasury:* `{formatted_balance}`\n\n" # Prominent display
+
+    # --- The Corrected Treasury Section ---
+    if settings.get('trading_mode') == 'PAPER':
+        paper_balance = settings.get('paper_balance', 0.0)
+        formatted_balance = escape_markdown_v2(f"${paper_balance:,.2f}")
+        status_text += f"💰 *Imperial Treasury \\(Paper\\):* `{formatted_balance}`\n\n"
 
     # --- Strategic Settings Section ---
     status_text += "*Strategic Settings:*\n"
-    for key, value in settings.items():
-        if key == 'watchlist': continue # Hide long watchlist from this view
+    # Create a copy to avoid modifying the original dict while iterating
+    settings_for_display = settings.copy()
+    settings_for_display.pop('paper_balance', None) # Remove paper_balance for display
+    settings_for_display.pop('watchlist', None) # Hide long watchlist
+
+    for key, value in settings_for_display.items():
         key_name = escape_markdown_v2(key.replace('_', ' ').title())
         value_str = escape_markdown_v2(str(value))
         status_text += f"\\- *{key_name}*: `{value_str}`\n"
@@ -201,7 +206,7 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if update.effective_chat and update.effective_chat.type != 'private':
         await update.message.reply_text("For your security, please use this command in a private chat with me.")
         return
-    await update.message.reply_html(PAYMENT_Message)
+    await update.message.reply_html(PAYMENT_MESSAGE)
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     if isinstance(context.error, BadRequest) and ("Message is not modified" in str(context.error) or "Query is too old" in str(context.error)):
