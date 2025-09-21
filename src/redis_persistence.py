@@ -56,25 +56,49 @@ class RedisPersistence(BasePersistence):
 
     async def get_bot_data(self) -> BD:
         key = self._get_key("bot_data", "bot")
-        data_str = await self.redis.get(key)
-        if data_str:
-            return cast(BD, json.loads(data_str))
+        for attempt in range(3):
+            try:
+                data_str = await self.redis.get(key)
+                if data_str:
+                    return cast(BD, json.loads(data_str))
+                return cast(BD, {})
+            except Exception as e:
+                logger.error(f"[REDIS] get_bot_data failed (attempt {attempt+1}/3): {e}")
+                await asyncio.sleep(2 * (attempt + 1))
+        logger.critical("[REDIS] get_bot_data failed after 3 attempts. Returning empty.")
         return cast(BD, {})
 
     async def update_bot_data(self, data: BD) -> None:
         key = self._get_key("bot_data", "bot")
-        await self.redis.set(key, json.dumps(data))
+        for attempt in range(3):
+            try:
+                await self.redis.set(key, json.dumps(data))
+                return
+            except Exception as e:
+                logger.error(f"[REDIS] update_bot_data failed (attempt {attempt+1}/3): {e}")
+                await asyncio.sleep(2 * (attempt + 1))
+        logger.critical("[REDIS] update_bot_data failed after 3 attempts. Data not persisted.")
 
     async def get_chat_data(self) -> Dict[int, CD]:
-        keys = await self.redis.keys(self._get_key("chat_data", "*"))
         chat_data: Dict[int, CD] = {}
-        for key in keys:
-            chat_id_str = key.split(":")[-1]
-            if chat_id_str.isdigit():
-                chat_id = int(chat_id_str)
-                data_str = await self.redis.get(key)
-                if data_str:
-                    chat_data[chat_id] = json.loads(data_str)
+        for attempt in range(3):
+            try:
+                keys = await self.redis.keys(self._get_key("chat_data", "*"))
+                for key in keys:
+                    chat_id_str = key.split(":")[-1]
+                    if chat_id_str.isdigit():
+                        chat_id = int(chat_id_str)
+                        try:
+                            data_str = await self.redis.get(key)
+                            if data_str:
+                                chat_data[chat_id] = json.loads(data_str)
+                        except Exception as e:
+                            logger.error(f"[REDIS] get_chat_data: failed to get key {key}: {e}")
+                return chat_data
+            except Exception as e:
+                logger.error(f"[REDIS] get_chat_data failed (attempt {attempt+1}/3): {e}")
+                await asyncio.sleep(2 * (attempt + 1))
+        logger.critical("[REDIS] get_chat_data failed after 3 attempts. Returning empty.")
         return chat_data
 
     async def update_chat_data(self, chat_id: int, data: CD) -> None:

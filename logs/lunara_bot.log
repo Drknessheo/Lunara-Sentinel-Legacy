@@ -5934,3 +5934,190 @@ task: <Task pending name='Task-5' coro=<_redis_pubsub_listener() done, defined a
 2025-09-09 02:04:32,811 - src.autotrade_jobs - INFO - [MONITOR] Monitoring open autotrades...
 2025-09-09 02:05:07,320 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
 2025-09-09 02:05:07,333 - telegram.ext.Application - INFO - Application.stop() complete
+2025-09-21 09:19:05,983 - src.core.redis_client - INFO - Successfully connected to Redis server.
+2025-09-21 09:19:06,035 - __main__ - INFO - 🚀 Forging the new asynchronous empire...
+2025-09-21 09:19:06,043 - __main__ - INFO - Initializing the asynchronous database...
+2025-09-21 09:19:06,135 - src.db - INFO - Checking for necessary database migrations...
+2025-09-21 09:19:06,136 - src.db - INFO - 'symbol' column in 'trades' already exists. No migration needed.
+2025-09-21 09:19:06,137 - src.db - INFO - 'watchlist' column in 'users' already exists. No migration needed.
+2025-09-21 09:19:06,137 - src.db - INFO - 'stop_loss' column in 'trades' already exists. No migration needed.
+2025-09-21 09:19:06,138 - __main__ - INFO - Database initialization complete.
+2025-09-21 09:19:06,139 - src.core.redis_client - INFO - Instance legion_instance_1758424744.928571 attempting to acquire master lock...
+2025-09-21 09:19:06,446 - src.core.redis_client - INFO - Instance legion_instance_1758424744.928571 has acquired the master lock. We are the Prime Legion.
+2025-09-21 09:19:08,089 - __main__ - INFO - Initializing and starting the TradeExecutor as a background task...
+2025-09-21 09:19:08,089 - __main__ - INFO - TradeExecutor is now running in the background.
+2025-09-21 09:19:08,090 - __main__ - INFO - Starting bot polling... The empire is listening.
+2025-09-21 09:19:08,090 - src.trade_executor - INFO - [EXECUTOR] Starting TradeExecutor run loop (interval: 20s)...
+2025-09-21 09:19:08,090 - src.trade_executor - INFO - [EXECUTOR_INIT] Performing initial state synchronization from DB to Redis...
+2025-09-21 09:19:08,384 - src.trade_executor - INFO - [EXECUTOR_INIT] Initial state sync complete.
+2025-09-21 09:19:08,924 - src.trade_executor - INFO - [ORACLE] Starting sequential Gemini consultation for user 6284071528 on 16 symbols.
+2025-09-21 09:19:10,307 - src.core.binance_client - INFO - Binance client initialized successfully.
+2025-09-21 09:19:10,736 - telegram.ext.Application - INFO - Application started
+2025-09-21 09:19:25,219 - src.handlers - INFO - User 6284071528 (Shamim Reza) started the bot.
+2025-09-21 09:20:02,029 - src.db - INFO - [DB_WRITE] Attempting to update setting 'autotrade' for user 6284071528 with value 'off'.
+2025-09-21 09:20:02,196 - src.db - INFO - [DB_WRITE] SUCCESS: Setting 'autotrade' for user 6284071528 was updated.
+2025-09-21 09:20:02,196 - src.handlers - INFO - User 6284071528 toggled setting 'autotrade' to 'off'.
+2025-09-21 09:20:06,626 - src.db - INFO - [DB_WRITE] Attempting to update setting 'autotrade' for user 6284071528 with value 'on'.
+2025-09-21 09:20:06,752 - src.db - INFO - [DB_WRITE] SUCCESS: Setting 'autotrade' for user 6284071528 was updated.
+2025-09-21 09:20:06,752 - src.handlers - INFO - User 6284071528 toggled setting 'autotrade' to 'on'.
+2025-09-21 09:26:03,265 - urllib3.connectionpool - WARNING - Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ReadTimeoutError("HTTPSConnectionPool(host='api.binance.com', port=443): Read timed out. (read timeout=10)")': /api/v3/klines?interval=15m&limit=1000&startTime=1738540800000&symbol=AVAXUSDT
+2025-09-21 09:52:36,759 - urllib3.connectionpool - WARNING - Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ReadTimeoutError("HTTPSConnectionPool(host='api.binance.com', port=443): Read timed out. (read timeout=10)")': /api/v3/klines?interval=15m&limit=1000&startTime=1538791200000&symbol=VETUSDT
+2025-09-21 09:52:48,897 - urllib3.connectionpool - WARNING - Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x000001FFB4D00CD0>: Failed to resolve 'api.binance.com' ([Errno 11001] getaddrinfo failed)")': /api/v3/klines?interval=15m&limit=1000&startTime=1538791200000&symbol=VETUSDT
+2025-09-21 09:53:08,666 - src.handlers - ERROR - Exception while handling an update: Error while reading from measured-whale-51756.upstash.io:6379 : (22, 'The semaphore timeout period has expired', None, 121, None)
+Traceback (most recent call last):
+  File "F:\lunara-bot\venv\Lib\site-packages\redis\asyncio\connection.py", line 599, in read_response
+    response = await self._parser.read_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        disable_decoding=disable_decoding
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "F:\lunara-bot\venv\Lib\site-packages\redis\_parsers\resp2.py", line 82, in read_response
+    response = await self._read_response(disable_decoding=disable_decoding)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\lunara-bot\venv\Lib\site-packages\redis\_parsers\resp2.py", line 90, in _read_response
+    raw = await self._readline()
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\lunara-bot\venv\Lib\site-packages\redis\_parsers\base.py", line 283, in _readline
+    data = await self._stream.readline()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\asyncio\streams.py", line 562, in readline
+    line = await self.readuntil(sep)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\asyncio\streams.py", line 677, in readuntil
+    await self._wait_for_data('readuntil')
+  File "G:\Pycharm soft\Lib\asyncio\streams.py", line 539, in _wait_for_data
+    await self._waiter
+  File "G:\Pycharm soft\Lib\asyncio\proactor_events.py", line 286, in _loop_reading
+    length = fut.result()
+  File "G:\Pycharm soft\Lib\asyncio\windows_events.py", line 804, in _poll
+    value = callback(transferred, key, ov)
+  File "G:\Pycharm soft\Lib\asyncio\windows_events.py", line 463, in finish_socket_func
+    return ov.getresult()
+           ~~~~~~~~~~~~^^
+OSError: [WinError 121] The semaphore timeout period has expired
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "F:\lunara-bot\src\redis_persistence.py", line 66, in update_bot_data
+    await self.redis.set(key, json.dumps(data))
+  File "F:\lunara-bot\venv\Lib\site-packages\redis\asyncio\client.py", line 677, in execute_command
+    return await conn.retry.call_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "F:\lunara-bot\venv\Lib\site-packages\redis\asyncio\retry.py", line 55, in call_with_retry
+    raise error
+  File "F:\lunara-bot\venv\Lib\site-packages\redis\asyncio\retry.py", line 50, in call_with_retry
+    return await do()
+           ^^^^^^^^^^
+  File "F:\lunara-bot\venv\Lib\site-packages\redis\asyncio\client.py", line 652, in _send_command_parse_response
+    return await self.parse_response(conn, command_name, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\lunara-bot\venv\Lib\site-packages\redis\asyncio\client.py", line 698, in parse_response
+    response = await connection.read_response()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\lunara-bot\venv\Lib\site-packages\redis\asyncio\connection.py", line 613, in read_response
+    raise ConnectionError(f"Error while reading from {host_error} : {e.args}")
+redis.exceptions.ConnectionError: Error while reading from measured-whale-51756.upstash.io:6379 : (22, 'The semaphore timeout period has expired', None, 121, None)
+2025-09-21 09:57:36,299 - urllib3.connectionpool - WARNING - Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ReadTimeoutError("HTTPSConnectionPool(host='api.binance.com', port=443): Read timed out. (read timeout=10)")': /api/v3/klines?interval=15m&limit=1000&startTime=1603986300000&symbol=XRPUSDT
+2025-09-21 09:57:48,391 - urllib3.connectionpool - WARNING - Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x000001FFB4D00A50>: Failed to resolve 'api.binance.com' ([Errno 11001] getaddrinfo failed)")': /api/v3/klines?interval=15m&limit=1000&startTime=1603986300000&symbol=XRPUSDT
+2025-09-21 10:10:38,808 - src.trade_executor - INFO - [ORACLE] Starting sequential Gemini consultation for user 6284071528 on 16 symbols.
+2025-09-21 11:23:33,078 - src.trade_executor - INFO - [ORACLE] Starting sequential Gemini consultation for user 6284071528 on 16 symbols.
+2025-09-21 12:10:39,027 - src.trade_executor - INFO - [ORACLE] Starting sequential Gemini consultation for user 6284071528 on 7 symbols.
+2025-09-21 12:37:04,971 - src.trade_executor - INFO - [ORACLE] Starting sequential Gemini consultation for user 6284071528 on 7 symbols.
+2025-09-21 12:40:09,910 - __main__ - INFO - Beginning graceful shutdown...
+2025-09-21 12:40:11,304 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
+2025-09-21 12:40:11,304 - telegram.ext.Application - CRITICAL - Fetching updates was aborted due to CancelledError(). Suppressing exception to ensure graceful shutdown.
+Traceback (most recent call last):
+  File "G:\Pycharm soft\Lib\asyncio\runners.py", line 194, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "G:\Pycharm soft\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "G:\Pycharm soft\Lib\asyncio\base_events.py", line 708, in run_until_complete
+    self.run_forever()
+    ~~~~~~~~~~~~~~~~^^
+  File "G:\Pycharm soft\Lib\asyncio\base_events.py", line 679, in run_forever
+    self._run_once()
+    ~~~~~~~~~~~~~~^^
+  File "G:\Pycharm soft\Lib\asyncio\base_events.py", line 2027, in _run_once
+    handle._run()
+    ~~~~~~~~~~~^^
+  File "G:\Pycharm soft\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\lunara-bot\src\trade_executor.py", line 49, in run
+    await self._process_user(user_id)
+  File "F:\lunara-bot\src\trade_executor.py", line 69, in _process_user
+    await self._analyze_and_conditionally_buy(user_id, settings)
+  File "F:\lunara-bot\src\trade_executor.py", line 127, in _analyze_and_conditionally_buy
+    decisions = await self._get_batch_gemini_decisions(user_id, symbols_to_evaluate, settings)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\lunara-bot\src\trade_executor.py", line 143, in _get_batch_gemini_decisions
+    analysis_result = await self._analyze_and_prepare(symbol, settings)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\lunara-bot\src\trade_executor.py", line 173, in _analyze_and_prepare
+    return technical_analyzer.analyze_symbol(symbol, klines, settings)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\lunara-bot\src\technical_analyzer.py", line 34, in analyze_symbol
+    df = pd.DataFrame(kline_data, columns=kline_columns)
+  File "F:\lunara-bot\venv\Lib\site-packages\pandas\core\frame.py", line 851, in __init__
+    arrays, columns, index = nested_data_to_arrays(
+                             ~~~~~~~~~~~~~~~~~~~~~^
+        # error: Argument 3 to "nested_data_to_arrays" has incompatible
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        dtype,
+        ^^^^^^
+    )
+    ^
+  File "F:\lunara-bot\venv\Lib\site-packages\pandas\core\internals\construction.py", line 520, in nested_data_to_arrays
+    arrays, columns = to_arrays(data, columns, dtype=dtype)
+                      ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\lunara-bot\venv\Lib\site-packages\pandas\core\internals\construction.py", line 845, in to_arrays
+    content, columns = _finalize_columns_and_data(arr, columns, dtype)
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "F:\lunara-bot\venv\Lib\site-packages\pandas\core\internals\construction.py", line 945, in _finalize_columns_and_data
+    contents = convert_object_array(contents, dtype=dtype)
+  File "F:\lunara-bot\venv\Lib\site-packages\pandas\core\internals\construction.py", line 1071, in convert_object_array
+    arrays = [convert(arr) for arr in content]
+              ~~~~~~~^^^^^
+  File "F:\lunara-bot\venv\Lib\site-packages\pandas\core\internals\construction.py", line 1030, in convert
+    arr = lib.maybe_convert_objects(
+        arr,
+        try_float=coerce_float,
+        convert_to_nullable_dtype=dtype_backend != "numpy",
+    )
+  File "G:\Pycharm soft\Lib\asyncio\runners.py", line 157, in _on_sigint
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "F:\lunara-bot\src\main.py", line 91, in main
+    await asyncio.sleep(10) # Renew lock every 10 seconds
+    ^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\asyncio\tasks.py", line 718, in sleep
+    return await future
+           ^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "F:\lunara-bot\venv\Lib\site-packages\telegram\ext\_application.py", line 673, in stop
+    self.__update_fetcher_task.result()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "F:\lunara-bot\venv\Lib\site-packages\telegram\ext\_application.py", line 1228, in _update_fetcher
+    await self.__update_fetcher()
+  File "F:\lunara-bot\venv\Lib\site-packages\telegram\ext\_application.py", line 1207, in __update_fetcher
+    update = await self.update_queue.get()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\Pycharm soft\Lib\asyncio\queues.py", line 186, in get
+    await getter
+asyncio.exceptions.CancelledError

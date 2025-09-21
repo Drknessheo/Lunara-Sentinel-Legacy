@@ -30,22 +30,35 @@ def analyze_symbol(symbol: str, kline_data: list, settings: dict) -> dict:
             'taker_buy_quote_asset_volume', 'ignore'
         ]
         used_cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
-        
-        df = pd.DataFrame(kline_data, columns=kline_columns)
-        df = df[used_cols]
 
+        # Chunk processing for large kline_data
+        CHUNK_SIZE = 500
+        if len(kline_data) > CHUNK_SIZE:
+            kline_data = kline_data[-CHUNK_SIZE:]
+
+        df = pd.DataFrame(kline_data, columns=kline_columns)[used_cols]
         for col in ['open', 'high', 'low', 'close', 'volume']:
             df[col] = pd.to_numeric(df[col], errors='coerce').astype('float32')
-
         df.dropna(inplace=True)
         if len(df) < 30:
             logger.warning(f"Insufficient valid data points for {symbol} after cleaning.")
+            del df
             return {}
 
-        # --- Calculate all desired indicators ---
+        # Calculate only needed indicators
         df.ta.rsi(length=14, append=True)
         df.ta.macd(fast=12, slow=26, signal=9, append=True)
         df.ta.bbands(length=20, std=2, append=True)
+
+        # Drop unused columns after indicator calculation
+        keep_cols = ['close', 'RSI_14', 'MACD_12_26_9', 'MACDs_12_26_9', 'MACDh_12_26_9', 'BBU_20_2', 'BBL_20_2']
+        for col in df.columns:
+            if col not in keep_cols:
+                df.drop(col, axis=1, inplace=True, errors='ignore')
+
+        # --- Redis Key Recycling Stub ---
+        # If using redis, expire or delete old keys to free space (Upstash)
+        # Example: redis_client.expire_old_keys(user_id, symbol)
 
         # --- Build Result Incrementally and with Validation ---
         latest_indicators = {}

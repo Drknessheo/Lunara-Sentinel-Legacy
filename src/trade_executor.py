@@ -136,19 +136,27 @@ class TradeExecutor:
         if not api_key: return redis_client.cache_gemini_failure(user_id, symbols)
 
         # --- STRATEGIC REFACTOR: Process symbols sequentially to conserve memory ---
+        import random
         batch_analysis = {}
+        MAX_SYMBOLS = 10  # Limit to 10 symbols per batch for memory/network safety
+        symbols = symbols[:MAX_SYMBOLS]
         for symbol in symbols:
-            try:
-                # Process one symbol at a time
-                analysis_result = await self._analyze_and_prepare(symbol, settings)
-                if analysis_result:
-                    batch_analysis[symbol] = analysis_result
-                # A small sleep to prevent hitting API rate limits too aggressively
-                await asyncio.sleep(1) 
-            except Exception as e:
-                logger.error(f"Error during sequential analysis of {symbol}: {e}")
-        
-        if not batch_analysis: return redis_client.cache_gemini_failure(user_id, symbols)
+            for attempt in range(3):
+                try:
+                    # Process one symbol at a time
+                    analysis_result = await self._analyze_and_prepare(symbol, settings)
+                    if analysis_result:
+                        batch_analysis[symbol] = analysis_result
+                    # Sleep to prevent hitting API rate limits too aggressively
+                    await asyncio.sleep(1 + random.uniform(0, 0.5))
+                    break
+                except Exception as e:
+                    logger.error(f"Error during analysis of {symbol} (attempt {attempt+1}/3): {e}")
+                    await asyncio.sleep(2 ** attempt)
+            else:
+                logger.critical(f"Failed to analyze {symbol} after 3 attempts. Skipping.")
+        if not batch_analysis:
+            return redis_client.cache_gemini_failure(user_id, symbols)
 
         prompt = f'''User: {user_id}. Profile: {json.dumps(settings)}. Analyze market data and decide BUY or HOLD for each symbol. Respond in valid JSON.\n\nMarket Data:\n{json.dumps(batch_analysis, indent=2)}'''
 

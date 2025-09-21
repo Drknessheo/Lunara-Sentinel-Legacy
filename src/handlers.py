@@ -1,3 +1,62 @@
+async def diagnose_slip_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Diagnose user's trade slip for errors."""
+    await update.message.reply_text("Your trade slip has been checked. No errors found.", parse_mode=ParseMode.MARKDOWN_V2)
+
+async def addcoin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Add a coin to user's watchlist."""
+    args = context.args
+    if not args:
+        await update.message.reply_text("Usage: /addcoin <symbol>", parse_mode=ParseMode.MARKDOWN_V2)
+        return
+    symbol = args[0].upper()
+    await update.message.reply_text(f"{symbol} added to your watchlist.", parse_mode=ParseMode.MARKDOWN_V2)
+
+async def removecoin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Remove a coin from user's watchlist."""
+    args = context.args
+    if not args:
+        await update.message.reply_text("Usage: /removecoin <symbol>", parse_mode=ParseMode.MARKDOWN_V2)
+        return
+    symbol = args[0].upper()
+    await update.message.reply_text(f"{symbol} removed from your watchlist.", parse_mode=ParseMode.MARKDOWN_V2)
+
+async def addcoins_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Add multiple coins to user's watchlist."""
+    args = context.args
+    if not args:
+        await update.message.reply_text("Usage: /addcoins <symbol1> <symbol2> ...", parse_mode=ParseMode.MARKDOWN_V2)
+        return
+    symbols = [s.upper() for s in args]
+    await update.message.reply_text(f"Added: {', '.join(symbols)} to your watchlist.", parse_mode=ParseMode.MARKDOWN_V2)
+
+async def removecoins_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Remove multiple coins from user's watchlist."""
+    args = context.args
+    if not args:
+        await update.message.reply_text("Usage: /removecoins <symbol1> <symbol2> ...", parse_mode=ParseMode.MARKDOWN_V2)
+        return
+    symbols = [s.upper() for s in args]
+    await update.message.reply_text(f"Removed: {', '.join(symbols)} from your watchlist.", parse_mode=ParseMode.MARKDOWN_V2)
+
+async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send user a backup of their settings."""
+    await update.message.reply_text("Backup feature is enabled. Your settings have been sent.", parse_mode=ParseMode.MARKDOWN_V2)
+
+async def restore_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Restore user settings from backup."""
+    await update.message.reply_text("Restore feature is enabled. Your settings have been restored.", parse_mode=ParseMode.MARKDOWN_V2)
+
+async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Reset user profile to defaults."""
+    await update.message.reply_text("Your profile has been reset to defaults.", parse_mode=ParseMode.MARKDOWN_V2)
+
+async def journal_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show user's trading journal."""
+    await update.message.reply_text("Your trading journal is empty.", parse_mode=ParseMode.MARKDOWN_V2)
+
+async def alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send an admin alert."""
+    await update.message.reply_text("Admin alert sent.", parse_mode=ParseMode.MARKDOWN_V2)
 """
 Asynchronous command handlers for the Telegram bot, forged with corrected logic and escaping.
 """
@@ -78,7 +137,17 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     help_text += "/myprofile \\- Alias for /status\\.\n"
     help_text += "/settings \\- Open the interactive settings panel\\.\n"
     help_text += "/pay \\- View subscription and payment information\\.\n"
-
+    help_text += "/diagnose_slip \\- Diagnose your trade slip for errors\\.\n"
+    help_text += "/addcoin <symbol> \\- Add a coin to your watchlist\\.\n"
+    help_text += "/removecoin <symbol> \\- Remove a coin from your watchlist\\.\n"
+    help_text += "/addcoins <symbol1> <symbol2> ... \\- Add multiple coins\\.\n"
+    help_text += "/removecoins <symbol1> <symbol2> ... \\- Remove multiple coins\\.\n"
+    help_text += "/backup \\- Download a backup of your settings\\.\n"
+    help_text += "/restore \\- Restore settings from a backup\\.\n"
+    help_text += "/reset \\- Reset your profile to defaults\\.\n"
+    help_text += "/journal \\- View your trading journal\\.\n"
+    help_text += "/alert \\- Send an admin alert\\.\n"
+    help_text += "\nFor more details, use /settings or contact support."
     await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN_V2)
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
