@@ -1,3 +1,6 @@
+from telegram import Update
+from telegram.ext import ContextTypes
+from telegram.constants import ParseMode
 async def diagnose_slip_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Diagnose user's trade slip for errors."""
     await update.message.reply_text("Your trade slip has been checked. No errors found.", parse_mode=ParseMode.MARKDOWN_V2)
