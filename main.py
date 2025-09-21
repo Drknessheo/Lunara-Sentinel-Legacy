@@ -9,17 +9,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 
 # Load environment variables
 load_dotenv()
-import psutil
 
 # Use TELEGRAM_BOT_TOKEN for secret key
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 PORT = int(os.getenv("PORT", 8080))
-
-# Log memory usage for performance monitoring
-def log_memory_usage():
-    process = psutil.Process(os.getpid())
-    mem_mb = process.memory_info().rss / (1024 * 1024)
-    logging.info(f"Current memory usage: {mem_mb:.2f} MB")
+WEBHOOK_URL = f"https://lunessasignels.onrender.com/webhook"
 
 # --- Your Existing Bot Handlers (Example) --
 # (You'll need to define these functions based on your bot's logic)
@@ -54,25 +48,14 @@ def main() -> None:
     application.add_handler(CommandHandler("alert", alert_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
-    # Log memory usage before starting
-    log_memory_usage()
-
     # Start the Webhook for Render
     application.run_webhook(
         listen="0.0.0.0",
         port=PORT,
-        url_path=TELEGRAM_TOKEN,
-        webhook_url=f"https://lunessasignels.onrender.com/{TELEGRAM_TOKEN}"
+        url_path="webhook",
+        webhook_url=WEBHOOK_URL
     )
     logging.info(f"Bot is running and listening on port {PORT}...")
-
-    # Periodically log memory usage (every 5 minutes)
-    import threading
-    def periodic_memory_log():
-        while True:
-            log_memory_usage()
-            threading.Event().wait(300)
-    threading.Thread(target=periodic_memory_log, daemon=True).start()
 
 if __name__ == "__main__":
     main()
