@@ -36,7 +36,7 @@ def main() -> None:
         listen="0.0.0.0",
         port=PORT,
         url_path=TELEGRAM_TOKEN,
-        webhook_url=f"https://your-app-name.onrender.com/{TELEGRAM_TOKEN}" # Replace with your Render app URL
+        webhook_url=f"https://lunessasignels.onrender.com/{TELEGRAM_TOKEN}" # Replace with your Render app URL
     )
     logging.info(f"Bot is running and listening on port {PORT}...")
 
