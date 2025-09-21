@@ -22,7 +22,7 @@ def main() -> int:
     load_dotenv()
 
     # Check for essential environment variables
-    required_vars = ["BOT_TOKEN", "REDIS_URL", "ADMIN_USER_ID"]
+    required_vars = ["TELEGRAM_BOT_TOKEN", "REDIS_URL", "ADMIN_USER_ID"]
     missing_vars = [var for var in required_vars if not os.getenv(var)]
 
     if missing_vars:
