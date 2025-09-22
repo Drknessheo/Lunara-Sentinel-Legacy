@@ -1,5 +1,6 @@
 services:
   - type: cron
     name: lunara-cron
+    runtime: python
     schedule: "* * * * *"
     startCommand: "python run_once.py"
