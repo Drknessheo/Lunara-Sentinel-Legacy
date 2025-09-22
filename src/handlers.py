@@ -68,7 +68,9 @@ import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
-from telegram.error import BadRequest
+from telegram.error import BadRequest, Conflict
+import asyncio
+import os
 
 from . import db
 
@@ -133,24 +135,28 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays a list of available commands."""
-    help_text = r"*Your Imperial Command Manual*\n\n"
-    help_text += r"/start \- Initialize your command center\.\n"
-    help_text += r"/help \- Display this command manual\.\n"
-    help_text += r"/status \- View your current settings and open trades\.\n"
-    help_text += r"/myprofile \- Alias for /status\.\n"
-    help_text += r"/settings \- Open the interactive settings panel\.\n"
-    help_text += r"/pay \- View subscription and payment information\.\n"
-    help_text += r"/diagnose_slip \- Diagnose your trade slip for errors\.\n"
-    help_text += r"/addcoin \<symbol\> \- Add a coin to your watchlist\.\n"
-    help_text += r"/removecoin \<symbol\> \- Remove a coin from your watchlist\.\n"
-    help_text += r"/addcoins \<symbol1\> \<symbol2\> \.\.\. \- Add multiple coins\.\n"
-    help_text += r"/removecoins \<symbol1\> \<symbol2\> \.\.\. \- Remove multiple coins\.\n"
-    help_text += r"/backup \- Download a backup of your settings\.\n"
-    help_text += r"/restore \- Restore settings from a backup\.\n"
-    help_text += r"/reset \- Reset your profile to defaults\.\n"
-    help_text += r"/journal \- View your trading journal\.\n"
-    help_text += r"/alert \- Send an admin alert\.\n"
-    help_text += r"\nFor more details, use /settings or contact support\."
+    help_text = r"""
+*Your Imperial Command Manual*
+
+/start \- Initialize your command center\.
+/help \- Display this command manual\.
+/status \- View your current settings and open trades\.
+/myprofile \- Alias for /status\.
+/settings \- Open the interactive settings panel\.
+/pay \- View subscription and payment information\.
+/diagnose\_slip \- Diagnose your trade slip for errors\.
+/addcoin \<symbol\> \- Add a coin to your watchlist\.
+/removecoin \<symbol\> \- Remove a coin from your watchlist\.
+/addcoins \<symbol1\> \<symbol2\> \.\.\. \- Add multiple coins\.
+/removecoins \<symbol1\> \<symbol2\> \.\.\. \- Remove multiple coins\.
+/backup \- Download a backup of your settings\.
+/restore \- Restore settings from a backup\.
+/reset \- Reset your profile to defaults\.
+/journal \- View your trading journal\.
+/alert \- Send an admin alert\.
+
+For more details, use /settings or contact support\.
+"""
     await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN_V2)
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -281,13 +287,33 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.message.reply_html(PAYMENT_MESSAGE)
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if isinstance(context.error, BadRequest) and ("Message is not modified" in str(context.error) or "Query is too old" in str(context.error)):
-        return # Suppress these common, now-handled errors.
+    """Log Errors and handle specific cases like Telegram Conflict."""
+    
+    # Handle the case where another bot instance is running.
+    if isinstance(context.error, Conflict):
+        logger.critical(
+            "TELEGRAM CONFLICT: Another bot instance is running with the same token. "
+            "This instance will now perform a hard shutdown to resolve the conflict."
+        )
+        # This is a hard exit. It's not graceful, but it's necessary to stop the zombie process.
+        os._exit(1)
 
+    # Suppress common, non-critical errors that are already handled.
+    if isinstance(context.error, BadRequest) and (
+        "Message is not modified" in str(context.error) 
+        or "Query is too old" in str(context.error)
+    ):
+        return
+
+    # Log all other exceptions.
     logger.error(f"Exception while handling an update: {context.error}", exc_info=context.error)
 
+    # Optionally, notify the user about the error.
     if isinstance(update, Update) and update.effective_message:
         try:
-            await update.effective_message.reply_text("An internal error occurred\\. The Imperial Guard has been notified\\.", parse_mode=ParseMode.MARKDOWN_V2)
+            await update.effective_message.reply_text(
+                "An internal error occurred\. The Imperial Guard has been notified\.",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
         except Exception as e:
             logger.error(f"Failed to send final error message to user: {e}")

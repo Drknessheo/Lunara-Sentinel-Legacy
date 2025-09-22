@@ -17,6 +17,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from telegram.error import Conflict
 
 # --- Import Core Components ---
 from src import config
@@ -83,8 +84,14 @@ async def main() -> None:
         logger.info("Starting bot polling... The empire is listening.")
         await application.initialize()
         await application.start()
-        await application.updater.start_polling()
         
+        try:
+            await application.updater.start_polling()
+        except Conflict as e:
+            logger.critical(f"TELEGRAM CONFLICT: Another bot instance is already running. This instance will shut down. Details: {e}")
+            # The finally block will handle the cleanup.
+            return
+
         # Keep the master lock renewed
         while True:
             redis_client.renew_master_lock()
@@ -94,7 +101,6 @@ async def main() -> None:
         logger.info("Shutdown signal received.")
     finally:
         logger.info("Beginning graceful shutdown...")
-        redis_client.release_master_lock() # Release the lock on shutdown
         if application.updater and application.updater.running:
             await application.updater.stop()
         if application.running:
@@ -105,6 +111,7 @@ async def main() -> None:
                 await executor_task
             except asyncio.CancelledError:
                 logger.info("TradeExecutor task successfully cancelled.")
+        redis_client.release_master_lock() # Release the lock after stopping everything else
         logger.info("Empire has been laid to rest. Goodbye.")
 
 if __name__ == "__main__":

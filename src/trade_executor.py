@@ -14,8 +14,6 @@ from .core import binance_client, redis_client
 
 logger = logging.getLogger(__name__)
 
-TRADE_MONITOR_INTERVAL_SECONDS = 20
-
 # --- Synchronous Gemini Consultation --- #
 def _run_gemini_consultation_sync(api_key: str, model_name: str, prompt: str) -> dict:
     """Synchronous function to be run in a separate thread."""
@@ -33,11 +31,14 @@ class TradeExecutor:
     """A unified, high-frequency trading executor."""
 
     def __init__(self, bot):
+        from collections import defaultdict
+        import asyncio
         self.bot = bot
         self.user_states = {}
+        self.user_locks = defaultdict(asyncio.Lock)
 
     async def run(self):
-        logger.info(f"[EXECUTOR] Starting TradeExecutor run loop (interval: {TRADE_MONITOR_INTERVAL_SECONDS}s)...")
+        logger.info(f"[EXECUTOR] Starting TradeExecutor run loop (interval: {config.TRADE_MONITOR_INTERVAL_SECONDS}s)...")
         await self._initial_state_sync()
 
         while True:
@@ -50,7 +51,7 @@ class TradeExecutor:
             except Exception as e:
                 logger.error(f"[EXECUTOR] Unhandled error in main run loop: {e}", exc_info=True)
             
-            await asyncio.sleep(TRADE_MONITOR_INTERVAL_SECONDS)
+            await asyncio.sleep(config.TRADE_MONITOR_INTERVAL_SECONDS)
 
     async def _initial_state_sync(self):
         logger.info("[EXECUTOR_INIT] Performing initial state synchronization from DB to Redis...")
@@ -89,7 +90,7 @@ class TradeExecutor:
         if sl > 0 and pnl <= -sl: sell_reason = f"🛡️ Stop-loss of {sl}% triggered."
 
         if not sell_reason:
-            sell_reason = self._evaluate_trailing_stop(trade, settings, current_price, pnl)
+            sell_reason = await self._evaluate_trailing_stop(trade, settings, current_price, pnl)
 
         if not sell_reason:
             pt = float(settings.get('profit_target', 0))
@@ -98,19 +99,21 @@ class TradeExecutor:
         if sell_reason:
             await self._sell_trade(trade, current_price, sell_reason)
 
-    def _evaluate_trailing_stop(self, trade: dict, settings: dict, price: float, pnl: float) -> str | None:
+    async def _evaluate_trailing_stop(self, trade: dict, settings: dict, price: float, pnl: float) -> str | None:
         uid, sym = trade["user_id"], trade["symbol"]
-        state = self.user_states.setdefault(uid, {}).setdefault(sym, {"armed": False, "peak": 0})
-        act, drop = float(settings.get('trailing_activation', 0)), float(settings.get('trailing_drop', 0))
+        
+        async with self.user_locks[uid]:
+            state = self.user_states.setdefault(uid, {}).setdefault(sym, {"armed": False, "peak": 0})
+            act, drop = float(settings.get('trailing_activation', 0)), float(settings.get('trailing_drop', 0))
 
-        if not (act > 0 and drop > 0): return None
-        if not state["armed"] and pnl >= act: state["armed"], state["peak"] = True, price
+            if not (act > 0 and drop > 0): return None
+            if not state["armed"] and pnl >= act: state["armed"], state["peak"] = True, price
 
-        if state["armed"]:
-            if price > state["peak"]: state["peak"] = price
-            if ((state["peak"] - price) / state["peak"]) * 100 >= drop:
-                return f"🐉 Dragon strike! Profit of {pnl:.2f}% locked in."
-        return None
+            if state["armed"]:
+                if price > state["peak"]: state["peak"] = price
+                if ((state["peak"] - price) / state["peak"]) * 100 >= drop:
+                    return f"🐉 Dragon strike! Profit of {pnl:.2f}% locked in."
+            return None
 
     async def _analyze_and_conditionally_buy(self, user_id: int, settings: dict):
         if redis_client.is_gemini_cooldown_active(user_id): return
