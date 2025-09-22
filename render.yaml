@@ -1,5 +1,5 @@
 services:
-  - type: worker
-    name: lunara-bot
-    env: python
-    startCommand: python -m src.main
+  - type: cron
+    name: lunara-cron
+    schedule: "* * * * *"
+    startCommand: "python blueprint/lunessasignels/lunara-bot/run_once.py"
