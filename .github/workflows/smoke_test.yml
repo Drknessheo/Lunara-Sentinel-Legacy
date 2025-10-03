@@ -1,0 +1,100 @@
+name: Smoke test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 2s --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Wait for Redis
+        run: |
+          for i in `seq 1 10`; do
+            if nc -z 127.0.0.1 6379; then
+              echo redis up && break
+            fi
+            sleep 1
+          done
+
+
+      - name: Start mock server (success mode)
+        env:
+          MODE: success
+          PORT: 8081
+          SECRET: ${{ secrets.SMOKE_WEBHOOK_SECRET }}
+        run: |
+          nohup python -m tests.mock_server > /tmp/mock_server.log 2>&1 &
+          echo $! > /tmp/mock_server.pid
+
+      - name: Wait for mock server health
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8081/health > /dev/null; then
+              echo "Mock server is up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "Mock server failed to start"; cat /tmp/mock_server.log; exit 1
+
+      - name: Run smoke test
+        run: |
+          # Run the smoke test against the mock server
+          python scripts/smoke_test.py --base-url http://127.0.0.1:8081 --webhook-url http://127.0.0.1:8081/webhook --webhook-secret "${{ secrets.SMOKE_WEBHOOK_SECRET }}"
+
+      - name: Run retry integration test
+        env:
+          REDIS_URL: "redis://127.0.0.1:6379"
+        run: |
+          python -m pip install pytest
+          pytest -q tests/test_retry.py
+
+      - name: Run full test suite
+        env:
+          REDIS_URL: "redis://127.0.0.1:6379"
+        run: |
+          python -m pip install pytest
+          pytest -q tests/
+
+      - name: Upload mock server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mock-server-log
+          path: /tmp/mock_server.log
+
+      - name: Tear down mock server
+        if: always()
+        run: |
+          if [ -f /tmp/mock_server.pid ]; then kill $(cat /tmp/mock_server.pid) || true; fi
+          pkill -f "tests.mock_server" || pkill -f mock_server.py || true

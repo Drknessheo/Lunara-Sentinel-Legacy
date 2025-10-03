@@ -72,6 +72,9 @@ from modules import db_access as db
 from memory import log_trade_outcome
 import statistics
 import gemini_cacher
+import redis
+import json
+import config as _config
 
 # --- Market Crash/Big Buyer Shield ---
 # Now imported from risk_management.py
@@ -982,6 +985,15 @@ async def run_monitoring_cycle(context: ContextTypes.DEFAULT_TYPE, open_trades, 
         mode = trade['mode'] if 'mode' in trade.keys() else None
         user_id = trade['user_id'] if 'user_id' in trade.keys() else None
         symbol = trade['coin_symbol'] if 'coin_symbol' in trade.keys() else None
+        # Normalize symbol casing coming from DB; many imports mix case (bnbusdt vs BNBUSDT)
+        if symbol:
+            try:
+                symbol_upper = symbol.upper()
+            except Exception:
+                symbol_upper = symbol
+        else:
+            symbol_upper = symbol
+        symbol = symbol_upper
         if not symbol or symbol not in prices:
             continue
 
@@ -995,12 +1007,58 @@ async def run_monitoring_cycle(context: ContextTypes.DEFAULT_TYPE, open_trades, 
             settings = db.get_user_effective_settings(None)
 
         # Validate trade object for required keys
-        if 'quantity' not in trade or trade['quantity'] is None:
+        # Treat missing or non-positive quantities as invalid and record them for diagnostics
+        bad_quantity = False
+        try:
+            q = trade.get('quantity') if hasattr(trade, 'get') else trade['quantity']
+        except Exception:
+            q = None
+
+        if q is None or (isinstance(q, (int, float)) and q <= 0):
+            bad_quantity = True
+
+        if bad_quantity:
             try:
                 trade_id = trade['id']
-            except KeyError:
+            except Exception:
                 trade_id = 'unknown'
-            logger.error(f"[user_id={user_id}][trade_id={trade_id}] Missing quantity in trade: {trade}")
+            # Build a slim, JSON-serializable dict for logging
+            try:
+                trade_repr = dict(trade)
+            except Exception:
+                # sqlite3.Row sometimes doesn't convert directly
+                trade_repr = {k: trade[k] for k in trade.keys()} if hasattr(trade, 'keys') else str(trade)
+
+            logger.error(f"[user_id={user_id}][trade_id={trade_id}][symbol={symbol}] Missing/invalid quantity in trade: {trade_repr}")
+
+            # Push diagnostic entry to Redis (non-fatal)
+            try:
+                if getattr(_config, 'REDIS_URL', None):
+                    rc = redis.from_url(_config.REDIS_URL, decode_responses=True)
+                    rc.lpush('trade_issues', json.dumps({
+                        'trade_id': trade_id,
+                        'user_id': user_id,
+                        'symbol': symbol,
+                        'quantity': q,
+                        'row': trade_repr,
+                        'ts': int(time.time())
+                    }))
+                    # Keep list reasonably sized
+                    rc.ltrim('trade_issues', 0, 999)
+            except Exception as e:
+                logger.debug(f"Failed to record trade issue to Redis: {e}")
+
+            # Optionally notify admin (opt-in via config flag)
+            try:
+                if getattr(_config, 'NOTIFY_ADMIN_ON_TRADE_ISSUE', False) and getattr(_config, 'ADMIN_USER_ID', None):
+                    admin_id = _config.ADMIN_USER_ID
+                    # context is available in this function; send a short alert
+                    await context.bot.send_message(chat_id=admin_id, text=f"Detected invalid trade qty for user {user_id}, trade {trade_id}, symbol {symbol}. See trade_issues list.")
+            except Exception:
+                # Never escalate on notification failure
+                pass
+
+            # Skip this trade during monitoring to avoid runtime errors
             continue
 
         # Notional guard before any sell/close logic

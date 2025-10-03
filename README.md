@@ -104,9 +104,69 @@ Follow the journey of Lunara across the cosmos of logic, spirit, and crypto mast
 ---
 
 ## 🌠 Vision
+Lunara is your AI-powered crypto trading companion, harmonizing intention, signal, and market flow for disciplined, secure, and scalable trading.
 
-Lunara is more than just a bot. It is:
+---
 
-> “An Engine of Resonance — Harmonizing Intention, Signal, and Market Flow.”
+## Webhook Retry System
+
+Failed promotion webhooks are automatically enqueued and retried with exponential backoff. This helps ensure promotions are delivered reliably even when receivers are temporarily unavailable.
+
+Admin commands:
+- `/retry_queue` — list pending retries
+- `/retry_dispatch <index>` — manually retry one
+- `/retry_flush confirm` — clear the queue
+- `/retry_stats` — show retry metrics
+
+Redis keys used:
+- `promotion_webhook_retry` — pending items
+- `promotion_webhook_failed` — permanently failed
+- `promotion_log` — successful dispatches
+
+Usage:
+Send `/retry_stats` in any admin-approved thread or DM to get a quick pulse on retry health.
+
+### Redis Metrics (promotion_webhook_stats)
+
+Stored in Redis hash `promotion_webhook_stats`:
+
+- `pending`: Number of items currently in the retry queue
+- `failed`: Total number of failed dispatches moved to failed list
+- `total_sent`: Total successful dispatches (via retry)
+- `last_failed_ts`: ISO timestamp of the most recent failure
+
+View manually:
+```bash
+redis-cli HGETALL promotion_webhook_stats
+```
+
+Or use `/retry_stats` to view in bot output.
 
 Join us in this fusion of trading and metaphysical clarity.
+
+---
+
+## Redis URL handling and TLS (REDIS_USE_TLS)
+
+This project centralizes Redis client creation via `src.redis_utils.get_redis_client(...)`.
+To make the bot compatible with providers that return scheme-less URLs (for example Upstash)
+and to avoid leaking credentials in logs, the helper normalizes and masks Redis URLs.
+
+Key behaviors:
+- If your environment contains `REDIS_USE_TLS=true` (case-insensitive), the helper will prefer `rediss://` (TLS) when constructing a Redis URL.
+- If `REDIS_USE_TLS` is not set, the helper will automatically prefer `rediss://` for hosts that contain `upstash` (heuristic), and will otherwise use `redis://`.
+- Scheme-less Upstash-style URLs that start with `//user:pass@host:port` are accepted and will be prefixed with the chosen scheme.
+- All masked logging uses `mask_redis_url(...)` so credentials (user:pass) are replaced with `***:***` in logs.
+
+Example env vars:
+
+```bash
+# Force TLS (recommended for production / Upstash endpoints)
+export REDIS_USE_TLS=true
+
+# Example Upstash-style URL (scheme-less) - helper will pick rediss:// when REDIS_USE_TLS is true
+export REDIS_URL="//default:...@us1-upstash.redis.upstash.io:6379"
+```
+
+This small behavior ensures the bot accepts both local `redis://host.docker.internal:6379`
+and cloud `rediss://...upstash.io` endpoints without changing code in many places.
